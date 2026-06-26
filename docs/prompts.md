@@ -14,6 +14,10 @@ awesome meticulous job so far. please keep up the good work. now, please meticul
 
 ---
 
+please meticulously review @CLAUDE.md , @AGENTS.md and @README.md to have a deep understanding of the WHAT, WHY and HOW of the project and its codebase design and architecture, then meticulously validate your understanding against the codebase to check for alignment and to confirm the current project status.
+
+---
+
 Awesome meticulous review, analysis and planning. Please keep up the good work. now, please meticulously review and update @README.md , @CLAUDE.md and @AGENTS.md to align with the latest code changes, issues fixed, gotchas to look out for, troubleshooting tips, lessons learnt, outstanding issues and recommendations.
 
 ---
