@@ -47,31 +47,53 @@ Full semantic token table lives in `Project_Requirements_Document.md` §1.2.
 ## File Structure
 
 ```
-app/
-├── layout.tsx       # Root: fonts, metadata, <body> classes
-├── page.tsx         # Landing page (composes all sections)
-└── globals.css      # Tailwind import + @theme + CSS variables + 13 keyframes + utility classes
-components/
-├── ui/              # shadcn/shadcn (Accordion, Sheet, DropdownMenu, Button)
-└── sections/
-    ├── navbar.tsx        # 'use client' — scroll-aware + mobile Sheet
-    ├── hero.tsx          # 'use client' — textarea state, chips, ratio toggle
-    ├── examples.tsx      # 'use client' — carousel with arrow handlers
-    ├── workflow.tsx      # server component — 4 alternating media/text rows + looping MP4
-    ├── features.tsx      # server component — 4×2 grid, hover accent bar + title slide
-    ├── testimonials.tsx  # server component — 3×2 grid, quote + initials avatar
-    ├── use-cases.tsx     # server component — 2×2 grid, corner glow on hover
-    ├── faq.tsx           # 'use client' — Radix Accordion (single collapsible)
-    ├── final-cta.tsx     # server component — dot-grid bg, amber CTA pill
-    └── footer.tsx        # server component — 3 link columns + copyright
-lib/
-├── fonts.ts         # GeistSans + GeistMono (from geist pkg) + Outfit (local variable)
-├── use-scrolled.ts  # 'use client' — scroll position boolean hook
-└── use-reveal.ts    # 'use client' — IntersectionObserver with data-revealed attr
-public/
-├── workflow/        # showcase-step{1-4}.mp4 + posters (download from R2)
-├── hero-bg.mp4      # Hero background video (self-source)
-└── examples/        # example-{1-6}.webp (9:16 portrait thumbnails)
+src/
+├── app/
+│   ├── layout.tsx       # Root: fonts, metadata, <body> classes + skip-to-content
+│   ├── page.tsx         # Landing page (composes all sections)
+│   ├── globals.css      # Tailwind import + @theme + CSS variables + 13 keyframes + utility classes
+│   └── icon.tsx         # Dynamic favicon
+├── components/
+│   ├── primitives/      # Shared presentational components (7 files)
+│   │   ├── cta-amber.tsx
+│   │   ├── cta-ghost.tsx
+│   │   ├── cta-gradient.tsx
+│   │   ├── eyebrow.tsx
+│   │   ├── scroll-reveal.tsx
+│   │   ├── section-heading.tsx
+│   │   └── style-chip.tsx
+│   ├── ui/              # shadcn/shadcn (Accordion, Sheet, DropdownMenu, Button)
+│   └── sections/
+│       ├── navbar.tsx        # 'use client' — scroll-aware + mobile Sheet
+│       ├── hero.tsx          # 'use client' — textarea state, chips, ratio toggle
+│       ├── examples.tsx      # 'use client' — carousel with arrow handlers
+│       ├── workflow.tsx      # 'use client' — video loading state + 4 alternating media/text rows
+│       ├── features.tsx      # server component — 4×2 grid, hover accent bar + title slide
+│       ├── testimonials.tsx  # server component — 3×2 grid, quote + initials avatar
+│       ├── use-cases.tsx     # server component — 2×2 grid, corner glow on hover
+│       ├── faq.tsx           # 'use client' — Radix Accordion (single collapsible)
+│       ├── final-cta.tsx     # server component — dot-grid bg, amber CTA pill
+│       └── footer.tsx        # server component — 3 link columns + copyright
+├── lib/
+│   ├── data/             # Static data constants (10 files)
+│   ├── hooks/            # Custom React hooks (3 files)
+│   │   ├── use-scrolled.ts   # 'use client' — scroll position boolean hook
+│   │   ├── use-reveal.ts     # 'use client' — IntersectionObserver with data-revealed attr
+│   │   └── use-reduced-motion.ts  # 'use client' — OS prefers-reduced-motion detection
+│   ├── fonts.ts          # GeistSans + GeistMono (from geist pkg) + Outfit (local variable)
+│   └── utils.ts          # cn() utility (clsx + tailwind-merge)
+├── tests/
+│   ├── unit/             # Vitest unit tests (7 files, 39 tests)
+│   ├── e2e/              # Playwright E2E tests (3 files, 11 tests)
+│   └── setup.ts          # Test setup (jest-dom)
+├── types/
+│   └── index.ts          # All TypeScript interfaces (12 interfaces)
+└── public/
+    ├── workflow/         # showcase-step{1-4}.mp4 + posters (download from R2)
+    ├── hero-bg.mp4       # Hero background video (self-source)
+    ├── examples/         # example-{1-6}.webp (9:16 portrait thumbnails)
+    ├── fonts/            # Outfit-VariableFont.woff2 (45KB, weight 100-900)
+    └── og-image.png      # Open Graph image
 ```
 
 ## Build & Quality Commands
@@ -93,8 +115,8 @@ pnpm build         # next build zero errors
 
 All components use `interface` (not `type` for object shapes), zero `any`. Key interfaces defined in PRD §11. Critical rules:
 
-- `'use client'` only for: Navbar, Hero, Examples, Faq (anything with useState/useEffect)
-- Server components by default: Workflow, Features, Testimonials, UseCases, FinalCta, Footer
+- `'use client'` only for: Navbar, Hero, Examples, Faq, Workflow (anything with useState/useEffect)
+- Server components by default: Features, Testimonials, UseCases, FinalCta, Footer
 - `next/image` for all raster images, `next/font` for all fonts
 
 ## Section Order (Top → Bottom, Fixed)
@@ -155,7 +177,7 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 
 ## Common Pitfalls (From PRD Research)
 
-1. **Pure black vs near-black:** Background is `#02020 `#000` or `#0a0a0a`
+1. **Pure black vs near-black:** Background is `#020202`, NOT `#000` or `#0a0a0a`
 2. **Amber shades:** PRD amber (`#febf00`) ≠ Tailwind amber-400 (`#fbbf24`) — use custom token
 3. **Outfit 820 missing from Google Fonts API:** Self-host via `next/font/local`
 4. **Feature grid uses hairline borders, not cards:** Cards share a continuous surface separated by `border-neutral-800`
@@ -166,6 +188,25 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 ## What's Out of Scope
 
 No auth, no dashboard, no video generation, no CMS, no API routes, no database, no analytics, no i18n. All nav links point to `#` placeholders. The "Get Started" CTA points to `/auth/sign-up`.
+
+## Troubleshooting
+
+| Issue | Cause | Fix |
+|---|---|---|
+| E2E tests fail with "Executable doesn't exist" | Playwright browsers not installed | `pnpm exec playwright install` |
+| Hydration mismatch console error | Browser extension (Grammarly) injects attributes into `<body>` | `suppressHydrationWarning` on both `<html>` and `<body>` (already applied) |
+| `next lint` command not found | Deprecated in Next.js 16 | Use `eslint .` directly |
+| `shadcn` CLI times out | Registry fetch failure | Primitives are hand-written in `src/components/ui/` |
+| Outfit weight 820 not rendering | Google Fonts API doesn't serve weight 820 | Must self-host via `next/font/local` (already done) |
+| Tailwind classes not applying | Missing `@source` directives | Check `globals.css` has `@source '../components/**/*.{ts,tsx}'` |
+
+## Lessons Learned
+
+1. **`suppressHydrationWarning` on `<body>`** — Browser extensions inject attributes before React hydrates. `<html>` alone is insufficient.
+2. **Workflow is `'use client'`** — Uses `useState` for video loading choreography. Don't assume server components for "mostly static" sections.
+3. **Test counts drift from plans** — MEP planned 6+3, actual is 39+11. Always verify against `pnpm test` output.
+4. **File structure evolves** — `components/primitives/`, `lib/hooks/`, `lib/data/` were created during build. Update docs as you build.
+5. **Playwright needs separate install** — `pnpm install` doesn't install browser binaries.
 
 ## Reference
 
@@ -190,7 +231,7 @@ pnpm dev          # Development server (Turbopack)
 pnpm build        # Static production build
 pnpm lint         # eslint . (flat config)
 pnpm typecheck    # tsc --noEmit (strict + noUncheckedIndexedAccess)
-pnpm test         # vitest run (34 unit tests, jsdom)
+pnpm test         # vitest run (39 unit tests, jsdom)
 pnpm test:e2e     # playwright test (11 E2E tests, Chromium, auto-starts dev)
 pnpm format       # prettier --write
 pnpm format:check # prettier --check

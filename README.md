@@ -50,10 +50,10 @@ pnpm typecheck
 # Lint — must pass with zero warnings
 pnpm lint
 
-# Unit tests (Vitest) — 34 tests across 6 files
+# Unit tests (Vitest) — 39 tests across 7 files
 pnpm test
 
-# E2E tests (Playwright) — 11 tests, auto-starts dev server
+# E2E tests (Playwright) — 11 tests, auto-starts dev server (requires `pnpm exec playwright install` first)
 pnpm test:e2e
 
 # Format check — all files use Prettier code style
@@ -85,12 +85,12 @@ pnpm format:check # Prettier --check (verify only)
 
 ## Architecture
 
-This is a single-page static landing page. All 10 sections are composed in `app/page.tsx`. Five components are client-side (interactivity), five are server components (static HTML).
+This is a single-page static landing page. All 10 sections are composed in `src/app/page.tsx`. Five components are client-side (interactivity), five are server components (static HTML).
 
 ```mermaid
 flowchart TB
-    Layout["app/layout.tsx<br/>Fonts · Metadata · Body classes"]
-    Page["app/page.tsx<br/>Composes all sections"]
+    Layout["src/app/layout.tsx<br/>Fonts · Metadata · Body classes"]
+    Page["src/app/page.tsx<br/>Composes all sections"]
 
     Layout --> Page
 
@@ -100,7 +100,6 @@ flowchart TB
         Features["features.tsx"]
         Testimonials["testimonials.tsx"]
         UseCases["use-cases.tsx"]
-        Workflow["workflow.tsx"]
     end
 
     subgraph Client Components (interactive)
@@ -108,6 +107,7 @@ flowchart TB
         Hero["hero.tsx<br/>textarea + chips"]
         Examples["examples.tsx<br/>carousel arrows"]
         Faq["faq.tsx<br/>Radix Accordion"]
+        Workflow["workflow.tsx<br/>video loading state"]
     end
 ```
 
@@ -119,7 +119,8 @@ flowchart TB
 | Hero | `'use client'` | Textarea, chip click, ratio toggle |
 | Examples | `'use client'` | Carousel arrow click handlers |
 | Faq | `'use client'` | Radix Accordion (stateful) |
-| Workflow, Features, Testimonials, UseCases, FinalCTA, Footer | Server | Pure static HTML/CSS |
+| Workflow | `'use client'` | `useState` for poster→video fade-in choreography |
+| Features, Testimonials, UseCases, FinalCTA, Footer | Server | Pure static HTML/CSS |
 
 ### Section Order (Fixed)
 
@@ -146,7 +147,8 @@ Navbar (fixed)
 | `--primary` | `#febf00` | CTAs, active states, focus rings (NOT Tailwind amber-400) |
 | `--card` | `#060607` | Card surfaces |
 | `--muted-foreground` | `#8e8e95` | Secondary text |
-| `--foreground` | `#f8f8f8` | Body text |
+| `--foreground` | `#f8f8f8` | Default foreground text |
+| Body text | `#d4d4d8` | Paragraph/body text (zinc-300, used via Tailwind utility) |
 
 ### Typography
 
@@ -193,30 +195,53 @@ Scroll-reveal uses `IntersectionObserver` + a `data-revealed` attribute pattern.
 ## Project Structure
 
 ```
-� app/
-  � layout.tsx          # Root: fonts, metadata, <body> classes
-  � page.tsx            # Landing page (composes all sections)
-  📄 globals.css         # @theme + CSS variables + 13 keyframes + utilities
-📂 components/
-  📂 ui/                 # shadcn/ui primitives (Accordion, Sheet, DropdownMenu, Button)
-  📂 sections/
-    � navbar.tsx       # Client — scroll-aware + mobile Sheet
-    📄 hero.tsx         # Client — textarea state, chips, ratio toggle
-    📄 examples.tsx     # Client — carousel with arrow handlers
-    📄 workflow.tsx     # Server — 4 alternating media/text rows
-    📄 features.tsx     # Server — 4×2 grid, hover accent bar
-    📄 testimonials.tsx # Server — 3×2 grid, initials avatars
-    📄 use-cases.tsx    # Server — 2×2 grid, corner glow
-    � faq.tsx          # Client — Radix Accordion
-    📄 final-cta.tsx    # Server — dot-grid bg, amber pill
-    � footer.tsx       # Server — 3 link columns
-📂 lib/
-  📄 fonts.ts           # GeistSans + GeistMono + Outfit (self-hosted)
-  📄 use-scrolled.ts    # Scroll position boolean hook
-  📄 use-reveal.ts      # IntersectionObserver reveal hook
-📂 public/
-  📂 workflow/          # Demo videos + posters (self-hosted)
-  📂 examples/          # Card thumbnails (9:16 portrait)
+src/
+├── app/
+│   ├── layout.tsx          # Root: fonts, metadata, <body> classes + skip-to-content
+│   ├── page.tsx            # Landing page (composes all 10 sections)
+│   ├── globals.css         # @theme + CSS variables + 13 keyframes + utilities
+│   └── icon.tsx            # Dynamic favicon
+├── components/
+│   ├── primitives/         # Shared presentational components (7 files)
+│   │   ├── cta-amber.tsx
+│   │   ├── cta-ghost.tsx
+│   │   ├── cta-gradient.tsx
+│   │   ├── eyebrow.tsx
+│   │   ├── scroll-reveal.tsx
+│   │   ├── section-heading.tsx
+│   │   └── style-chip.tsx
+│   ├── ui/                 # shadcn/ui primitives (Accordion, Sheet, DropdownMenu, Button)
+│   └── sections/
+│       ├── navbar.tsx       # Client — scroll-aware + mobile Sheet
+│       ├── hero.tsx         # Client — textarea state, chips, ratio toggle
+│       ├── examples.tsx     # Client — carousel with arrow handlers
+│       ├── workflow.tsx     # Client — video loading state, 4 alternating rows
+│       ├── features.tsx     # Server — 4×2 grid, hover accent bar
+│       ├── testimonials.tsx # Server — 3×2 grid, initials avatars
+│       ├── use-cases.tsx    # Server — 2×2 grid, corner glow
+│       ├── faq.tsx          # Client — Radix Accordion
+│       ├── final-cta.tsx    # Server — dot-grid bg, amber pill
+│       └── footer.tsx       # Server — 3 link columns
+├── lib/
+│   ├── data/               # Static data constants (10 files)
+│   ├── hooks/              # Custom React hooks (3 files)
+│   │   ├── use-scrolled.ts
+│   │   ├── use-reveal.ts
+│   │   └── use-reduced-motion.ts
+│   ├── fonts.ts            # GeistSans + GeistMono + Outfit (self-hosted)
+│   └── utils.ts            # cn() utility (clsx + tailwind-merge)
+├── tests/
+│   ├── unit/               # Vitest unit tests (7 files, 39 tests)
+│   ├── e2e/                # Playwright E2E tests (3 files, 11 tests)
+│   └── setup.ts            # Test setup (jest-dom)
+├── types/
+│   └── index.ts            # All TypeScript interfaces (12 interfaces)
+└── public/
+    ├── workflow/           # Demo videos + posters (self-hosted)
+    ├── examples/           # Card thumbnails (9:16 portrait)
+    ├── fonts/              # Outfit variable font (45KB woff2)
+    ├── hero-bg.mp4         # Hero background video
+    └── og-image.png        # Open Graph image
 ```
 
 ## Asset Requirements
@@ -263,7 +288,7 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 
 ### Unit Tests (Vitest)
 
-34 tests across 6 files, all GREEN:
+39 tests across 7 files, all GREEN:
 
 | Test file | Tests | What it covers |
 |---|---|---|
@@ -273,6 +298,7 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 | `use-reduced-motion.test.ts` | 4 | matchMedia integration, change event handling |
 | `hero-chip-populate.test.tsx` | 5 | Chip → textarea seed population for all 4 chips + replace behavior |
 | `hero-ratio-toggle.test.tsx` | 3 | Ratio toggle single-selection enforcement (9:16 ↔ 16:9) |
+| `layout-hydration.test.tsx` | 5 | `suppressHydrationWarning` on `<body>`, skip-to-content, JSON-LD, children rendering |
 
 ### E2E Tests (Playwright)
 
@@ -306,12 +332,40 @@ The canonical spec is `Project_Requirements_Document.md` (v2.0, 2718 lines). The
 
 - **PostCSS moderate vulnerability** (GHSA-qx2v-qp2m-jg93): 1 moderate vuln in `postcss <8.5.10` (transitive via `next`). Not exploitable in this static page (no user-supplied CSS processing). Will resolve when Next.js updates its lockfile. `pnpm audit --audit-level=high` passes clean.
 
+### Troubleshooting
+
+| Issue | Cause | Fix |
+|---|---|---|
+| E2E tests fail with "Executable doesn't exist" | Playwright browsers not installed | Run `pnpm exec playwright install` |
+| Hydration mismatch console error | Browser extension (Grammarly) injects attributes into `<body>` | Already fixed: `suppressHydrationWarning` on both `<html>` and `<body>` |
+| `next lint` command not found | Deprecated in Next.js 16 | Use `eslint .` directly |
+| `shadcn` CLI times out | Registry fetch failure | Primitives are hand-written in `src/components/ui/` |
+| Outfit weight 820 not rendering | Google Fonts API doesn't serve weight 820 | Must self-host via `next/font/local` (already done) |
+| Tailwind classes not applying | Missing `@source` directives | Check `globals.css` has `@source '../components/**/*.{ts,tsx}'` |
+
+### Lessons Learned
+
+1. **`suppressHydrationWarning` belongs on `<body>`, not just `<html>`** — Browser extensions like Grammarly inject attributes into `<body>` before React hydrates. The `<html>` element already had the prop, but `<body>` didn't, causing the mismatch.
+2. **Workflow component needs `'use client'`** — Uses `useState` for poster→video fade-in choreography. Server components cannot use React state.
+3. **Test counts drift from plans** — The MEP planned 6 unit + 3 E2E tests; actual implementation expanded to 39 unit + 11 E2E. Always verify counts against actual `pnpm test` output, not documentation.
+4. **File structure evolves during implementation** — The `components/primitives/` directory, `lib/hooks/` and `lib/data/` subdirectories were created during build but not reflected in initial docs. Update docs as you build.
+5. **Playwright requires browser binary installation** — `pnpm install` doesn't install browser binaries. Must run `pnpm exec playwright install` separately.
+
+### Recommendations
+
+1. **Run `pnpm exec playwright install` after fresh clone** — Required for E2E tests to work.
+2. **Add pre-commit hooks** — Consider adding `husky` + `lint-staged` to enforce `pnpm lint && pnpm typecheck && pnpm test` before commits.
+3. **Monitor PostCSS vulnerability** — Track when Next.js updates its lockfile to resolve the transitive `postcss <8.5.10` vuln.
+4. **Visual regression testing** — Consider adding Playwright screenshot comparison against the live site for pixel-perfect verification.
+5. **Bundle size monitoring** — Add `next/bundle-analyzer` to track JS/CSS bundle sizes against the <100KB JS / <30KB CSS budget.
+
 ### Document Hierarchy
 
 | Document | Role |
 |---|---|
 | `Project_Requirements_Document.md` | Canonical spec (v2.0, 2718 lines, field-verified) |
 | `MASTER_EXECUTION_PLAN.md` | Execution record (8 phases, 15 decisions, 20 risks) |
+| `CLAUDE.md` | Agent briefing document (stack, conventions, pitfalls, anti-patterns) |
 | `AGENTS.md` | Compact agent instructions |
 | `README.md` | This file — quick start + build state |
 | `PRD_2.md`, `draft_PRD.md` | Historical drafts (do not reference during implementation) |
@@ -323,7 +377,7 @@ This is a clone project with a fixed spec. Changes should reference the canonica
 
 1. `pnpm lint` — zero warnings
 2. `pnpm typecheck` — zero errors
-3. `pnpm test` — 34 unit tests pass
+3. `pnpm test` — 39 unit tests pass
 4. `pnpm test:e2e` — 11 E2E tests pass
 5. `pnpm format:check` — all files use Prettier code style
 6. `pnpm build` — zero errors
