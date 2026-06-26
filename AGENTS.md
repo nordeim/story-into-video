@@ -199,6 +199,7 @@ No auth, no dashboard, no video generation, no CMS, no API routes, no database, 
 | `shadcn` CLI times out | Registry fetch failure | Primitives are hand-written in `src/components/ui/` |
 | Outfit weight 820 not rendering | Google Fonts API doesn't serve weight 820 | Must self-host via `next/font/local` (already done) |
 | Tailwind classes not applying | Missing `@source` directives | Check `globals.css` has `@source '../components/**/*.{ts,tsx}'` |
+| Cross-origin dev resource blocked | Next.js blocks `/_next/webpack-hmr` from non-localhost origins | Add origin to `allowedDevOrigins` in `next.config.ts` and restart dev server |
 
 ## Lessons Learned
 

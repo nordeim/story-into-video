@@ -342,6 +342,7 @@ The canonical spec is `Project_Requirements_Document.md` (v2.0, 2718 lines). The
 | `shadcn` CLI times out | Registry fetch failure | Primitives are hand-written in `src/components/ui/` |
 | Outfit weight 820 not rendering | Google Fonts API doesn't serve weight 820 | Must self-host via `next/font/local` (already done) |
 | Tailwind classes not applying | Missing `@source` directives | Check `globals.css` has `@source '../components/**/*.{ts,tsx}'` |
+| Cross-origin dev resource blocked | Next.js blocks `/_next/webpack-hmr` from non-localhost origins (e.g. Cloudflare Tunnel, LAN IP) | Add the origin to `allowedDevOrigins` in `next.config.ts` and restart the dev server |
 
 ### Lessons Learned
 
