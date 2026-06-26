@@ -169,4 +169,36 @@ No auth, no dashboard, no video generation, no CMS, no API routes, no database, 
 
 ## Reference
 
-The canonical spec is `Project_Requirements_Document.md` (v2.0, 2719 lines). Every color, pixel, keyframe, and interaction is field-verified from the live production DOM.
+The canonical spec is `Project_Requirements_Document.md` (v2.0, 2718 lines). Every color, pixel, keyframe, and interaction is field-verified from the live production DOM. The execution record is `MASTER_EXECUTION_PLAN.md` (8 phases, 15 critical pre-build decisions, 20-item risk register).
+
+## Implementation Deviations (Post-Build)
+
+The following deviations from the PRD were made during implementation. All are documented in `MASTER_EXECUTION_PLAN.md` §3 (Critical Pre-Build Decisions):
+
+1. **`src/` directory convention** — app code lives in `src/` (per `nextjs16-tailwind4` skill), not at repo root as shown in PRD §6.1.
+2. **Tailwind v4 `@theme` block** — all design tokens in `src/app/globals.css` `@theme { … }`. No `tailwind.config.ts` file. Aligns with PRD §8.2 future direction.
+3. **Kebab-case keyframes** — all 13 `@keyframes` normalized to kebab-case (`grid-shimmer`, not `gridShimmer`). PRD §9 camelCase and PRD §8.1 kebab conflict; kebab is the modern convention.
+4. **Outfit variable font self-hosted** — `next/font/local` pointing to `public/fonts/Outfit-VariableFont.woff2` (45KB, weight 100–900 covering 820). NOT `next/font/google` (which only serves discrete weights).
+5. **ESLint flat config** — `eslint.config.mjs` uses direct plugin imports (`@eslint/js`, `typescript-eslint`, `eslint-plugin-react`, `eslint-plugin-react-hooks`, `@next/eslint-plugin-next`). The `eslint-config-next` FlatCompat is broken with ESLint 9.39+.
+6. **shadcn/ui primitives hand-written** — 4 components (`button`, `accordion`, `sheet`, `dropdown-menu`) hand-written per canonical new-york style. The `shadcn` CLI timed out via `pnpm dlx` and global install.
+7. **`next lint` deprecated** — Next.js 16 removed `next lint`. The `lint` script in `package.json` runs `eslint .` directly.
+
+## Build & Quality Commands (Actual)
+
+```bash
+pnpm dev          # Development server (Turbopack)
+pnpm build        # Static production build
+pnpm lint         # eslint . (flat config)
+pnpm typecheck    # tsc --noEmit (strict + noUncheckedIndexedAccess)
+pnpm test         # vitest run (34 unit tests, jsdom)
+pnpm test:e2e     # playwright test (11 E2E tests, Chromium, auto-starts dev)
+pnpm format       # prettier --write
+pnpm format:check # prettier --check
+```
+
+## Asset Pipeline
+
+```bash
+./scripts/download-assets.sh        # Download R2 workflow videos + posters (idempotent)
+./scripts/generate-thumbnails.sh    # Generate 6 example thumbnails via z-ai CLI
+```

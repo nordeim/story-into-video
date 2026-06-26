@@ -1,0 +1,13 @@
+node_modules/
+.next/
+out/
+build/
+coverage/
+playwright-report/
+test-results/
+public/fonts/
+skills/
+docs/
+pnpm-lock.yaml
+*.md
+next-env.d.ts

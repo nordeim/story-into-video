@@ -50,8 +50,14 @@ pnpm typecheck
 # Lint — must pass with zero warnings
 pnpm lint
 
-# Production build — must pass with zero errors
-pnpm build
+# Unit tests (Vitest) — 34 tests across 6 files
+pnpm test
+
+# E2E tests (Playwright) — 11 tests, auto-starts dev server
+pnpm test:e2e
+
+# Format check — all files use Prettier code style
+pnpm format:check
 ```
 
 ## Build & Quality Commands
@@ -60,8 +66,12 @@ pnpm build
 pnpm dev          # Development server (Turbopack)
 pnpm build        # Static production build
 pnpm start        # Serve built output
-pnpm lint         # ESLint (eslint-config-next core-web-vitals)
+pnpm lint         # ESLint (flat config, next/core-web-vitals + typescript-eslint)
 pnpm typecheck    # tsc --noEmit (strict mode, noUncheckedIndexedAccess)
+pnpm test         # Vitest unit tests (jsdom env)
+pnpm test:e2e     # Playwright E2E tests (Chromium)
+pnpm format       # Prettier --write (auto-fix)
+pnpm format:check # Prettier --check (verify only)
 ```
 
 **Lighthouse targets:**
@@ -233,15 +243,92 @@ See `Project_Requirements_Document.md` §10 for the full asset manifest with dow
 | Static page | `force-static`, no SSR, no API routes |
 | External deps | No CDN links — all bundled |
 
+## Asset Pipeline
+
+Media assets are **not version-controlled** in their source form (only the generated files in `/public/` are). To regenerate:
+
+```bash
+# Download workflow videos + posters from R2 (idempotent)
+./scripts/download-assets.sh
+
+# Generate 6 example thumbnails via z-ai CLI (requires z-ai-web-dev-sdk)
+./scripts/generate-thumbnails.sh
+```
+
+The Outfit variable font (`public/fonts/Outfit-VariableFont.woff2`, 45KB) was downloaded from the [Google Fonts GitHub repo](https://github.com/google/fonts/raw/main/ofl/outfit/Outfit%5Bwght%5D.ttf) and converted to woff2 via `fonttools`. This is required for weight 820 access (see Decision C in `MASTER_EXECUTION_PLAN.md`).
+
+The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-poster.webp` via ffmpeg's `zoompan` filter (10s, 1920×1080, H.264, subtle 1.0→1.05 zoom).
+
+## Testing
+
+### Unit Tests (Vitest)
+
+34 tests across 6 files, all GREEN:
+
+| Test file | Tests | What it covers |
+|---|---|---|
+| `cn.test.ts` | 8 | `cn()` utility: string merge, conditionals, tailwind-merge dedup, arrays/objects |
+| `use-scrolled.test.ts` | 7 | Scroll threshold detection, boundary cases, scroll event updates |
+| `use-reveal.test.tsx` | 7 | IntersectionObserver integration, once/toggle modes, disconnect behavior |
+| `use-reduced-motion.test.ts` | 4 | matchMedia integration, change event handling |
+| `hero-chip-populate.test.tsx` | 5 | Chip → textarea seed population for all 4 chips + replace behavior |
+| `hero-ratio-toggle.test.tsx` | 3 | Ratio toggle single-selection enforcement (9:16 ↔ 16:9) |
+
+### E2E Tests (Playwright)
+
+11 tests across 3 spec files, all GREEN (Chromium):
+
+| Spec file | Tests | What it covers |
+|---|---|---|
+| `hero-cta.spec.ts` | 3 | Hero CTA + Final CTA + Navbar Get Started all link to `/auth/sign-up` |
+| `mobile-nav.spec.ts` | 5 | Hamburger opens Sheet, all links present, close button works, desktop links hidden on mobile |
+| `faq-accordion.spec.ts` | 3 | Expand/collapse, single-open behavior, all 6 questions present |
+
+## Implementation Notes
+
+### Deviations from PRD
+
+The canonical spec is `Project_Requirements_Document.md` (v2.0, 2718 lines). The following intentional deviations were made during implementation (documented in `MASTER_EXECUTION_PLAN.md` §3):
+
+1. **Tailwind v4 CSS-first `@theme`** — all design tokens live in `src/app/globals.css` inside a single `@theme { … }` block. No `tailwind.config.ts` file exists. This aligns with the `nextjs16-tailwind4` skill's mandate and is the documented future direction in PRD §8.2.
+
+2. **Kebab-case keyframes** — all 13 `@keyframes` names normalized to kebab-case (e.g., `grid-shimmer` instead of `gridShimmer`). PRD §9 ships camelCase, PRD §8.1 ships kebab — they conflict. Kebab-case is the modern Tailwind convention.
+
+3. **Outfit variable font self-hosted** — loaded via `next/font/local` (not `next/font/google`) to access weight 820 precisely. The variable woff2 (45KB, weight range 100–900) is at `public/fonts/Outfit-VariableFont.woff2`.
+
+4. **`src/` directory convention** — app code lives in `src/` (per `nextjs16-tailwind4` skill best practice), not at the repo root as shown in PRD §6.1.
+
+5. **ESLint flat config** — `eslint.config.mjs` uses direct plugin imports (`@eslint/js`, `typescript-eslint`, `eslint-plugin-react`, `eslint-plugin-react-hooks`, `@next/eslint-plugin-next`) instead of `eslint-config-next`'s FlatCompat (which is broken with ESLint 9.39+).
+
+6. **shadcn/ui primitives hand-written** — the 4 shadcn components (`button`, `accordion`, `sheet`, `dropdown-menu`) were hand-written using the canonical new-york style source code. The `shadcn` CLI timed out via `pnpm dlx` and the globally-installed CLI also timed out fetching the registry.
+
+### Known Issues
+
+- **PostCSS moderate vulnerability** (GHSA-qx2v-qp2m-jg93): 1 moderate vuln in `postcss <8.5.10` (transitive via `next`). Not exploitable in this static page (no user-supplied CSS processing). Will resolve when Next.js updates its lockfile. `pnpm audit --audit-level=high` passes clean.
+
+### Document Hierarchy
+
+| Document | Role |
+|---|---|
+| `Project_Requirements_Document.md` | Canonical spec (v2.0, 2718 lines, field-verified) |
+| `MASTER_EXECUTION_PLAN.md` | Execution record (8 phases, 15 decisions, 20 risks) |
+| `AGENTS.md` | Compact agent instructions |
+| `README.md` | This file — quick start + build state |
+| `PRD_2.md`, `draft_PRD.md` | Historical drafts (do not reference during implementation) |
+| `bundled_skills_to_use.md` | Skill routing reference |
+
 ## Contributing
 
-This is a clone project with a fixed spec. Changes should reference the canonical `Project_Requirements_Document.md` (v2.0, 2719 lines). Before submitting:
+This is a clone project with a fixed spec. Changes should reference the canonical `Project_Requirements_Document.md` (v2.0, 2718 lines). Before submitting:
 
 1. `pnpm lint` — zero warnings
 2. `pnpm typecheck` — zero errors
-3. `pnpm build` — zero errors
-4. Visual verification against live site at 1440×900
-5. Lighthouse ≥ 95 across all categories
+3. `pnpm test` — 34 unit tests pass
+4. `pnpm test:e2e` — 11 E2E tests pass
+5. `pnpm format:check` — all files use Prettier code style
+6. `pnpm build` — zero errors
+7. Visual verification against live site at 1440×900
+8. Lighthouse ≥ 95 across all categories
 
 ## License
 

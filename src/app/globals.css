@@ -1,0 +1,471 @@
+@import 'tailwindcss';
+
+/* ============================================================
+   @source — explicit content scanning (Tailwind v4 best practice)
+   The `app/` directory is auto-scanned; we add `components/` and `lib/`.
+   ============================================================ */
+@source '../components/**/*.{ts,tsx}';
+@source '../lib/**/*.{ts,tsx}';
+
+/* ============================================================
+   @theme — design tokens (Tailwind v4 CSS-first configuration)
+   Converts PRD §9 :root variables to v4 @theme block.
+   All keyframe names normalized to kebab-case (Decision B).
+   Hex values preserved verbatim from PRD §1.2 (field-verified).
+   ============================================================ */
+@theme {
+  /* ── Color Palette (verified from live site :root) ── */
+  --color-background: #020202;
+  --color-foreground: #f8f8f8;
+  --color-card: #060607;
+  --color-card-foreground: #f8f8f8;
+  --color-popover: #0b0b0d;
+  --color-popover-foreground: #f8f8f8;
+  --color-primary: #febf00;
+  --color-primary-foreground: #020202;
+  --color-secondary: #111114;
+  --color-secondary-foreground: #f8f8f8;
+  --color-muted: #1a1a1d;
+  --color-muted-foreground: #8e8e95;
+  --color-accent: #febf00;
+  --color-accent-foreground: #020202;
+  --color-destructive: #ff2d39;
+  --color-destructive-foreground: #f8f8f8;
+  --color-border: #1a1a1d;
+  --color-input: #0b0b0d;
+  --color-ring: #febf0080;
+
+  /* Chart palette (reserved for future dashboard use) */
+  --color-chart-1: #febf00;
+  --color-chart-2: #00aa6f;
+  --color-chart-3: #8d92f9;
+  --color-chart-4: #f14d4c;
+  --color-chart-5: #7bc27e;
+
+  /* ── Typography ── */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-heading: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+
+  /* ── Border Radius ── */
+  --radius: 0.75rem;
+  --radius-sm: calc(0.75rem - 4px);
+  --radius-md: calc(0.75rem - 2px);
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+
+  /* ── Shadows ── */
+  --shadow-hero-input: 0 20px 80px rgba(0, 0, 0, 0.6);
+  --shadow-eyebrow-glow: 0 0 30px rgba(234, 179, 8, 0.1);
+  --shadow-cta-glow: 0 0 40px rgba(251, 191, 36, 0.3);
+
+  /* ── Animations (13 keyframes, all kebab-case) ── */
+  --animate-fade-in-up: fade-in-up 0.6s ease-out both;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-glow-pulse: glow-pulse 3s ease-in-out infinite;
+  --animate-border-glow: border-glow 4s ease-in-out infinite;
+  --animate-composite-pulse-text: composite-pulse-text 2s ease-in-out infinite;
+  --animate-shimmer: shimmer 3s linear infinite;
+  --animate-btn-shimmer: btn-shimmer 1.5s ease-in-out infinite;
+  --animate-grid-shimmer: grid-shimmer 8s ease-in-out infinite;
+  --animate-grid-sweep-h: grid-sweep-h 8s linear infinite;
+  --animate-grid-sweep-v: grid-sweep-v 10s linear infinite;
+  --animate-scanline-scroll: scanline-scroll 1s linear infinite;
+  --animate-lang-dropdown-in: lang-dropdown-in 0.15s ease-out;
+  --animate-marquee-scroll: marquee-scroll 40s linear infinite;
+
+  /* ── Keyframes (inside @theme so Tailwind v4 picks them up) ── */
+
+  /* Entrance */
+  @keyframes fade-in-up {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Ambient */
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0) rotate(var(--card-rotate, 0deg));
+    }
+    50% {
+      transform: translateY(-12px) rotate(var(--card-rotate, 0deg));
+    }
+  }
+
+  @keyframes glow-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 40px rgba(251, 191, 36, 0.5);
+    }
+  }
+
+  @keyframes border-glow {
+    0%,
+    100% {
+      border-color: rgba(245, 184, 0, 0.08);
+    }
+    50% {
+      border-color: rgba(245, 184, 0, 0.2);
+    }
+  }
+
+  @keyframes composite-pulse-text {
+    0%,
+    100% {
+      opacity: 0.7;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  /* Shimmer */
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  @keyframes btn-shimmer {
+    0% {
+      transform: translate(-100%);
+    }
+    100% {
+      transform: translate(100%);
+    }
+  }
+
+  /* Grid */
+  @keyframes grid-shimmer {
+    0% {
+      transform: translate(-20%, -30%);
+    }
+    50% {
+      transform: translate(70%, 40%);
+    }
+    100% {
+      transform: translate(-20%, -30%);
+    }
+  }
+
+  @keyframes grid-sweep-h {
+    0% {
+      transform: translate(-600px);
+    }
+    100% {
+      transform: translate(calc(600px + 100vw));
+    }
+  }
+
+  @keyframes grid-sweep-v {
+    0% {
+      transform: translateY(-500px);
+    }
+    100% {
+      transform: translateY(calc(500px + 100vh));
+    }
+  }
+
+  @keyframes scanline-scroll {
+    0% {
+      background-position-x: 0;
+    }
+    100% {
+      background-position-x: 30px;
+    }
+  }
+
+  /* Dropdown */
+  @keyframes lang-dropdown-in {
+    0% {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.96);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* Marquee (custom — required for style chips ticker) */
+  @keyframes marquee-scroll {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+}
+
+/* ============================================================
+   @layer base — global element styles
+   ============================================================ */
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+  }
+
+  ::selection {
+    background-color: rgba(251, 191, 36, 0.3);
+    color: #fff;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #020202;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1a1a1d;
+    border-radius: 5px;
+    border: 2px solid #020202;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2a2a2d;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
+
+/* ============================================================
+   @utility — single-purpose helpers (Tailwind v4 idiom)
+   Replaces v3's @layer components + @layer utilities pattern.
+   ============================================================ */
+
+/* Hide scrollbar (for carousels) */
+@utility scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Marquee edge mask — fades chips at left/right edges */
+@utility marquee-mask {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+}
+
+/* Marquee track — infinite horizontal scroll, pauses on hover */
+@utility marquee-track {
+  display: flex;
+  gap: 0.5rem;
+  width: max-content;
+  animation: var(--animate-marquee-scroll);
+
+  &:hover {
+    animation-play-state: paused;
+  }
+
+  @media (max-width: 640px) {
+    animation-duration: 30s;
+  }
+}
+
+/* Glass input widget (Hero story textarea wrapper) */
+@utility glass-input {
+  position: relative;
+  border-radius: var(--radius-2xl);
+  background-color: rgb(9 9 11 / 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 1.25rem;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  transition-property: border-color, box-shadow;
+  transition-duration: 500ms;
+  box-shadow: var(--shadow-hero-input);
+
+  @media (min-width: 640px) {
+    padding: 1.5rem;
+  }
+
+  &:hover {
+    border-color: rgb(255 255 255 / 0.12);
+  }
+
+  &:focus-within {
+    border-color: rgb(251 191 36 / 0.3);
+    box-shadow:
+      var(--shadow-hero-input),
+      0 0 30px rgb(251 191 36 / 0.1);
+  }
+}
+
+/* Eyebrow badge — amber pill with ambient glow */
+@utility eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 1rem;
+  border-radius: 9999px;
+  background-color: rgb(251 191 36 / 0.1);
+  border: 1px solid rgb(251 191 36 / 0.25);
+  backdrop-filter: blur(4px);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-primary);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  box-shadow: var(--shadow-eyebrow-glow);
+}
+
+/* Section heading (H2) — Outfit, fluid clamp size */
+@utility section-heading {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.1;
+}
+
+/* Tier-4 CTA: solid amber pill with hover scale + glow */
+@utility cta-amber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding: 0.875rem 2rem;
+  background-color: var(--color-primary);
+  color: var(--color-primary-foreground);
+  font-weight: 700;
+  font-size: 15px;
+  border-radius: 9999px;
+  transition-property: background-color, box-shadow, transform;
+  transition-duration: 200ms;
+
+  &:hover {
+    background-color: rgb(252 211 77);
+    box-shadow: 0 10px 15px -3px rgb(251 191 36 / 0.2);
+    transform: scale(1.02);
+  }
+}
+
+/* ============================================================
+   Scroll reveal — data-attribute driven, CSS-only animation
+   The useReveal hook flips data-revealed from 'false' to 'true'
+   when the element enters the viewport via IntersectionObserver.
+   ============================================================ */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 0.6s ease-out,
+    transform 0.6s ease-out;
+  transition-delay: var(--reveal-delay, 0s);
+}
+
+[data-reveal][data-revealed='true'] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ============================================================
+   Radix accordion content animation — grid-template-rows trick
+   Modern GPU-accelerated alternative to max-height animation.
+   Supported in Chrome 117+, Firefox 118+, Safari 17.4+.
+   ============================================================ */
+.radix-accordion-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 300ms ease-out;
+}
+
+.radix-accordion-content[data-state='open'] {
+  grid-template-rows: 1fr;
+}
+
+.radix-accordion-content > div {
+  overflow: hidden;
+}
+
+/* ============================================================
+   Reduced motion preference — disable ALL animations
+   Honors OS-level reduce-motion setting.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .marquee-track {
+    animation: none !important;
+  }
+
+  video[autoplay] {
+    display: none;
+  }
+
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* ============================================================
+   Print styles — graceful degradation
+   ============================================================ */
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  video,
+  .marquee-track,
+  [data-reveal] {
+    display: none !important;
+  }
+}
