@@ -3,6 +3,7 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  allowedDevOrigins: ['storyintovideo.jesspete.shop', '192.168.2.132'],
   images: {
     formats: ['image/avif', 'image/webp'],
   },
