@@ -50,7 +50,7 @@ pnpm typecheck
 # Lint — must pass with zero warnings
 pnpm lint
 
-# Unit tests (Vitest) — 39 tests across 7 files
+# Unit tests (Vitest) — 45 tests across 9 files
 pnpm test
 
 # E2E tests (Playwright) — 11 tests, auto-starts dev server (requires `pnpm exec playwright install` first)
@@ -231,7 +231,7 @@ src/
 │   ├── fonts.ts            # GeistSans + GeistMono + Outfit (self-hosted)
 │   └── utils.ts            # cn() utility (clsx + tailwind-merge)
 ├── tests/
-│   ├── unit/               # Vitest unit tests (7 files, 39 tests)
+│   ├── unit/               # Vitest unit tests (9 files, 45 tests)
 │   ├── e2e/                # Playwright E2E tests (3 files, 11 tests)
 │   └── setup.ts            # Test setup (jest-dom)
 ├── types/
@@ -288,7 +288,7 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 
 ### Unit Tests (Vitest)
 
-39 tests across 7 files, all GREEN:
+45 tests across 9 files, all GREEN:
 
 | Test file | Tests | What it covers |
 |---|---|---|
@@ -299,6 +299,8 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 | `hero-chip-populate.test.tsx` | 5 | Chip → textarea seed population for all 4 chips + replace behavior |
 | `hero-ratio-toggle.test.tsx` | 3 | Ratio toggle single-selection enforcement (9:16 ↔ 16:9) |
 | `layout-hydration.test.tsx` | 5 | `suppressHydrationWarning` on `<body>`, skip-to-content, JSON-LD, children rendering |
+| `metadata.test.ts` | 2 | Canonical URL (`alternates.canonical`) presence + clone-domain resolution |
+| `hero-character-counter.test.tsx` | 4 | Counter renders `0 / 500`, updates on type, amber warning at ≥450 chars, muted below threshold |
 
 ### E2E Tests (Playwright)
 
@@ -348,7 +350,7 @@ The canonical spec is `Project_Requirements_Document.md` (v2.0, 2718 lines). The
 
 1. **`suppressHydrationWarning` belongs on `<body>`, not just `<html>`** — Browser extensions like Grammarly inject attributes into `<body>` before React hydrates. The `<html>` element already had the prop, but `<body>` didn't, causing the mismatch.
 2. **Workflow component needs `'use client'`** — Uses `useState` for poster→video fade-in choreography. Server components cannot use React state.
-3. **Test counts drift from plans** — The MEP planned 6 unit + 3 E2E tests; actual implementation expanded to 39 unit + 11 E2E. Always verify counts against actual `pnpm test` output, not documentation.
+3. **Test counts drift from plans** — The MEP planned 6 unit + 3 E2E tests; actual implementation expanded to 45 unit + 11 E2E. Always verify counts against actual `pnpm test` output, not documentation.
 4. **File structure evolves during implementation** — The `components/primitives/` directory, `lib/hooks/` and `lib/data/` subdirectories were created during build but not reflected in initial docs. Update docs as you build.
 5. **Playwright requires browser binary installation** — `pnpm install` doesn't install browser binaries. Must run `pnpm exec playwright install` separately.
 
@@ -371,6 +373,8 @@ The canonical spec is `Project_Requirements_Document.md` (v2.0, 2718 lines). The
 | `README.md` | This file — quick start + build state |
 | `PRD_2.md`, `draft_PRD.md` | Historical drafts (do not reference during implementation) |
 | `bundled_skills_to_use.md` | Skill routing reference |
+| `storyintovideo_deviation_report.md` | External gap analysis (live-site comparison — 26 claimed deviations) |
+| `deviation_report_validation.md` | Validation of the deviation report against codebase + PRD (only 1 genuine gap + 1 enhancement found) |
 
 ## Contributing
 
@@ -378,7 +382,7 @@ This is a clone project with a fixed spec. Changes should reference the canonica
 
 1. `pnpm lint` — zero warnings
 2. `pnpm typecheck` — zero errors
-3. `pnpm test` — 39 unit tests pass
+3. `pnpm test` — 45 unit tests pass
 4. `pnpm test:e2e` — 11 E2E tests pass
 5. `pnpm format:check` — all files use Prettier code style
 6. `pnpm build` — zero errors

@@ -150,7 +150,7 @@ pnpm dev                        # Start dev server (Turbopack, port 3000)
 | `pnpm build` | Static production build | Before deploy |
 | `pnpm lint` | ESLint (flat config, zero warnings) | Before commit |
 | `pnpm typecheck` | `tsc --noEmit` (zero errors) | Before commit |
-| `pnpm test` | Vitest unit tests (39 tests, jsdom) | Before commit |
+| `pnpm test` | Vitest unit tests (45 tests, jsdom) | Before commit |
 | `pnpm test:e2e` | Playwright E2E tests (11 tests, Chromium) | Before deploy |
 | `pnpm format` | Prettier auto-fix | — |
 | `pnpm format:check` | Prettier verify | CI |
@@ -234,7 +234,7 @@ src/
 │   ├── fonts.ts             # Font configuration
 │   └── utils.ts             # cn() utility
 ├── tests/
-│   ├── unit/                # Vitest unit tests (7 files)
+│   ├── unit/                # Vitest unit tests (9 files)
 │   ├── e2e/                 # Playwright E2E tests (3 files)
 │   └── setup.ts             # Test setup
 └── types/
@@ -380,7 +380,7 @@ You are successful when:
 
 - `pnpm lint` exits with 0 warnings
 - `pnpm typecheck` exits with 0 errors
-- `pnpm test` passes all 39 unit tests
+- `pnpm test` passes all 45 unit tests
 - `pnpm test:e2e` passes all 11 E2E tests (requires Playwright browsers installed)
 - `pnpm build` exits with 0 errors
 - Lighthouse scores ≥95 across Performance, Accessibility, Best Practices, SEO

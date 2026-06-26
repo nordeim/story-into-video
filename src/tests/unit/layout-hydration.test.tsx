@@ -21,24 +21,29 @@ describe('RootLayout — hydration resilience', () => {
   it('layout source has suppressHydrationWarning on <body> (hydration guard)', () => {
     // suppressHydrationWarning is a React-internal prop consumed by the reconciler
     // during hydration — it does NOT appear in the rendered DOM. We verify it by
-    // reading the source file and checking the <body> JSX line.
+    // reading the source file and checking the <body> opening tag.
     //
     // This prevents regression: if someone removes the prop, this test fails.
     // The Grammarly browser extension injects data-new-gr-c-s-check-loaded and
     // data-gr-ext-installed into <body> before React hydrates, causing a
     // hydration mismatch if suppressHydrationWarning is absent.
-    const bodyLine = layoutSource.split('\n').find((line) => line.includes('<body'));
-    expect(bodyLine).toBeDefined();
-    expect(bodyLine).toContain('suppressHydrationWarning');
+    //
+    // We use a regex to extract the full <body ...> opening tag (which may span
+    // multiple lines after Prettier formatting) rather than a line-by-line search.
+    const bodyTag = layoutSource.match(/<body[\s\S]*?>/)?.[0];
+    expect(bodyTag).toBeDefined();
+    expect(bodyTag).toContain('suppressHydrationWarning');
   });
 
   it('layout source has correct body className', () => {
-    const bodyLine = layoutSource.split('\n').find((line) => line.includes('<body'));
-    expect(bodyLine).toBeDefined();
-    expect(bodyLine).toContain('bg-background');
-    expect(bodyLine).toContain('text-foreground');
-    expect(bodyLine).toContain('min-h-screen');
-    expect(bodyLine).toContain('antialiased');
+    // Extract the full <body ...> opening tag via regex — handles multi-line
+    // tags that Prettier may produce when attributes exceed the print width.
+    const bodyTag = layoutSource.match(/<body[\s\S]*?>/)?.[0];
+    expect(bodyTag).toBeDefined();
+    expect(bodyTag).toContain('bg-background');
+    expect(bodyTag).toContain('text-foreground');
+    expect(bodyTag).toContain('min-h-screen');
+    expect(bodyTag).toContain('antialiased');
   });
 
   it('renders skip-to-content link targeting #main', () => {

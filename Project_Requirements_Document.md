@@ -287,7 +287,8 @@ Children, in order:
 4. **Story input widget** — `w-full max-w-2xl animate-[fade-in-up_0.6s_ease-out_0.2s_both]`.
    Container: `group/input relative rounded-2xl bg-zinc-950/60 backdrop-blur-xl p-5 sm:p-6 border border-white/[0.08] hover:border-white/[0.12] shadow-[0_20px_80px_rgba(0,0,0,0.6)] transition-all duration-500`.
    Contents:
-   - `<textarea>` — placeholder "Paste your story here, or write a short idea...", `w-full bg-transparent text-white text-base resize-none focus:outline-none`, height ≈ 78px (3 lines).
+   - `<textarea>` — placeholder "Paste your story here, or write a short idea...", `w-full bg-transparent text-white text-base resize-none focus:outline-none`, height ≈ 78px (3 lines). `maxLength={500}` (hard cap, prevents over-limit input).
+   - **Character counter** — `mt-2 flex justify-end` row directly below the textarea. Renders `{story.length} / 500` in GeistMono to match the ratio-toggle type system: `font-mono text-[10px] tabular-nums`. Default state: `text-zinc-600`. Warning state at ≥450 characters (90% of limit): `text-amber-400` (amber is rationed per design system; the warning is the only amber affordance in the input widget besides the active ratio toggle). The counter updates live on every `onChange` of the textarea.
    - **Story example chips row** — `flex flex-wrap gap-2 mt-4`:
      - 4 chips: "Time travel", "Space odyssey", "Rival chefs", "Victorian mystery".
      - Style: `px-3 py-1 rounded-full text-[11px] font-medium bg-white/[0.06] text-zinc-400 hover:text-white hover:bg-white/[0.1] transition-colors duration-200`.

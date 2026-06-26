@@ -83,7 +83,7 @@ src/
 │   ├── fonts.ts          # GeistSans + GeistMono (from geist pkg) + Outfit (local variable)
 │   └── utils.ts          # cn() utility (clsx + tailwind-merge)
 ├── tests/
-│   ├── unit/             # Vitest unit tests (7 files, 39 tests)
+│   ├── unit/             # Vitest unit tests (9 files, 45 tests)
 │   ├── e2e/              # Playwright E2E tests (3 files, 11 tests)
 │   └── setup.ts          # Test setup (jest-dom)
 ├── types/
@@ -232,7 +232,7 @@ pnpm dev          # Development server (Turbopack)
 pnpm build        # Static production build
 pnpm lint         # eslint . (flat config)
 pnpm typecheck    # tsc --noEmit (strict + noUncheckedIndexedAccess)
-pnpm test         # vitest run (39 unit tests, jsdom)
+pnpm test         # vitest run (45 unit tests, jsdom)
 pnpm test:e2e     # playwright test (11 E2E tests, Chromium, auto-starts dev)
 pnpm format       # prettier --write
 pnpm format:check # prettier --check

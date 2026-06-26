@@ -18,6 +18,10 @@ Awesome meticulous review, analysis and planning. Please keep up the good work. 
 
 ---
 
+Awesome meticulous review, analysis and planning. Please keep up the good work. now, please meticulously review the included gap analysis `storyintovideo_deviation_report.md` and validate it againt the codebase to check for alignment and to identify the root causes and the optimal fixes. then meticulously plan to create a comprehensive remediation plan with a detailed ToDo list to apply the optimal fixes. review and validat the remediation plan against the codebase to ensure alignment before proceeding to execute it meticulously. remember to use TDD approach to make code changes.
+
+---
+
 please try out system installed (external) CLI browser tools 'agent-browser' and 'playwright-cli' by executing them directly as bash shell commands. already installed so just run them. use the 'agent-browser -h' or 'playwright-cli -h' to get more usage guide.
 
 ---
