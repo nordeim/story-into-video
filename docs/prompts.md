@@ -310,7 +310,7 @@ awesome meticulous job so far. please keep up the good work. now, please meticul
 
 ---
 
-please meticulously plan to distill all your knowledge and know-how about the current project into a skill with a filename `onestopnews_SKILL.md`
+please meticulously plan to distill all your knowledge and know-how about the current project into a skill with a filename `storyintovideo_SKILL.md`
 
 # use the following steps/flow as your methodology guide:
 
