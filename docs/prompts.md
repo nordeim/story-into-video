@@ -30,6 +30,10 @@ Awesome meticulous review, analysis and planning. Please keep up the good work. 
 
 ---
 
+Please mticulously validate your findings against the codebase again to ensure alignment, then meticulously plan to create a comprehensive Production Readiness Plan document (markdown file) with actionable details that can be used as a engineering blueprint for another coding ahent to follow. refer to the included `skills/` folder for relevant skills for implementation templates like `skills/nextjs16-react19-postgres17/SKILL.md` for Auth function.
+
+---
+
 please try out system installed (external) CLI browser tools 'agent-browser' and 'playwright-cli' by executing them directly as bash shell commands. already installed so just run them. use the 'agent-browser -h' or 'playwright-cli -h' to get more usage guide.
 
 ---
