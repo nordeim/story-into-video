@@ -20,22 +20,24 @@ describe('Middleware — route protection', () => {
     expect(middlewareSource).toMatch(/\/billing/);
   });
 
-  it('redirects unauthenticated users to /sign-in (via auth config pages.signIn)', () => {
-    // The signIn page is configured in src/lib/auth/config.ts (pages.signIn)
-    // rather than in the middleware itself. Verify both files reference it.
-    const authConfigPath = resolve(__dirname, '../../lib/auth/config.ts');
-    const authConfigSource = readFileSync(authConfigPath, 'utf-8');
-    expect(authConfigSource).toMatch(/pages:\s*\{[^}]*signIn:\s*['"]\/sign-in['"]/s);
+  it('redirects unauthenticated users to /sign-in (via explicit redirect logic)', () => {
+    // The middleware now uses explicit redirect logic with NextResponse.redirect
+    // instead of relying on Auth.js default behavior.
+    expect(middlewareSource).toMatch(/NextResponse\.redirect/);
+    expect(middlewareSource).toMatch(/\/sign-in/);
   });
 
-  it('config.matcher excludes static assets and API routes', () => {
-    // matcher should exclude _next/static, _next/image, favicon, api/auth
+  it('config.matcher lists only protected routes (no catch-all)', () => {
+    // The matcher should ONLY list specific protected paths.
+    // A catch-all pattern would shadow the specific matchers and
+    // cause auth checks to be bypassed on protected routes.
     expect(middlewareSource).toMatch(/matcher/);
-    expect(middlewareSource).toMatch(/\(\?!/); // negative lookahead pattern
-    expect(middlewareSource).toMatch(/_next\/static/);
-    expect(middlewareSource).toMatch(/_next\/image/);
-    expect(middlewareSource).toMatch(/favicon/);
-    expect(middlewareSource).toMatch(/api\/auth/);
+    expect(middlewareSource).toMatch(/\/dashboard/);
+    expect(middlewareSource).toMatch(/\/create/);
+    expect(middlewareSource).toMatch(/\/billing/);
+    // Should NOT have a catch-all negative-lookahead regex pattern
+    // (that was the bug that allowed /create to bypass auth)
+    expect(middlewareSource).not.toMatch(/\(\?!.*_next/);
   });
 
   it('does NOT access the database (Edge runtime constraint)', () => {
