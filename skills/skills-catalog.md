@@ -1,6 +1,6 @@
 # Skills Catalog
 
-> **134 skills** organized into 10 categories. Each entry shows the skill name and a concise description of what it does and when to use it. Skills marked with `*` are external (outside `/home/pete/.pi/agent/skills/`).
+> **136 skills** organized into 10 categories. Each entry shows the skill name and a concise description of what it does and when to use it. Skills marked with `*` are external (outside `/home/pete/.pi/agent/skills/`).
 
 ---
 
@@ -20,7 +20,7 @@
 | **ui-ux-pro-max** | UI/UX design intelligence: layout generation, design tokens, component specs, accessibility, turning UX recs into code. |
 | **scaffold-ui** | Generates anti-generic React components with brutalist Tailwind styling and strict DOM hygiene (no rounded/shadow/gradient). |
 | **personal-portfolio** | Tactile Brutalist + Editorial portfolio SPA: React 19, TS 6 strict, Vite 6, Tailwind v4, kinetic typography, dual-theme. |
-| **brutalist-portfolio-nextjs** | Next.js 16 brutalist portfolio — full architecture, 16 components, 8+ remediation phases, 52 lessons learned. |
+| **brutalist-portfolio-nextjs** | Complete Next.js 16 brutalist portfolio reference: architecture, design system, 16 components, 8+ remediation phases, 52 lessons learned. Use for brutalist/avant-garde portfolio builds, WCAG AAA accessibility, Tailwind v4 CSS-first theming, custom hooks, anti-pattern debugging. |
 | **luxeverse-architect** | Cinematic, production-grade anti-generic web platform architecture and execution framework. |
 | **avant-garde-design-v4** | Elite web design for distinctive interfaces. Luxury/premium brand experiences, landing pages, Tailwind v3→v4 migration. |
 
@@ -47,6 +47,7 @@
 | Skill | Description |
 |-------|-------------|
 | **fullstack-dev** | Next.js 16 + TypeScript + Tailwind v4 + shadcn/ui + Prisma ORM. API routes, WebSocket, DB schemas, full project scaffolding. |
+| **nextjs16-react19-postgres17** | Complete engineering reference for Next.js 16 + React 19 + PostgreSQL 17 full-stack apps. Drizzle ORM, BullMQ job queues, Auth.js v5, 5-layer architecture, 3-layer source provenance, RSS ingestion, AI summarization, WCAG AAA, Tailwind v4. Use for production full-stack patterns. |
 | **web-frameworks** | Next.js (App Router, RSC, PPR, SSR, SSG, ISR) + Turborepo (monorepo) + RemixIcon (3100+ SVG icons). |
 | **api-and-interface-design** | Stable API and interface design. REST/GraphQL endpoints, type contracts, module boundaries. |
 | **api-patterns** | API design decision-making: REST vs GraphQL vs tRPC, response formats, versioning, pagination. |
@@ -83,13 +84,15 @@
 | **webapp-testing-journey** | Systematic QA methodology: URL journey testing, accessibility tree, DOM inspection, network debugging, performance tracing. |
 | **frontend-ui-testing-journey** | Frontend UI testing with 4 browser tools (OpenClaw, agent-browser, chrome-devtools-mcp, @playwright/mcp). Troubleshooting guides. |
 | **browser-testing-with-devtools** | Real-browser testing via Chrome DevTools MCP. DOM inspection, console errors, network analysis, performance profiling. |
-| **playwright-cli** | Playwright CLI for browser automation, page testing, and test workflows. |
-| **agent-browser** | Rust-based headless browser CLI with Node.js fallback. Navigate, click, type, snapshot pages. |
+| **playwright-cli** | Full Playwright CLI (v0.1.14). Multi-browser (Chrome/Firefox/WebKit/Edge), test debugging (`pause-at`/`resume`/`step-over`), request inspection (`request <n>`/`response-body`), request mocking (`route` with `--status`/`--body`/`--header`), offline mode, annotated video recording, CDP attach, persistent profiles, `run-code` for custom snippets. **Choose for:** writing/debugging Playwright tests, cross-browser validation, deep HTTP inspection, API mocking, connecting to existing browsers. |
+| **agent-browser** | Fast Rust-based headless browser CLI (v0.29.1). Compact token-efficient snapshots (`-i -c`), auth vault (`auth save/login`), React DevTools (`react tree`/`inspect`/`renders`/`suspense`), Core Web Vitals (`vitals --json`), SPA navigation (`pushstate`), session persistence (`--session-name`), MCP server mode, streaming, dashboard, plugins, diff, clipboard. **Choose for:** quick E2E smoke tests, auth flows, React debugging, vitals measurement, SPA navigation, AI agent browser workflows. |
 | **browser-automation** | CDP-based browser automation CLI. Snapshots, form filling, navigation without Playwright/Puppeteer. |
 | **chrome-devtools-mcp** | Google-official Chrome DevTools MCP (29 tools). Lighthouse audits, performance traces, network inspection, JS evaluation. |
 | **performance-optimization** | Measure-first performance work. Core Web Vitals, load time budgets, profiling, bottleneck elimination. |
 | **e2e-testing-lessons** | Lessons from 15-phase E2E testing: auth, API contracts, tool selection, hybrid methodology. |
 | **web-design-guidelines** | Review UI code against Web Interface Guidelines. Accessibility, best-practice compliance. |
+
+> **📌 `agent-browser` vs `playwright-cli`:** Both drive real Chromium. Use **`agent-browser`** for fast interactive flows — compact snapshots, auth vault, React DevTools, Core Web Vitals, SPA `pushstate`. Use **`playwright-cli`** for test suites — multi-browser (Firefox/WebKit/Edge), `pause-at` debugging, `request`/`response-body` inspection, `route` mocking, annotated video, CDP attach. Both can run together; use `playwright-cli attach --cdp` to inspect an `agent-browser` session.
 
 ---
 
@@ -129,6 +132,7 @@
 | **orchestrator-toolkit** | Pure-Python orchestration: task management, complexity analysis, decomposition, persistence, recovery. |
 | **loop-builder** | Design unattended agent "loops": scheduled, self-verifying workflows for recurring tasks. |
 | **task-review** | After complex tasks, evaluate whether to save the path as a reusable skill. |
+| **distill-codebase-skill** | Reference template for distilling codebase knowledge into a reusable SKILL.md. Use after major updates, security remediation, or architectural overhauls to capture lessons learned, anti-patterns, debugging guides, and best practices for future agents. |
 | **idea-refine** | Iterative idea refinement through divergent and convergent thinking. |
 | **context-engineering** | Optimize agent context setup for new sessions, task switching, or degrading output quality. |
 | **context-anchor** | Recover from context compaction by scanning memory files and surfacing where you left off. |
@@ -214,11 +218,11 @@
 |---|----------|-------|
 | 1 | Frontend Development & UI Engineering | 15 |
 | 2 | Design Artifacts & Visual Creation | 9 |
-| 3 | Full-Stack & Backend Development | 8 |
+| 3 | Full-Stack & Backend Development | 9 |
 | 4 | AI / ML / Multimodal SDK Skills | 8 |
 | 5 | Testing, QA & Performance | 14 |
 | 6 | Code Quality, Security & Architecture | 13 |
-| 7 | Planning, Workflow & Project Management | 18 |
+| 7 | Planning, Workflow & Project Management | 19 |
 | 8 | Documentation & Content Creation | 14 |
 | 9 | Career, Learning & Personal Development | 14 |
 | 10 | DevOps, Infrastructure & External Integrations | 21 |

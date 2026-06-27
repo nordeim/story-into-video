@@ -326,3 +326,81 @@ Summary of All Changes
 │ 7 │ Fix healthcheck     │ Dockerfile.dev              │ Changed from /api/health (didn't exist) to / (marketing page). Also created src/app/api/health/route.ts for future use                                           │ 
 └───┴─────────────────────┴─────────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
+---
+
+1. Migration generated and applied (drizzle/0000_parched_wind_dancer.sql) 
+- 8 enums, 11 tables, 9 FK constraints 
+- All ON DELETE behaviors correct (CASCADE for owned entities, SET null for usage_events.project_id) 
+ 
+2. Seed script created (src/lib/db/seed.ts) 
+- Idempotent: TRUNCATE ... RESTART IDENTITY CASCADE clears before seeding 
+- 1 dev user, 1 subscription, 2 projects, 3 characters, 6 scenes, 1 video, 1 voiceover, 15 usage events 
+- Dev login: dev@storyintovideo.com / password123 
+ 
+3. npm scripts added (package.json) 
+ 
+┌──────────────────┬────────────────────────────────────┐ 
+│ Script           │ Command                            │ 
+├──────────────────┼────────────────────────────────────┤ 
+│ drizzle:generate │ Generate migration SQL from schema │ 
+├──────────────────┼────────────────────────────────────┤ 
+│ drizzle:migrate  │ Apply migrations to database       │ 
+├──────────────────┼────────────────────────────────────┤ 
+│ drizzle:studio   │ Open Drizzle schema browser        │ 
+├──────────────────┼────────────────────────────────────┤ 
+│ db:seed          │ Run seed script                    │ 
+├──────────────────┼────────────────────────────────────┤ 
+│ db:reset         │ Migrate + seed in one command      │ 
+└──────────────────┴────────────────────────────────────┘ 
+ 
+4. New dependencies (devDependencies) 
+- dotenv-cli — loads .env.local for CLI scripts 
+- tsx — runs TypeScript seed script 
+ 
+5. Health endpoint (src/app/api/health/route.ts) 
+- Returns { status: "ok", timestamp: "..." } 
+ 
+### Verification Results 
+ 
+┌──────────────────────────────────────────────────────────────────────────────┬────────┐ 
+│ Check                                                                        │ Result │ 
+├──────────────────────────────────────────────────────────────────────────────┼────────┤ 
+│ Schema: 11 tables, 8 enums                                                   │ ✅     │ 
+├──────────────────────────────────────────────────────────────────────────────┼────────┤ 
+│ FK constraints: 9 with correct ON DELETE                                     │ ✅     │ 
+├──────────────────────────────────────────────────────────────────────────────┼────────┤ 
+│ Seed: 1 user, 2 projects, 3 chars, 6 scenes, 1 video, 1 voiceover, 15 events │ ✅     │ 
+├──────────────────────────────────────────────────────────────────────────────┼────────┤ 
+│ Marketing page (/) → 200                                                     │ ✅     │ 
+├──────────────────────────────────────────────────────────────────────────────┼────────┤ 
+│ Health endpoint (/api/health) → 200 + JSON                                   │ ✅     │ 
+├──────────────────────────────────────────────────────────────────────────────┼────────┤ 
+│ /dashboard redirect → 307 → /sign-in                                         │ ✅     │ 
+├──────────────────────────────────────────────────────────────────────────────┼────────┤ 
+│ /sign-in page → 200                                                          │ ✅     │ 
+└──────────────────────────────────────────────────────────────────────────────┴────────┘ 
+ 
+### Files Changed/Created 
+ 
+┌──────────────────────────────────────┬────────────────────────────────────┐ 
+│ File                                 │ Action                             │ 
+├──────────────────────────────────────┼────────────────────────────────────┤ 
+│ package.json                         │ Added 4 scripts, 2 devDependencies │ 
+├──────────────────────────────────────┼────────────────────────────────────┤ 
+│ drizzle/0000_parched_wind_dancer.sql │ Generated migration                │ 
+├──────────────────────────────────────┼────────────────────────────────────┤ 
+│ drizzle/meta/_journal.json           │ Auto-generated journal             │ 
+├──────────────────────────────────────┼────────────────────────────────────┤ 
+│ src/lib/db/seed.ts                   │ New seed script                    │ 
+├──────────────────────────────────────┼────────────────────────────────────┤ 
+│ src/app/api/health/route.ts          │ New health endpoint                │ 
+└──────────────────────────────────────┴────────────────────────────────────┘ 
+ 
+### Suggested Next Steps 
+ 
+1. Test sign-in flow — Run pnpm dev, navigate to /sign-in, log in with dev@storyintovideo.com / password123. This validates the full DB → Auth.js → bcrypt → session chain. 
+2. Test dashboard — After login, /dashboard should show "The Dragon's Quest" and "Ocean Mystery" projects. 
+3. Test project detail — Navigate to /projects/<id> to verify the pipeline status rendering. 
+4. Run pnpm db:reset — Confirms the full migrate + seed cycle is reproducible from scratch. 
+5. Commit — All changes are ready for version control.
+

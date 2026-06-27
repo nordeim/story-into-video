@@ -1,6 +1,6 @@
 ---
 name: distill-codebase-skill
-description: reference template for distilling the knowledge and expertise and experiences after completing updating a project codebase. structural guide for a complete, codebase-verified engineering reference that any coding agent can use to extend, debug, onboard, or replicate the OneStopNews architecture — including all Phase 25 security and correctness remediation knowledge.
+description: "Reference template for distilling codebase knowledge into a comprehensive engineering skill document. Use after completing a major project update, security remediation, or architectural overhaul to create a reusable SKILL.md that captures lessons learned, anti-patterns, debugging guides, and best practices for future agents."
 ---
 
 # This is just a reference template for distilling the knowledge and expertise and experiences after completing updating a project codebase
