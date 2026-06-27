@@ -47,6 +47,7 @@ import {
   getProjectVoiceover,
   appendVideo,
   updateVideoSubtitle,
+  updateVideo,
 } from '@/features/pipeline/queries';
 
 describe('T2: Voiceover + Video pipeline queries', () => {
@@ -138,6 +139,23 @@ describe('T2: Voiceover + Video pipeline queries', () => {
       expect(db.update).toHaveBeenCalled();
       const setChain = vi.mocked(db.update).mock.results[0]?.value.set;
       expect(setChain).toHaveBeenCalled();
+    });
+  });
+
+  describe('T3: updateVideo', () => {
+    it('updates the videoKey + duration on the existing video row by projectId', async () => {
+      vi.mocked(db.update).mockReturnValue(dbUpdateChain() as never);
+
+      await updateVideo('proj-1', 'proj-1/final.mp4', 90);
+
+      expect(db.update).toHaveBeenCalled();
+      const setChain = vi.mocked(db.update).mock.results[0]?.value.set;
+      expect(setChain).toHaveBeenCalledWith(
+        expect.objectContaining({
+          videoKey: 'proj-1/final.mp4',
+          duration: 90,
+        }),
+      );
     });
   });
 });

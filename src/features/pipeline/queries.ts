@@ -150,6 +150,25 @@ export async function updateVideoSubtitle(projectId: string, subtitleKey: string
     .where(eq(videos.projectId, projectId));
 }
 
+/**
+ * Update an existing video row with the final MP4 key + duration.
+ * Called by Step 6 after FFmpeg assembly completes. The video row was
+ * created by Step 5 (with videoKey=null); this fills in the actual values.
+ *
+ * Using a dedicated update (not upsert) because the row MUST already exist
+ * — if it doesn't, we want a hard failure, not a silent orphan row.
+ */
+export async function updateVideo(
+  projectId: string,
+  videoKey: string,
+  duration: number,
+): Promise<void> {
+  await db
+    .update(videos)
+    .set({ videoKey, duration })
+    .where(eq(videos.projectId, projectId));
+}
+
 export async function getProjectVideo(projectId: string) {
   const [video] = await db
     .select()

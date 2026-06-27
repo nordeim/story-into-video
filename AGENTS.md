@@ -58,7 +58,7 @@ Full semantic token table lives in `Project_Requirements_Document.md` §1.2.
 ## The 5-Layer Architecture (Golden Rule)
 
 ```
-Layer 0: src/middleware.ts        — Cookie check, redirect. NO DB. NO logic. Edge runtime.
+Layer 0: src/proxy.ts             — Cookie check, redirect. NO DB. NO logic. Edge runtime.
 Layer 1: src/app/                 — Route structure, metadata, Suspense. Layouts must NOT fetch data.
 Layer 2: src/features/            — UI composition, data binding, mutations (auth, projects, pipeline, billing)
 Layer 3: src/features/*/domain/   — Pure business logic. No Next.js or DB runtime imports (import type only)
@@ -115,7 +115,7 @@ src/
 │   ├── e2e/                      # 9 files, 48 tests
 │   └── setup.ts                  # jest-dom + test env vars
 ├── types/index.ts                # 12 marketing interfaces
-└── middleware.ts                 # Layer 0: route protection (Edge runtime)
+└── proxy.ts                      # Layer 0: route protection (Edge runtime)
 
 .husky/
 └── pre-commit                    # Runs `pnpm lint-staged` on staged files
@@ -173,7 +173,7 @@ All components use `interface` (not `type` for object shapes), zero `any`. Criti
 
 - **`verifySession()`** — `src/features/auth/domain/verify-session.ts`. Returns session or throws `NEXT_REDIRECT`. **Never wrap in try/catch.**
 - **API routes use `auth()` directly** — returns null → 401 JSON. Do NOT use `verifySession()` in API routes.
-- **Middleware** — `src/middleware.ts` exports `auth` as default (Auth.js v5 pattern). Checks cookie presence only; Edge runtime can't access DB.
+- **Middleware** — `src/proxy.ts` exports `auth` as default (Auth.js v5 pattern). Checks cookie presence only; Edge runtime can't access DB.
 - **`AUTH_SECRET`** — read from `env` module, never `process.env.AUTH_SECRET`.
 
 ## AI Pipeline (Inngest, 6 Steps — fully wired)

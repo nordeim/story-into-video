@@ -9,10 +9,10 @@ export const metadata = {
  * /create — the project creation wizard.
  *
  * Server component wrapping the CreateWizard client component.
- * Protected by middleware (Layer 0).
+ * Protected by proxy (Layer 0).
  *
  * CRITICAL: force-dynamic prevents Next.js from prerendering this page
- * at build time, ensuring the middleware auth check always runs.
+ * at build time, ensuring the proxy auth check always runs.
  */
 export const dynamic = 'force-dynamic';
 

@@ -2,12 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
-// Middleware runs on Edge runtime — we test the config structurally rather
+// Proxy runs on Edge runtime — we test the config structurally rather
 // than executing it (which requires a Next.js server runtime).
-const MIDDLEWARE_PATH = resolve(__dirname, '../../middleware.ts');
-const middlewareSource = readFileSync(MIDDLEWARE_PATH, 'utf-8');
+// In Next.js 16, middleware.ts is renamed to proxy.ts.
+const PROXY_PATH = resolve(__dirname, '../../proxy.ts');
+const middlewareSource = readFileSync(PROXY_PATH, 'utf-8');
 
-describe('Middleware — route protection', () => {
+describe('Proxy — route protection', () => {
   it('uses next-auth auth function as middleware', () => {
     expect(middlewareSource).toMatch(/export default auth/);
     expect(middlewareSource).toMatch(/from ['"]@\/lib\/auth['"]/);

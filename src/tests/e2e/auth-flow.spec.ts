@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 import { signIn, signOut } from './helpers/auth';
 
 /**
- * auth-flow — Authentication and middleware protection tests.
+ * auth-flow — Authentication and proxy protection tests.
  *
  * Validates:
  *  - Unauthenticated users are redirected from protected routes

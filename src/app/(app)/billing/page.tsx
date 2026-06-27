@@ -8,7 +8,7 @@ type BillingPlan = TierPlan | 'free';
 /**
  * /billing — shows current plan + credits + upgrade options.
  *
- * Server Component. Protected by middleware.
+ * Server Component. Protected by proxy (Layer 0).
  */
 
 const PLANS: Array<{

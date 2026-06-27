@@ -3,23 +3,28 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 
 /**
- * Middleware — Layer 0 of the 5-layer architecture.
+ * Proxy — Layer 0 of the 5-layer architecture.
  *
  * Cookie check + redirect ONLY. NO database access. NO business logic.
  *
+ * In Next.js 16, the `middleware` file convention is renamed to `proxy`
+ * to better reflect its role as a network boundary at the Edge Runtime.
+ * The functionality is identical — only the filename changes.
+ *
  * Pattern source: skills/nextjs16-react19-postgres17/SKILL.md §5
+ * Next.js 16 migration: https://nextjs.org/docs/messages/middleware-to-proxy
  *
  * In Auth.js v5, the `auth` function exported from NextAuth() can be used
  * as middleware. However, the default behavior only populates `req.auth` —
  * it does NOT automatically redirect unauthenticated users.
  *
  * We wrap it with an explicit redirect check for protected routes.
- * The middleware only checks cookie presence. Actual session validity is
+ * The proxy only checks cookie presence. Actual session validity is
  * verified by verifySession() in Server Components / Server Actions.
  *
  * CRITICAL: The matcher must ONLY list protected routes. If a catch-all
  * pattern is included, it shadows the specific route matchers and the
- * middleware never runs on the protected paths.
+ * proxy never runs on the protected paths.
  */
 export default auth(async (req) => {
   const { nextUrl } = req;

@@ -118,7 +118,7 @@ This is a hybrid Next.js app. The marketing page (`/`) is statically prerendered
 ### The 5-Layer Architecture (Golden Rule)
 
 ```
-Layer 0: src/middleware.ts        — Cookie check, redirect. NO DB. NO logic. Edge runtime.
+Layer 0: src/proxy.ts             — Cookie check, redirect. NO DB. NO logic. Edge runtime.
 Layer 1: src/app/                 — Route structure, metadata, Suspense. Layouts must NOT fetch data.
 Layer 2: src/features/            — UI composition, data binding, mutations (auth, projects, pipeline, billing)
 Layer 3: src/features/*/domain/   — Pure business logic. No Next.js or DB runtime imports (import type only)
@@ -320,7 +320,7 @@ src/
 │   ├── e2e/                      # 9 files, 48 tests
 │   └── setup.ts                  # jest-dom + test env vars
 ├── types/index.ts                # 12 marketing interfaces
-└── middleware.ts                 # Layer 0: route protection (Edge runtime)
+└── proxy.ts                      # Layer 0: route protection (Edge runtime)
 
 .husky/
 └── pre-commit                    # Runs `pnpm lint-staged` on staged files

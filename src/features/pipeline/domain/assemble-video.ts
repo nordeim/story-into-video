@@ -1,6 +1,24 @@
 import ffmpeg from 'fluent-ffmpeg';
-import { path as ffmpegPath } from '@ffmpeg-installer/ffmpeg';
 import { writeFile, readFile, unlink } from 'fs/promises';
+
+/**
+ * Resolve the FFmpeg binary path.
+ *
+ * Uses the FFMPEG_PATH env var if set, otherwise defaults to /usr/bin/ffmpeg
+ * (standard location on Ubuntu/Debian/macOS Homebrew).
+ *
+ * This replaces the old @ffmpeg-installer/ffmpeg package which used dynamic
+ * require() calls that Turbopack cannot resolve. System FFmpeg is preferred
+ * because:
+ *   - Zero npm dependencies → zero bundling issues
+ *   - Smaller deploy footprint (~0 vs ~80MB)
+ *   - The project controls its environment (Docker, self-hosted Inngest)
+ *
+ * Pattern source: ADR-006 (FFmpeg on server, fall back to Shotstack)
+ */
+export function getFfmpegPath(): string {
+  return process.env.FFMPEG_PATH ?? '/usr/bin/ffmpeg';
+}
 
 /**
  * Video assembly — composites scene images + voiceover audio + subtitles
@@ -23,8 +41,8 @@ import { writeFile, readFile, unlink } from 'fs/promises';
  *   - Cleaning up temp files (SRT + output MP4) after reading
  */
 
-// Configure fluent-ffmpeg to use the installed binary
-ffmpeg.setFfmpegPath(ffmpegPath);
+// Configure fluent-ffmpeg to use the system binary
+ffmpeg.setFfmpegPath(getFfmpegPath());
 
 export interface AssembleVideoInput {
   sceneImageUrls: string[];

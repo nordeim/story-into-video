@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -36,10 +36,8 @@ vi.mock('fs/promises', () => ({
   unlink: mockUnlink,
 }));
 
-// Mock @ffmpeg-installer/ffmpeg — provides a path string
-vi.mock('@ffmpeg-installer/ffmpeg', () => ({
-  path: '/fake/path/to/ffmpeg',
-}));
+// Mock fluent-ffmpeg's setFfmpegPath (no @ffmpeg-installer/ffmpeg dependency)
+// The system ffmpeg path is now resolved at runtime via getFfmpegPath()
 
 vi.mock('fluent-ffmpeg', () => {
   const ffmpegMock = vi.fn(() => ffmpegChain);
@@ -47,7 +45,11 @@ vi.mock('fluent-ffmpeg', () => {
   return { default: ffmpegMock };
 });
 
-import { assembleVideo, buildFfmpegCommand } from '@/features/pipeline/domain/assemble-video';
+import {
+  assembleVideo,
+  buildFfmpegCommand,
+  getFfmpegPath,
+} from '@/features/pipeline/domain/assemble-video';
 
 describe('T3: assemble-video rewrite', () => {
   beforeEach(() => {
@@ -149,6 +151,28 @@ describe('T3: assemble-video rewrite', () => {
     expect(filterArg).toMatch(/concat=/);
     expect(filterArg).toMatch(/scale=/);
     expect(filterArg).toMatch(/subtitles=/);
+  });
+});
+
+describe('T1: system ffmpeg path resolution', () => {
+  const originalEnv = process.env.FFMPEG_PATH;
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env.FFMPEG_PATH;
+    } else {
+      process.env.FFMPEG_PATH = originalEnv;
+    }
+  });
+
+  it('getFfmpegPath returns FFMPEG_PATH env var when set', () => {
+    process.env.FFMPEG_PATH = '/custom/path/to/ffmpeg';
+    expect(getFfmpegPath()).toBe('/custom/path/to/ffmpeg');
+  });
+
+  it('getFfmpegPath defaults to /usr/bin/ffmpeg when env var is not set', () => {
+    delete process.env.FFMPEG_PATH;
+    expect(getFfmpegPath()).toBe('/usr/bin/ffmpeg');
   });
 });
 

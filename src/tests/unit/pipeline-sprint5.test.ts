@@ -127,7 +127,7 @@ vi.mock('fluent-ffmpeg', () => {
   return { default: ffmpegMock };
 });
 
-vi.mock('@ffmpeg-installer/ffmpeg', () => ({ path: '/fake/ffmpeg' }));
+// No @ffmpeg-installer/ffmpeg mock needed — assemble-video uses system ffmpeg via getFfmpegPath()
 
 vi.mock('fs/promises', () => ({
   default: {
@@ -154,6 +154,7 @@ vi.mock('@/features/pipeline/queries', () => ({
     projectId: 'p1',
     videoKey: 'p1/final.mp4',
   }),
+  updateVideo: vi.fn().mockResolvedValue(undefined),
   updateVideoSubtitle: vi.fn().mockResolvedValue(undefined),
   updateProjectProgress: vi.fn().mockResolvedValue(undefined),
   setProjectFailed: vi.fn().mockResolvedValue(undefined),
@@ -161,7 +162,7 @@ vi.mock('@/features/pipeline/queries', () => ({
     { id: 'c1', name: 'Hero', referenceImageKey: 'p1/char-1.png' },
   ]),
   getProjectScenes: vi.fn().mockResolvedValue([
-    { id: 's1', order: 1, generatedImageKey: 'https://r2.example.com/scene-1.png', duration: 8 },
+    { id: 's1', order: 1, generatedImageKey: 'p1/scene-1.png', duration: 8 },
   ]),
   getProjectVoiceover: vi.fn().mockResolvedValue({
     id: 'vo1',
@@ -213,10 +214,11 @@ vi.mock('@/features/billing/queries', () => ({
 
 import { synthesizeVoice } from '@/features/pipeline/domain/synthesize-voice';
 import { alignSubtitles } from '@/features/pipeline/domain/align-subtitles';
-import { putObject } from '@/lib/storage/r2';
+import { putObject, getSignedDownloadUrl } from '@/lib/storage/r2';
 import {
   appendVoiceover,
   appendVideo,
+  updateVideo,
   updateVideoSubtitle,
   updateProjectProgress,
 } from '@/features/pipeline/queries';
@@ -334,13 +336,21 @@ describe('T4+T5+T7: Inngest pipeline wires Steps 4-6', () => {
       'video/mp4',
     );
 
-    // appendVideo called with projectId + videoKey + subtitleKey + duration + resolution
+    // appendVideo called ONCE (in Step 5 to create the row with subtitleKey)
+    expect(appendVideo).toHaveBeenCalledTimes(1);
     expect(appendVideo).toHaveBeenCalledWith(
       'p1',
-      expect.stringMatching(/^p1\/final/),
+      null,
       expect.stringMatching(/^p1\/subtitles/),
+      null,
+      '720p',
+    );
+
+    // updateVideo called in Step 6 to fill in the final videoKey + duration
+    expect(updateVideo).toHaveBeenCalledWith(
+      'p1',
+      expect.stringMatching(/^p1\/final/),
       expect.any(Number),
-      expect.stringMatching(/^(720p|1080p|4k)$/),
     );
 
     // video_assembly credits debited
@@ -350,6 +360,24 @@ describe('T4+T5+T7: Inngest pipeline wires Steps 4-6', () => {
       'video_assembly',
       'p1',
     );
+  });
+
+  it('T2: Step 6 signs scene image URLs before passing to assembleVideo (not raw R2 keys)', async () => {
+    const fn = pipelineFunction as unknown as { handler: (ctx: unknown) => Promise<unknown> };
+    const mockStep = {
+      run: vi.fn(async (_name: string, cb: () => Promise<unknown>) => cb()),
+    };
+    const mockEvent = { data: { projectId: 'p1' } };
+
+    await fn.handler({ event: mockEvent, step: mockStep });
+
+    // getSignedDownloadUrl must be called for the scene image key
+    // (not just for audio + SRT). FFmpeg needs signed URLs, not R2 keys.
+    const signedUrlCalls = vi.mocked(getSignedDownloadUrl).mock.calls;
+    const sceneImageCall = signedUrlCalls.find(
+      (call) => call[0] === 'generated' && typeof call[1] === 'string' && call[1].includes('scene-1.png'),
+    );
+    expect(sceneImageCall).toBeDefined();
   });
 
   it('final step sets status=completed with progressPercent=100', async () => {

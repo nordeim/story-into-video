@@ -12,6 +12,7 @@ import {
   appendScene,
   appendVoiceover,
   appendVideo,
+  updateVideo,
   updateVideoSubtitle,
   updateProjectProgress,
   setProjectFailed,
@@ -261,9 +262,14 @@ export const pipelineFunction = inngest.createFunction(
       const srtResponse = await fetch(srtDownloadUrl);
       const subtitlesSrt = await srtResponse.text();
 
+      // Sign scene image URLs — FFmpeg needs accessible URLs, not R2 keys
+      const sceneImageUrls = await Promise.all(
+        scenes.map((s) => getSignedDownloadUrl('generated', s.generatedImageKey!)),
+      );
+
       // Assemble the video
       const assembleResult = await assembleVideo({
-        sceneImageUrls: scenes.map((s) => s.generatedImageKey!),
+        sceneImageUrls,
         sceneDurations: scenes.map((s) => s.duration ?? 8),
         audioUrl,
         subtitlesSrt,
@@ -275,8 +281,8 @@ export const pipelineFunction = inngest.createFunction(
       const videoKey = buildObjectKey(projectId, 'final.mp4');
       await putObject('videos', videoKey, assembleResult.videoBuffer, 'video/mp4');
 
-      // Update the video row with the actual video key + duration
-      await appendVideo(projectId, videoKey, subtitleKey, assembleResult.duration, '720p');
+      // Update the video row (created in Step 5) with the actual video key + duration
+      await updateVideo(projectId, videoKey, assembleResult.duration);
 
       // Debit video assembly credits
       await debitCredits(
