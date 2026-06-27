@@ -30,7 +30,7 @@ AI-powered story-into-video generator with a luxury-dark, cinematic marketing fr
 | Storage | Cloudflare R2 (S3-compatible, zero egress) | @aws-sdk/client-s3 |
 | Billing | Stripe (Checkout + Portal + Webhooks) | ^22.3.0 |
 | Validation | Zod (env + all Server Action inputs) | ^4.4.3 |
-| Video | FFmpeg (fluent-ffmpeg + @ffmpeg-installer/ffmpeg) | — |
+| Video | FFmpeg (fluent-ffmpeg + system binary) | `FFMPEG_PATH` env var (default `/usr/bin/ffmpeg`) |
 | Package Manager | pnpm | >=9.0.0 |
 | Node | — | >=20.0.0 |
 
@@ -153,7 +153,7 @@ Scroll reveal: `IntersectionObserver` via `useReveal` hook → `data-revealed` a
 ## The 5-Layer Architecture (Golden Rule)
 
 ```
-Layer 0: src/proxy.ts             — Cookie check, redirect. NO DB. NO logic. Edge runtime.
+Layer 0: src/proxy.ts             — Cookie check, redirect. NO DB. NO logic. Edge runtime. (Renamed from `middleware.ts` in Next.js 16 migration.)
 Layer 1: src/app/                 — Route structure, metadata, Suspense. Layouts must NOT fetch data.
 Layer 2: src/features/            — UI composition, data binding, mutations (auth, projects, pipeline, billing)
 Layer 3: src/features/*/domain/   — Pure business logic. No Next.js or DB runtime imports (import type only)
@@ -184,7 +184,7 @@ pnpm dev                        # Start dev server (Turbopack, port 3000)
 | `pnpm build` | Production build (hybrid: static + dynamic) | Before deploy |
 | `pnpm lint` | ESLint (flat config, zero warnings) | Before commit |
 | `pnpm typecheck` | `tsc --noEmit` (zero errors) | Before commit |
-| `pnpm test` | Vitest unit tests (227 tests, jsdom) | Before commit |
+| `pnpm test` | Vitest unit tests (232 tests, jsdom) | Before commit |
 | `pnpm test:e2e` | Playwright E2E tests (48 tests, Chromium) | Before deploy |
 | `pnpm format` | Prettier auto-fix | — |
 | `pnpm format:check` | Prettier verify | CI |
@@ -206,10 +206,10 @@ All four must pass with zero warnings/errors before any commit. **husky + lint-s
 
 | Type | Framework | Location | Count |
 |---|---|---|---|
-| Unit | Vitest + jsdom | `src/tests/unit/**/*.test.{ts,tsx}` | 227 (32 files) |
+| Unit | Vitest + jsdom | `src/tests/unit/**/*.test.{ts,tsx}` | 232 (32 files) |
 | E2E | Playwright (Chromium) | `src/tests/e2e/**/*.spec.ts` | 48 (9 files) |
 
-### Unit Test Coverage (32 files, 227 tests)
+### Unit Test Coverage (32 files, 232 tests)
 
 **Marketing layer (inherited from clone):**
 - `cn.test.ts` (8), `use-scrolled.test.ts` (7), `use-reveal.test.tsx` (7), `use-reduced-motion.test.ts` (4)
@@ -239,7 +239,7 @@ All four must pass with zero warnings/errors before any commit. **husky + lint-s
 - `assemble-video.test.ts` (9) — FFmpeg rewrite: SRT temp file, inputOptions per image, output Buffer readback, cleanup, source-level guarantees (no placeholder, no `.find(includes('concat'))`)
 - `pipeline-sprint5.test.ts` (8) — Steps 4-6 wiring: voiceover synthesis, subtitle alignment, video assembly, credit debits, final completion step
 - `sse-progress.test.ts` (12) — SSE route source-level guarantees + `useProjectProgress` hook functional behavior with mocked `EventSource`
-- `project-download.test.tsx` (9) — `getProject` LEFT JOIN videos, `ProjectDownloadButton` signed URL, `ProjectShareButton` clipboard fallback
+- `project-download.test.tsx` (10) — `getProject` LEFT JOIN videos, `ProjectDownloadButton` with server-side `downloadUrl` prop (no `r2.ts` import in client), `ProjectShareButton` clipboard fallback, source-level guarantee
 - `moderate-image.test.ts` (5) — `moderateImage` parses Replicate `safety_concept` / `api_safety_concept`, fail-open for unknown shapes
 - `legal-pages.test.ts` (10) — `/privacy` + `/terms` source-level guarantees (server components, required sections, AI-specific clauses)
 
@@ -321,7 +321,7 @@ src/
 │       ├── empty-state.tsx              # Reusable empty-state primitive
 │       ├── providers.tsx                # 'use client' — SessionProvider wrapper
 │       ├── project-progress-panel.tsx   # 'use client' — SSE subscriber + progress bar
-│       ├── project-download-button.tsx  # 'use client' — signed R2 URL download anchor
+│       ├── project-download-button.tsx  # 'use client' — receives `downloadUrl` prop (NO r2.ts import)
 │       └── project-share-button.tsx     # 'use client' — Web Share API + clipboard fallback
 ├── features/                     # Layer 2 + 3: Feature modules with domain isolation
 │   ├── auth/domain/verify-session.ts   # The DAL auth function (throws NEXT_REDIRECT)
@@ -367,7 +367,7 @@ src/
 │   ├── fonts.ts                  # Font configuration
 │   └── utils.ts                  # cn() utility
 ├── tests/
-│   ├── unit/                     # Vitest unit tests (32 files, 227 tests)
+│   ├── unit/                     # Vitest unit tests (32 files, 232 tests)
 │   ├── e2e/                      # Playwright E2E tests (9 files, 48 tests)
 │   └── setup.ts                  # Test setup (jest-dom + test env vars)
 ├── types/
@@ -395,7 +395,7 @@ src/
 | `/api/stripe/webhook` | ƒ Dynamic | Stripe webhook (signature-verified, idempotent) |
 | `/api/projects/[id]/progress` | ƒ Dynamic | SSE progress stream (auth + owner-checked, 2s polling) |
 | `/api/health` | ƒ Dynamic | Health check endpoint (returns `{ status: 'ok' }`) |
-| Middleware | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing` |
+| Proxy | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing` (renamed from `middleware.ts` in Next.js 16) |
 
 ### Database Schema (11 tables + 8 enums)
 
@@ -553,6 +553,8 @@ Final: Mark project status='completed', progressPercent=100
 37. **husky `prepare` script uses `|| true`** — `package.json` has `"prepare": "husky || true"`. The `|| true` prevents `pnpm install` from failing if husky isn't yet installed (first install on a fresh clone). Don't remove it.
 38. **`lint-staged` runs on staged files only** — not the whole codebase. Configured in `package.json` under `lint-staged`. Staged `.ts/.tsx` files get `eslint --fix` + `prettier --write`; `.json/.md/.css/.mjs` get `prettier --write` only.
 39. **Source-reading tests must strip comments before regex** — when asserting "code does not contain X", strip comments first: `src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')`. Otherwise the docblock (which may mention the old pattern by name) triggers a false positive.
+40. **Client components must NEVER import `@/lib/storage/r2` at module level** — the `r2.ts` module imports `env` which validates all 23 env vars at module load. In the browser, only `NEXT_PUBLIC_*` vars are available — all server-only vars are `undefined`, causing "Invalid environment variables" crash. Pattern: Server Component signs the URL via `getSignedDownloadUrl()`, passes as prop to the client component. This is a P0 bug that completely breaks the project detail page.
+41. **`@ffmpeg-installer/ffmpeg` is incompatible with Turbopack** — the package uses dynamic `require()` with runtime-constructed paths (`__dirname.indexOf('node_modules')`) that produce `/ROOT/node_modules/...` under Turbopack's virtual filesystem. Turbopack rejects this with "server relative imports are not implemented". Replaced with system FFmpeg binary via `getFfmpegPath()` helper.
 
 ## Troubleshooting
 
@@ -580,6 +582,9 @@ Final: Mark project status='completed', progressPercent=100
 | SSE route returns 307 redirect instead of 401 JSON | Used `verifySession()` (throws redirect) instead of `auth()` (returns null) | API routes use `auth()` directly: `const session = await auth(); if (!session?.user?.id) return NextResponse.json({error:'Unauthorized'},{status:401});` |
 | SSE stream hangs / never closes | `controller.close()` not called on terminal status | Poll DB every 2s; when `status ∈ {completed, failed}`, call `controller.close()` + `clearInterval(interval)` |
 | `EventSource` leaks across navigations | `useEffect` cleanup missing `eventSource.close()` | Return a cleanup function from `useEffect` that calls `eventSource.close()` |
+| Project detail page shows "This page couldn't load" | Client component imports `r2.ts` at module level, triggering env validation crash in browser | **Never import `@/lib/storage/r2` in `'use client'` files.** Sign URLs in Server Components, pass as props. |
+| `assemble-video` can't find FFmpeg binary | `@ffmpeg-installer/ffmpeg` removed; system FFmpeg not installed | `sudo apt install ffmpeg` (Ubuntu) or `brew install ffmpeg` (macOS). Set `FFMPEG_PATH` env var if non-standard. |
+| `FFMPEG_PATH` not set | Env var missing from `.env.local` | Add `FFMPEG_PATH=/usr/bin/ffmpeg` to `.env.local` |
 | husky pre-commit hook doesn't run | `pnpm install` didn't run the `prepare` script (first install) | Run `pnpm install` (activates `prepare: husky`); ensure `.husky/pre-commit` is executable (`chmod +x`) |
 | `assemble-video` returns `Buffer.from('placeholder')` | (Legacy bug, now fixed) Old impl didn't read the output file | Fixed in T3 rewrite — function now reads `/tmp/siv-video-<ts>.mp4` into a Buffer before resolving |
 | `moderateImage` returns `flagged:false` for unknown Replicate output | Fail-open policy for models that don't expose `safety_concept` | Deliberate tradeoff. If your model supports safety fields, verify the field name matches one of: `safety_concept`, `api_safety_concept`, `safety` |
@@ -589,7 +594,7 @@ Final: Mark project status='completed', progressPercent=100
 ### Marketing Layer (inherited)
 1. **`suppressHydrationWarning` on `<body>`** — Browser extensions inject attributes before React hydrates. `<html>` alone is insufficient.
 2. **Workflow is `'use client'`** — Uses `useState` for video loading choreography. Don't assume server components for "mostly static" sections.
-3. **Test counts drift from plans** — MEP planned 6+3, actual is now 227 unit + 48 E2E. Always verify against `pnpm test` output.
+3. **Test counts drift from plans** — MEP planned 6+3, actual is now 232 unit + 48 E2E. Always verify against `pnpm test` output.
 4. **File structure evolves** — `components/primitives/`, `lib/hooks/`, `lib/data/` were created during build. Update docs as you build.
 5. **Playwright needs separate install** — `pnpm install` doesn't install browser binaries.
 
@@ -618,6 +623,10 @@ Final: Mark project status='completed', progressPercent=100
 25. **TDD exposed 4 latent defects in `assemble-video.ts`** — the original implementation returned `Buffer.from('placeholder')`, never wrote the SRT file, never passed `-loop -t` input options, and extracted the filter via a brittle `.find(includes('concat'))`. All four were only discoverable by writing tests first. This is the strongest argument for TDD on legacy code: the tests document the contract the code should have been meeting.
 26. **Source-reading tests must strip comments** — when asserting "code does not contain X" via regex on source, strip comments first. Docblocks that explain the old pattern (e.g., "this replaces the placeholder Buffer.from pattern") trigger false positives. Pattern: `src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')`.
 27. **husky `prepare` script with `|| true` is intentional** — `package.json` has `"prepare": "husky || true"`. The `|| true` prevents `pnpm install` from failing on first install (when husky isn't yet installed). Don't "fix" this by removing the fallback.
+28. **Client components must NEVER import `r2.ts` at module level** — the `r2.ts` module imports `env` which validates all 23 env vars at module load. In the browser, only `NEXT_PUBLIC_*` vars exist — all server-only vars are `undefined`, causing "Invalid environment variables" crash. The fix: Server Component signs the URL, passes as prop to client component. This is a P0 bug that completely breaks the project detail page.
+29. **Server-side URL signing pattern** — for any client component that needs data from server-only env vars (R2 signed URLs, Stripe secrets, etc.), the Server Component should fetch/compute the value and pass it as a prop. This is the recommended Next.js 16 pattern and avoids the client-side env validation crash entirely.
+30. **`@ffmpeg-installer/ffmpeg` is incompatible with Turbopack** — the package uses dynamic `require()` calls with runtime-constructed paths that produce `/ROOT/node_modules/...` under Turbopack's virtual filesystem. Turbopack rejects this with "server relative imports are not implemented". Replaced with system FFmpeg binary via `getFfmpegPath()` helper.
+31. **`middleware.ts` renamed to `proxy.ts` in Next.js 16** — the file convention changed to better reflect its role as a network boundary. Functionality is identical; only the filename changes. Run `npx @next/codemod@canary middleware-to-proxy .` to migrate.
 
 ## Outstanding Issues
 
@@ -645,7 +654,7 @@ Final: Mark project status='completed', progressPercent=100
 - ~~`inngest.send()` commented out in `createProjectAction`~~ → Fixed (T8)
 - ~~FFmpeg `assemble-video.ts` placeholder implementation~~ → Fixed (T3 rewrite)
 - ~~No SSE progress stream~~ → Fixed (T9)
-- ~~No download/share on project detail~~ → Fixed (T10)
+- ~~No download/share on project detail~~ → Fixed (T10, then T1: server-side signing to fix env crash)
 - ~~No content moderation on generated images (ADR-011)~~ → Fixed (T11)
 - ~~No legal pages (Privacy/Terms)~~ → Fixed (T12)
 - ~~No pre-commit hooks~~ → Fixed (T14 — husky + lint-staged)
@@ -712,7 +721,7 @@ You are successful when:
 
 - `pnpm lint` exits with 0 warnings
 - `pnpm typecheck` exits with 0 errors
-- `pnpm test` passes all 227 unit tests
+- `pnpm test` passes all 232 unit tests
 - `pnpm test:e2e` passes all 48 E2E tests (requires Playwright browsers installed)
 - `pnpm build` exits with 0 errors
 - Lighthouse scores ≥95 across Performance, Accessibility, Best Practices, SEO (marketing page)

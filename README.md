@@ -29,7 +29,7 @@ The marketing page is preserved verbatim from the clone; the production app laye
 | Storage | Cloudflare R2 | S3-compatible, zero egress, signed URLs |
 | Billing | Stripe | Checkout + Customer Portal + Webhooks, credit-based metering |
 | Validation | Zod | Env vars + all Server Action inputs |
-| Video | FFmpeg | Scene + audio + subtitle composition → MP4 |
+| Video | FFmpeg (system binary) | Scene + audio + subtitle composition → MP4. Path via `FFMPEG_PATH` env var (default `/usr/bin/ffmpeg`). No npm installer dependency. |
 | Quality | ≥95 Lighthouse | Performance, Accessibility, Best Practices, SEO (marketing page) |
 
 ## Quick Start
@@ -72,7 +72,7 @@ pnpm typecheck
 # Lint — must pass with zero warnings
 pnpm lint
 
-# Unit tests (Vitest) — 227 tests across 32 files
+# Unit tests (Vitest) — 232 tests across 32 files
 pnpm test
 
 # E2E tests (Playwright) — 48 tests, auto-starts dev server
@@ -91,7 +91,7 @@ pnpm build        # Production build (hybrid: static + dynamic)
 pnpm start        # Serve built output
 pnpm lint         # ESLint (flat config, next/core-web-vitals + typescript-eslint)
 pnpm typecheck    # tsc --noEmit (strict mode, noUncheckedIndexedAccess)
-pnpm test         # Vitest unit tests (jsdom env)
+pnpm test         # Vitest unit tests (jsdom env) — 232 tests across 32 files
 pnpm test:e2e     # Playwright E2E tests (Chromium)
 pnpm format       # Prettier --write (auto-fix)
 pnpm format:check # Prettier --check (verify only)
@@ -113,12 +113,12 @@ pnpm drizzle-kit studio     # Open Drizzle Studio (schema browser)
 
 ## Architecture
 
-This is a hybrid Next.js app. The marketing page (`/`) is statically prerendered; auth-protected app routes (`/dashboard`, `/create`, `/projects/[id]`, `/billing`) are dynamic; API routes (`/api/auth`, `/api/inngest`, `/api/stripe/webhook`) are `force-dynamic`. A middleware (Edge runtime) protects authenticated routes.
+This is a hybrid Next.js app. The marketing page (`/`) is statically prerendered; auth-protected app routes (`/dashboard`, `/create`, `/projects/[id]`, `/billing`) are dynamic; API routes (`/api/auth`, `/api/inngest`, `/api/stripe/webhook`) are `force-dynamic`. A proxy (Edge runtime) protects authenticated routes.
 
 ### The 5-Layer Architecture (Golden Rule)
 
 ```
-Layer 0: src/proxy.ts             — Cookie check, redirect. NO DB. NO logic. Edge runtime.
+Layer 0: src/proxy.ts             — Cookie check, redirect. NO DB. NO logic. Edge runtime. (Renamed from middleware.ts in Next.js 16 migration.)
 Layer 1: src/app/                 — Route structure, metadata, Suspense. Layouts must NOT fetch data.
 Layer 2: src/features/            — UI composition, data binding, mutations (auth, projects, pipeline, billing)
 Layer 3: src/features/*/domain/   — Pure business logic. No Next.js or DB runtime imports (import type only)
@@ -295,7 +295,7 @@ src/
 │   ├── primitives/               # Marketing presentational (7 files)
 │   ├── sections/                 # Marketing page sections (10 files)
 │   ├── ui/                       # Hand-written shadcn (4: button, accordion, sheet, dropdown-menu)
-│   └── app/                      # App components (4: auth-form, create-wizard, empty-state, providers)
+│   └── app/                      # App components (8: auth-form, create-wizard, empty-state, providers, project-progress-panel, project-download-button, project-share-button)
 ├── features/                     # Layer 2 + 3: Feature modules
 │   ├── auth/domain/verify-session.ts       # DAL auth function
 │   ├── projects/{queries,actions}.ts       # DB access + Server Actions
@@ -316,7 +316,7 @@ src/
 │   ├── hooks/                              # 4 hooks (use-scrolled, use-reveal, use-reduced-motion, use-project-progress)
 │   ├── fonts.ts · utils.ts
 ├── tests/
-│   ├── unit/                     # 32 files, 227 tests
+│   ├── unit/                     # 32 files, 232 tests
 │   ├── e2e/                      # 9 files, 48 tests
 │   └── setup.ts                  # jest-dom + test env vars
 ├── types/index.ts                # 12 marketing interfaces
@@ -365,6 +365,8 @@ See `Project_Requirements_Document.md` §10 for the full asset manifest with dow
 | DB access | Through `queries.ts` boundary; components never call `db` directly |
 | Migrations | `drizzle-kit generate` + `migrate`; never `db push` in production |
 | External deps | No CDN links — all bundled |
+| R2 in client | **Never import `@/lib/storage/r2` in client components** — env validation throws in browser. Sign URLs server-side, pass as props. |
+| FFmpeg | System binary via `FFMPEG_PATH` env var (default `/usr/bin/ffmpeg`). No `@ffmpeg-installer/ffmpeg` npm package. |
 
 ## Asset Pipeline
 
@@ -386,7 +388,7 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 
 ### Unit Tests (Vitest)
 
-227 tests across 32 files, all GREEN:
+232 tests across 32 files, all GREEN:
 
 **Marketing layer (inherited from clone):**
 
@@ -431,7 +433,7 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 | `assemble-video.test.ts` | 9 | FFmpeg rewrite: SRT temp file, inputOptions per image, Buffer readback, cleanup |
 | `pipeline-sprint5.test.ts` | 8 | Steps 4-6 wiring: voiceover, subtitles, video assembly, credit debits, completion |
 | `sse-progress.test.ts` | 12 | SSE route source guarantees + `useProjectProgress` hook with mocked EventSource |
-| `project-download.test.tsx` | 9 | `getProject` LEFT JOIN videos, download button, share button clipboard fallback |
+| `project-download.test.tsx` | 10 | `getProject` LEFT JOIN videos, `ProjectDownloadButton` with server-side `downloadUrl` prop (no `r2.ts` import in client), `ProjectShareButton` clipboard fallback, source-level guarantee that `r2.ts` is NOT imported in client component |
 | `moderate-image.test.ts` | 5 | `moderateImage` parses Replicate safety output, fail-open for unknown shapes |
 | `legal-pages.test.ts` | 10 | `/privacy` + `/terms` source guarantees (server components, required sections) |
 
@@ -488,7 +490,7 @@ The remediation sprint closed 9 of the blueprint's outstanding gaps. The followi
 
 ### What's Implemented vs. Outstanding
 
-**✅ Fully implemented (code layer — 227 unit tests + 48 E2E tests, all GREEN):**
+**✅ Fully implemented (code layer — 232 unit tests + 48 E2E tests, all GREEN):**
 - Auth.js v5 (Google OAuth + Credentials, Drizzle adapter, JWT sessions, middleware)
 - Drizzle schema (11 tables, 8 enums) + migration config
 - `verifySession()` DAL + route protection
@@ -505,8 +507,9 @@ The remediation sprint closed 9 of the blueprint's outstanding gaps. The followi
 - Billing page (4-tier plan table)
 - SSE progress stream (`/api/projects/[id]/progress` — 2s polling, owner-checked)
 - `useProjectProgress` client hook + `ProjectProgressPanel` (live progress bar)
-- Download button (signed R2 URL) + Share button (Web Share API + clipboard fallback)
+- Download button (signed R2 URL, **server-side signing** via `SignedDownloadWrapper` Server Component) + Share button (Web Share API + clipboard fallback)
 - `getProject()` LEFT JOINs videos — returns `videoKey` for conditional download render
+- **Client components never import `r2.ts` at module level** — env validation only runs in Node.js (Server Components/API routes). Server-side URL signing pattern prevents the env crash in the browser.
 - Privacy Policy + Terms of Service pages (Server Components, AI-specific clauses)
 - All 14 marketing CTAs wired to real routes
 - husky + lint-staged pre-commit hook (`.husky/pre-commit`)
@@ -568,6 +571,9 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 | SSE route returns 307 redirect instead of 401 JSON | Used `verifySession()` (redirects) instead of `auth()` | API routes use `auth()` directly: returns null → 401 JSON |
 | SSE stream hangs / never closes | `controller.close()` not called on terminal status | Poll DB every 2s; close when `status ∈ {completed, failed}` |
 | `EventSource` leaks across navigations | `useEffect` cleanup missing `eventSource.close()` | Return cleanup fn from `useEffect` |
+| Project detail page shows "This page couldn't load" | Client component imports `r2.ts` at module level, triggering env validation in browser where server-only env vars are undefined | **Never import `@/lib/storage/r2` in `'use client'` files.** Sign URLs in Server Components, pass as props to client components. |
+| `assemble-video` can't find FFmpeg binary | `@ffmpeg-installer/ffmpeg` removed; system FFmpeg not installed | `sudo apt install ffmpeg` (Ubuntu) or `brew install ffmpeg` (macOS). Set `FFMPEG_PATH` env var if non-standard location. |
+| `FFMPEG_PATH` not set | Env var missing from `.env.local` | Add `FFMPEG_PATH=/usr/bin/ffmpeg` to `.env.local` (or your system's path) |
 | husky pre-commit hook doesn't run | `pnpm install` didn't run `prepare` script | Run `pnpm install`; ensure `.husky/pre-commit` is executable |
 
 ### Lessons Learned
@@ -575,7 +581,7 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 **Marketing layer (inherited):**
 1. **`suppressHydrationWarning` belongs on `<body>`, not just `<html>`** — Browser extensions like Grammarly inject attributes into `<body>` before React hydrates.
 2. **Workflow component needs `'use client'`** — Uses `useState` for poster→video fade-in choreography.
-3. **Test counts drift from plans** — The MEP planned 6 unit + 3 E2E; actual is now 227 unit + 48 E2E. Always verify against `pnpm test` output.
+3. **Test counts drift from plans** — The MEP planned 6 unit + 3 E2E; actual is now 232 unit + 48 E2E. Always verify against `pnpm test` output.
 4. **File structure evolves during implementation** — Update docs as you build.
 5. **Playwright requires browser binary installation** — `pnpm install` doesn't install browser binaries.
 
@@ -604,6 +610,10 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 25. **TDD exposed 4 latent defects in `assemble-video.ts`** — placeholder Buffer, missing SRT write, missing input options, brittle filter extraction. All discoverable only by writing tests first.
 26. **Source-reading tests must strip comments** — `src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')` before regex, else docblocks trigger false positives.
 27. **husky `prepare` script with `|| true` is intentional** — prevents `pnpm install` failure on first install. Don't remove.
+28. **Client components must NEVER import `r2.ts` at module level** — the `r2.ts` module imports `env` which validates all 23 env vars at module load. In the browser, only `NEXT_PUBLIC_*` vars exist — all others are `undefined`, causing "Invalid environment variables" crash. Pattern: Server Component signs the URL, passes as prop to client component. This is a P0 bug that completely breaks the project detail page.
+29. **Server-side URL signing pattern** — for any client component that needs data from server-only env vars (R2 signed URLs, Stripe secrets, etc.), the Server Component should fetch/compute the value and pass it as a prop. This is the recommended Next.js 16 pattern and avoids the client-side env validation crash entirely.
+30. **`@ffmpeg-installer/ffmpeg` is incompatible with Turbopack** — the package uses dynamic `require()` calls with runtime-constructed paths that Turbopack's static analyzer cannot resolve ("server relative imports are not implemented"). Replaced with system FFmpeg binary via `getFfmpegPath()` helper that reads `FFMPEG_PATH` env var with `/usr/bin/ffmpeg` default.
+31. **`middleware.ts` renamed to `proxy.ts` in Next.js 16** — the file convention changed to better reflect its role as a network boundary. The functionality is identical; only the filename changes. Run `npx @next/codemod@canary middleware-to-proxy .` to migrate.
 
 ### Recommendations
 
@@ -641,7 +651,7 @@ This project has a fixed marketing spec (`Project_Requirements_Document.md`) and
 
 1. `pnpm lint` — zero warnings
 2. `pnpm typecheck` — zero errors
-3. `pnpm test` — 227 unit tests pass
+3. `pnpm test` — 232 unit tests pass
 4. `pnpm test:e2e` — 48 E2E tests pass (requires Playwright browsers)
 5. `pnpm format:check` — all files use Prettier code style
 6. `pnpm build` — zero errors

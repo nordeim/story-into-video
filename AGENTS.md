@@ -13,7 +13,7 @@ Lucide React icons · class-variance-authority + clsx + tailwind-merge
 Auth.js v5 (NextAuth) + @auth/drizzle-adapter · Drizzle ORM + PostgreSQL (Neon)
 Inngest (job queue) · OpenAI GPT-4o + Whisper + Moderation · Replicate SDXL + IP-Adapter
 ElevenLabs (TTS) · Cloudflare R2 (storage) · Stripe (billing) · Zod (validation)
-FFmpeg (video assembly) · bcryptjs (password hashing)
+FFmpeg (system binary, `FFMPEG_PATH` env var) · bcryptjs (password hashing)
 ```
 
 ## Critical Design Decisions
@@ -32,6 +32,8 @@ FFmpeg (video assembly) · bcryptjs (password hashing)
 | Zod env validation (never `process.env.*` directly) | Catches typos at module load; fails fast on misconfigured deploys |
 | Credit-based billing (prepaid credits, not metered) | Simplest for AI products; no overage risk; predictable revenue |
 | Inngest for pipeline orchestration (not BullMQ) | Serverless-native; step functions map to 6-step workflow; no Redis |
+| System FFmpeg (not `@ffmpeg-installer/ffmpeg`) | Turbopack-incompatible; `FFMPEG_PATH` env var with `/usr/bin/ffmpeg` default |
+| Server-side URL signing | Client components NEVER import `r2.ts`; Server Components sign URLs, pass as props |
 
 ## Color System (Non-Negotiable)
 
@@ -105,13 +107,13 @@ src/
 │   ├── auth/{config,index}.ts              # Auth.js v5 (Google + Credentials + Drizzle adapter)
 │   ├── ai/{openai,replicate,elevenlabs}.ts # AI provider clients
 │   ├── inngest/{client,functions}.ts       # Inngest client + registrations
-│   ├── storage/r2.ts                       # R2 signed URLs (3 buckets)
+│   ├── storage/r2.ts                       # R2 signed URLs (3 buckets) — NEVER import in client components
 │   ├── stripe/client.ts                    # Stripe SDK + PRICE_IDS
 │   ├── data/                               # Static marketing data (10 files)
 │   ├── hooks/                              # use-scrolled, use-reveal, use-reduced-motion, use-project-progress
 │   ├── fonts.ts · utils.ts
 ├── tests/
-│   ├── unit/                     # 32 files, 227 tests
+│   ├── unit/                     # 32 files, 232 tests
 │   ├── e2e/                      # 9 files, 48 tests
 │   └── setup.ts                  # jest-dom + test env vars
 ├── types/index.ts                # 12 marketing interfaces
@@ -147,7 +149,7 @@ pnpm dev          # Development server (Turbopack)
 pnpm build        # Production build (hybrid: static + dynamic)
 pnpm lint         # eslint . (flat config)
 pnpm typecheck    # tsc --noEmit (strict + noUncheckedIndexedAccess)
-pnpm test         # vitest run (227 unit tests, jsdom)
+pnpm test         # vitest run (232 unit tests, jsdom)
 pnpm test:e2e     # playwright test (48 E2E tests, Chromium, auto-starts dev)
 pnpm format       # prettier --write
 pnpm format:check # prettier --check
@@ -185,7 +187,7 @@ Step 2: Generate characters (Replicate SDXL → moderateImage per ADR-011)
 Step 3: Generate scenes (Replicate SDXL + IP-Adapter → moderateImage per ADR-011)
 Step 4: Synthesize voiceover (ElevenLabs TTS → R2 putObject → appendVoiceover)
 Step 5: Align subtitles (fetch audio from R2 → Whisper ASR → SRT → R2 → updateVideoSubtitle)
-Step 6: Assemble video (FFmpeg → R2 putObject('videos') → appendVideo)
+Step 6: Assemble video (FFmpeg via `getFfmpegPath()` → R2 putObject('videos') → appendVideo)
 Final: Mark status='completed', progressPercent=100
 ```
 
@@ -213,6 +215,8 @@ Each step is idempotent (Inngest retries), debits credits (analysis=5, char=10, 
 | CreateWizard | Submit → createProjectAction | Server Action (auth-first, Zod, moderation, credits, **Inngest trigger**) |
 | Dashboard | Project list | Suspense + Server Component + `getUserProjects()` |
 | ProjectDetail | Live pipeline status | `ProjectProgressPanel` client component → SSE `/api/projects/[id]/progress` |
+| ProjectDetail | Download completed video | `SignedDownloadWrapper` (Server) → `ProjectDownloadButton` (Client, receives `downloadUrl` prop) |
+| ProjectDetail | Share project | `ProjectShareButton` → Web Share API + clipboard fallback |
 | ProjectDetail | Download completed video | `ProjectDownloadButton` → signed R2 URL (1h expiry) |
 | ProjectDetail | Share project | `ProjectShareButton` → Web Share API + clipboard fallback |
 
@@ -277,6 +281,9 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 25. **SSE polling (2s) over LISTEN/NOTIFY** — serverless can't hold long-lived Postgres connections. Poll DB every 2s; close stream on terminal status (`completed`/`failed`).
 26. **`EventSource` cleanup is mandatory** — `useEffect` must return `() => eventSource.close()`. Otherwise connection leaks across navigations.
 27. **`getProject()` LEFT JOINs videos** — returns `videoKey`, `subtitleKey` (nullable). UI conditionally renders download button. Don't add a second DB round-trip.
+28. **Client components must NEVER import `r2.ts` at module level** — env validation throws in browser where server-only env vars are undefined. Sign URLs in Server Components (`SignedDownloadWrapper`), pass as props. This is a P0 bug that breaks `/projects/[id]`.
+29. **`@ffmpeg-installer/ffmpeg` incompatible with Turbopack** — replaced with system FFmpeg binary via `getFfmpegPath()`. Set `FFMPEG_PATH` env var if non-standard location.
+30. **`middleware.ts` renamed to `proxy.ts` in Next.js 16** — functionality identical, only filename changes.
 28. **`putObject` (pipeline) vs `getSignedUploadUrl` (client)** — pipeline steps have Buffer in memory → direct PUT. Client uploads use presigned URL → browser uploads directly to R2.
 29. **`assemble-video.ts` temp file lifecycle** — writes SRT to `/tmp/siv-srt-<ts>.srt`, runs FFmpeg to `/tmp/siv-video-<ts>.mp4`, reads MP4 into Buffer, `unlink`s both. Never leak temp files.
 30. **`moderateImage` fail-open policy** — unknown Replicate output shapes return `flagged:false`. Deliberate tradeoff (fail-closed would block all generations from models without safety metadata).
@@ -285,7 +292,7 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 
 ## What's Implemented vs. Outstanding
 
-### ✅ Implemented (code layer — 227 unit tests + 48 E2E tests, all GREEN)
+### ✅ Implemented (code layer — 232 unit tests + 48 E2E tests, all GREEN)
 - Auth.js v5 (Google OAuth + Credentials, Drizzle adapter, JWT sessions)
 - Drizzle schema (11 tables, 8 enums) + migration config
 - `verifySession()` DAL + middleware route protection
@@ -305,12 +312,14 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 - Billing page (4-tier plan table)
 - SSE progress stream (`/api/projects/[id]/progress` — 2s polling, owner-checked)
 - `useProjectProgress` client hook + `ProjectProgressPanel` (live progress bar)
-- Download button (signed R2 URL) + Share button (Web Share API + clipboard fallback)
+- Download button (signed R2 URL, **server-side signing** via `SignedDownloadWrapper` Server Component) + Share button (Web Share API + clipboard fallback)
 - `getProject()` LEFT JOINs videos — returns `videoKey` for conditional download render
+- `getFfmpegPath()` helper — resolves FFmpeg binary from `FFMPEG_PATH` env var (default `/usr/bin/ffmpeg`)
+- **Client components never import `r2.ts` at module level** — prevents env validation crash in browser
 - Privacy Policy + Terms of Service pages (Server Components, AI-specific clauses)
 - All 14 marketing CTAs wired to real routes
 - husky + lint-staged pre-commit hook (`.husky/pre-commit`)
-- 227 unit tests (32 files) + 48 E2E tests (9 files)
+- 232 unit tests (32 files) + 48 E2E tests (9 files)
 
 ### ⚠️ Outstanding (requires external resources / not yet done)
 - **External service credentials** — Neon, Google OAuth, OpenAI, Replicate, ElevenLabs, R2, Stripe, Inngest, Resend, Upstash, Sentry (fill `.env.local` from `.env.example`)
@@ -361,13 +370,15 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 | SSE route returns 307 redirect instead of 401 JSON | Used `verifySession()` (redirects) instead of `auth()` | API routes use `auth()` directly: returns null → 401 JSON |
 | SSE stream hangs / never closes | `controller.close()` not called on terminal status | Poll DB every 2s; close when `status ∈ {completed, failed}` |
 | `EventSource` leaks across navigations | `useEffect` cleanup missing `eventSource.close()` | Return cleanup fn from `useEffect` |
+| Project detail page shows "This page couldn't load" | Client component imports `r2.ts` at module level, triggering env validation crash in browser | **Never import `@/lib/storage/r2` in `'use client'` files.** Sign URLs in Server Components, pass as props. |
+| `assemble-video` can't find FFmpeg binary | `@ffmpeg-installer/ffmpeg` removed; system FFmpeg not installed | `sudo apt install ffmpeg` (Ubuntu) or `brew install ffmpeg` (macOS). Set `FFMPEG_PATH` env var if non-standard. |
 | husky pre-commit hook doesn't run | `pnpm install` didn't run `prepare` script | Run `pnpm install`; ensure `.husky/pre-commit` is executable |
 
 ## Lessons Learned
 
 1. **`suppressHydrationWarning` on `<body>`** — Browser extensions inject attributes before React hydrates. `<html>` alone is insufficient.
 2. **Workflow is `'use client'`** — Uses `useState` for video loading choreography. Don't assume server components for "mostly static" sections.
-3. **Test counts drift from plans** — MEP planned 6+3, actual is now 227 unit + 48 E2E. Always verify against `pnpm test` output.
+3. **Test counts drift from plans** — MEP planned 6+3, actual is now 232 unit + 48 E2E. Always verify against `pnpm test` output.
 4. **File structure evolves** — `features/`, `lib/db/`, `lib/ai/`, `lib/auth/`, `lib/storage/`, `lib/inngest/`, `lib/stripe/`, `lib/env/` were created during production build. Update docs as you build.
 5. **Playwright needs separate install** — `pnpm install` doesn't install browser binaries.
 6. **Zod `.url()` rejects `postgresql://`** — use `.refine()` for non-standard URL schemes.
@@ -380,17 +391,22 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 13. **Stripe SDK v22 camelCase breaking change** — `currentPeriodEnd` not `current_period_end`.
 14. **ElevenLabs returns `Readable`, not `ReadableStream`** — duck-type the input in `streamToBuffer`.
 15. **TDD with mocked AI providers works well** — all 6 pipeline domain functions are fully unit-tested; real API calls only needed for manual E2E validation.
-16. **Vitest mock hoisting is the #1 test bug** — `vi.mock()` factories are hoisted above imports. Use `vi.hoisted()` for shared `vi.fn()` state. Symptom: `Cannot access 'X' before initialization`.
-17. **Mock constructors must be `class`, not arrow fns** — `new S3Client(...)` requires `new`-able mock. Arrow fns throw `"X is not a constructor"`.
-18. **SSE in Next.js 16** — `ReadableStream` + `text/event-stream` content-type + 2s DB polling. Simpler than Postgres LISTEN/NOTIFY for serverless.
-19. **`auth()` vs `verifySession()` for API routes** — `verifySession()` throws redirect (wrong for JSON). API routes use `auth()` → null → 401 JSON.
-20. **`EventSource` cleanup is non-negotiable** — `useEffect` must return `() => eventSource.close()`. Otherwise connection leaks.
-21. **Image moderation via Replicate safety output** — zero extra API calls vs. OpenAI vision moderation. Fail-open for unknown shapes (deliberate tradeoff).
-22. **`getProject()` LEFT JOIN videos** — cheaper than two queries. UI uses `videoKey` for conditional download button render.
-23. **`putObject` (pipeline) vs `getSignedUploadUrl` (client)** — pipeline has Buffer in memory → direct PUT. Client uploads use presigned URL.
-24. **TDD exposed 4 latent defects in `assemble-video.ts`** — placeholder Buffer, missing SRT write, missing input options, brittle filter extraction. All discoverable only by writing tests first.
-25. **Source-reading tests must strip comments** — `src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')` before regex, else docblocks trigger false positives.
-26. **husky `prepare` script with `|| true` is intentional** — prevents `pnpm install` failure on first install. Don't remove.
+16. **Client components must NEVER import `r2.ts` at module level** — the `r2.ts` module imports `env` which validates all 23 env vars at module load. In the browser, only `NEXT_PUBLIC_*` vars exist — all server-only vars are `undefined`, causing "Invalid environment variables" crash. The fix: Server Component signs the URL, passes as prop to client component. This is a P0 bug that completely breaks the project detail page.
+17. **Server-side URL signing pattern** — for any client component that needs data from server-only env vars (R2 signed URLs, Stripe secrets, etc.), the Server Component should fetch/compute the value and pass it as a prop. This is the recommended Next.js 16 pattern.
+18. **`@ffmpeg-installer/ffmpeg` incompatible with Turbopack** — the package uses dynamic `require()` with runtime-constructed paths that produce `/ROOT/node_modules/...` under Turbopack. Replaced with system FFmpeg binary via `getFfmpegPath()` helper.
+19. **`middleware.ts` renamed to `proxy.ts` in Next.js 16** — the file convention changed. Functionality identical, only filename changes.
+20. **Vitest mock hoisting is the #1 test bug** — `vi.mock()` factories are hoisted above imports. Use `vi.hoisted()` for shared `vi.fn()` state. Symptom: `Cannot access 'X' before initialization`.
+21. **Mock constructors must be `class`, not arrow fns** — `new S3Client(...)` requires `new`-able mock. Arrow fns throw `"X is not a constructor"`.
+22. **SSE in Next.js 16** — `ReadableStream` + `text/event-stream` content-type + 2s DB polling. Simpler than Postgres LISTEN/NOTIFY for serverless.
+23. **`auth()` vs `verifySession()` for API routes** — `verifySession()` throws redirect (wrong for JSON). API routes use `auth()` → null → 401 JSON.
+24. **`EventSource` cleanup is non-negotiable** — `useEffect` must return `() => eventSource.close()`. Otherwise connection leaks.
+25. **Image moderation via Replicate safety output** — zero extra API calls vs. OpenAI vision moderation. Fail-open for unknown shapes (deliberate tradeoff).
+26. **`getProject()` LEFT JOIN videos** — cheaper than two queries. UI uses `videoKey` for conditional download button render.
+27. **`putObject` (pipeline) vs `getSignedUploadUrl` (client)** — pipeline has Buffer in memory → direct PUT. Client uploads use presigned URL.
+28. **TDD exposed 4 latent defects in `assemble-video.ts`** — placeholder Buffer, missing SRT write, missing input options, brittle filter extraction. All discoverable only by writing tests first.
+29. **Source-reading tests must strip comments** — `src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')` before regex, else docblocks trigger false positives.
+30. **husky `prepare` script with `|| true` is intentional** — prevents `pnpm install` failure on first install. Don't remove.
+31. **`middleware.ts` renamed to `proxy.ts` in Next.js 16** — the file convention changed to better reflect its role as a network boundary. Functionality is identical; only the filename changes. Run `npx @next/codemod@canary middleware-to-proxy .` or rename manually.
 
 ## Reference
 

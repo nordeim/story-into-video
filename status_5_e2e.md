@@ -1120,4 +1120,33 @@ Quality Gate
   pnpm build      → ✅ Successful 
 ``` 
 
+---
+
+Documentation Update Summary 
+ 
+Files Modified 
+ 
+┌───────────┬────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐ 
+│ File      │ Sections Updated                                                                                                                                                                                                           │ 
+├───────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ README.md │ Tech Stack (FFmpeg), Quick Start (test counts), Architecture (proxy.ts), Project Structure (8 app components), Key Conventions (R2 + FFmpeg rules), Testing (232 tests, updated test table), What's Implemented            │ 
+│           │ (server-side signing), Troubleshooting (3 new entries), Lessons Learned (4 new entries), Anti-Patterns, Success Criteria                                                                                                   │ 
+├───────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ CLAUDE.md │ Tech Stack (FFmpeg), Architecture (proxy.ts), File Organization (8 app components), Routes (proxy), Build Commands (232 tests), Test Coverage (232 tests, updated test table), File Organization (download button          │ 
+│           │ description), Common Pitfalls (#40, #41), Troubleshooting (3 new entries), Lessons Learned (4 new entries), Outstanding Issues (download fix note)                                                                         │ 
+├───────────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ AGENTS.md │ Stack (FFmpeg), Critical Design Decisions (3 new rules), File Structure (r2.ts warning), Routes (proxy), Component Contracts (download button), AI Pipeline (getFfmpegPath), Interaction Inventory (3 new rows), Common    │ 
+│           │ Pitfalls (#26, #27), Troubleshooting (2 entries), Lessons Learned (4 new entries), Implementation Deviations                                                                                                               │ 
+└───────────┴────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘ 
+ 
+Key Changes Across All Docs 
+ 
+1. Test counts: 227 → 232 (all references updated) 
+2. FFmpeg: @ffmpeg-installer/ffmpeg → system binary via getFfmpegPath() + FFMPEG_PATH env var 
+3. Middleware → Proxy: Renamed in Next.js 16, all references updated 
+4. Server-side URL signing: New pattern documented — SignedDownloadWrapper Server Component signs URLs, passes as props to client components 
+5. Client components never import r2.ts: New pitfall/gotcha documented across all docs 
+6. Troubleshooting: 5 new entries (env crash, FFmpeg path, project detail page) 
+7. Lessons Learned: 4 new entries (#28-31 in README, #28-31 in CLAUDE, #16-19 in AGENTS) 
+8. Outstanding Issues: Download button marked as fixed with server-side signing note 
 
