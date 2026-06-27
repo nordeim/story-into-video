@@ -26,6 +26,10 @@ Awesome meticulous review, analysis and planning. Please keep up the good work. 
 
 ---
 
+Awesome meticulous review, analysis and planning. Please keep up the good work. Now, please suggest how to improve the codebase such that the remediated resulting website can be a production site with actual functionalities instead of mock placeholders
+
+---
+
 please try out system installed (external) CLI browser tools 'agent-browser' and 'playwright-cli' by executing them directly as bash shell commands. already installed so just run them. use the 'agent-browser -h' or 'playwright-cli -h' to get more usage guide.
 
 ---
