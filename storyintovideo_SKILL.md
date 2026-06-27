@@ -1,7 +1,7 @@
 ---
 name: storyintovideo
-description: Complete engineering reference for the StoryIntoVideo production SaaS — a luxury-dark cinematic AI story-into-video generator built with Next.js 16, React 19, Tailwind v4 CSS-first @theme, Auth.js v5, Drizzle/Postgres, Inngest, and a fully-wired 6-step AI pipeline (moderate → analyze → characters → scenes → voiceover → subtitles → assemble). Covers the marketing clone design system, the 5-layer production architecture, exact color tokens, the 13 CSS keyframes, the auth-first Server Action pattern, SSE progress streaming, image moderation (ADR-011), and every bug encountered during the 4-sprint build + remediation sprint. v2.0.0 reflects the post-remediation codebase (227 unit tests + 48 E2E tests, Steps 4-6 wired, inngest.send uncommented, assemble-video rewritten, legal pages live, husky pre-commit hook active).
-version: 2.0.0
+description: Complete engineering reference for the StoryIntoVideo production SaaS — a luxury-dark cinematic AI story-into-video generator built with Next.js 16, React 19, Tailwind v4 CSS-first @theme, Auth.js v5, Drizzle/Postgres, Inngest, and a fully-wired 6-step AI pipeline (moderate → analyze → characters → scenes → voiceover → subtitles → assemble). Covers the marketing clone design system, the 5-layer production architecture, exact color tokens, the 13 CSS keyframes, the auth-first Server Action pattern, SSE progress streaming, image moderation (ADR-011), server-side URL signing, and every bug encountered during the 4-sprint build + remediation sprint. v2.1.0 reflects the latest codebase (232 unit tests + 48 E2E tests, Steps 4-6 wired, assemble-video rewritten, legal pages live, husky pre-commit hook active, project-download-button refactored with server-side signing, @ffmpeg-installer/ffmpeg replaced with system FFmpeg, middleware→proxy rename).
+version: 2.1.0
 ---
 
 # StoryIntoVideo — Engineering Skill Reference
@@ -10,7 +10,7 @@ version: 2.0.0
 >
 > **Authoritative Sources:** This SKILL.md is derived from `CLAUDE.md` · `AGENTS.md` · `README.md` · `PRODUCTION_READINESS_PLAN.md` · `Project_Requirements_Document.md` · the actual source tree under `src/`. When in doubt, consult `CLAUDE.md` as the source of truth.
 >
-> **v2.0.0 changelog:** Reflects the remediation sprint — Steps 4-6 wired into Inngest, `inngest.send()` uncommented, `assemble-video.ts` rewritten (4 defects fixed), SSE progress stream at `/api/projects/[id]/progress`, download/share buttons on project detail, image moderation via `moderateImage` (ADR-011), `/privacy` + `/terms` legal pages, husky + lint-staged pre-commit hook, documentation drifts fixed. Test count 164 → 227.
+> **v2.1.0 changelog:** Reflects the latest fixes — `project-download-button.tsx` refactored to receive `downloadUrl` prop from `SignedDownloadWrapper` Server Component (fixes P0 env validation crash on `/projects/[id]`), `@ffmpeg-installer/ffmpeg` replaced with system FFmpeg via `getFfmpegPath()` (fixes Turbopack build failure), `middleware.ts` renamed to `proxy.ts` (Next.js 16 migration). Test count 227 → 232.
 
 ---
 
@@ -114,7 +114,7 @@ All implementation work follows this mandatory workflow (per `CLAUDE.md`):
 | `@aws-sdk/client-s3` | ^3.1075.0 | Cloudflare R2 storage (S3-compatible) |
 | `@aws-sdk/s3-request-presigner` | ^3.1075.0 | R2 signed URLs |
 | `fluent-ffmpeg` | ^2.1.3 | Video assembly (MP4 composition) |
-| `@ffmpeg-installer/ffmpeg` | ^1.1.0 | FFmpeg binary path |
+| *(none)* | — | FFmpeg binary — system-installed, path via `FFMPEG_PATH` env var (default `/usr/bin/ffmpeg`). `@ffmpeg-installer/ffmpeg` was removed (Turbopack-incompatible). |
 | `@radix-ui/react-accordion` | ^1.2.0 | FAQ accordion primitive |
 | `@radix-ui/react-dialog` | ^1.1.0 | Mobile nav Sheet primitive |
 | `@radix-ui/react-dropdown-menu` | ^2.1.0 | Language switcher primitive |
@@ -201,7 +201,7 @@ pnpm install          # Install deps (activates husky via `prepare` script)
 pnpm dev              # Start dev server (Turbopack, port 3000)
 pnpm lint             # ESLint flat config
 pnpm typecheck        # tsc --noEmit
-pnpm test             # Vitest (227 unit tests)
+pnpm test             # Vitest (232 unit tests)
 pnpm test:e2e         # Playwright (48 E2E tests, requires `pnpm exec playwright install`)
 pnpm build            # Production build
 pnpm drizzle-kit generate   # Create migration SQL from schema diff
@@ -233,7 +233,9 @@ pnpm create next-app@latest story-into-video \
 pnpm add next-auth@5.0.0-beta.31 @auth/drizzle-adapter drizzle-orm postgres
 pnpm add inngest openai replicate elevenlabs stripe
 pnpm add @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
-pnpm add fluent-ffmpeg @ffmpeg-installer/ffmpeg
+pnpm add fluent-ffmpeg
+# System FFmpeg — install via apt/brew, set FFMPEG_PATH env var if non-standard
+# sudo apt install ffmpeg  (Ubuntu)  or  brew install ffmpeg  (macOS)
 pnpm add @radix-ui/react-accordion @radix-ui/react-dialog @radix-ui/react-dropdown-menu @radix-ui/react-slot
 pnpm add bcryptjs class-variance-authority clsx tailwind-merge geist lucide-react zod
 
@@ -842,7 +844,7 @@ Ring:          #febf0080 (50% opacity amber focus ring)
 ### The 5-Layer Architecture (Golden Rule)
 
 ```
-Layer 0: src/middleware.ts        — Cookie check, redirect. NO DB. Edge runtime.
+Layer 0: src/proxy.ts             — Cookie check, redirect. NO DB. Edge runtime. (Renamed from `middleware.ts` in Next.js 16 migration.)
 Layer 1: src/app/                 — Route structure, metadata, Suspense. Layouts must NOT fetch data.
 Layer 2: src/features/            — UI composition, data binding, mutations (auth, projects, pipeline, billing)
 Layer 3: src/features/*/domain/   — Pure business logic. No Next.js or DB runtime imports (import type only)
@@ -921,14 +923,23 @@ Layer 4: src/lib/                 — Infrastructure: Drizzle, Auth.js, Inngest,
 
 #### ProjectDownloadButton (`src/components/app/project-download-button.tsx`)
 
-- Client component, fetches signed R2 URL on mount via `getSignedDownloadUrl('videos', videoKey)`
-- Renders: loading state ("Preparing…") → `<a href={signedUrl} download>` amber pill
-- 1-hour URL expiry (re-fetched on every mount, so always fresh)
+- Client component (presentational only), receives pre-signed `downloadUrl` prop from parent
+- Renders: `<a href={downloadUrl} download>` amber pill directly — no loading state, no `r2.ts` import
+- Parent is `SignedDownloadWrapper` (Server Component) that calls `getSignedDownloadUrl('videos', videoKey)` at SSR time
+- 1-hour URL expiry (generated at SSR time, so URL is fresh when page loads)
+- **Critical:** This component must NEVER import from `@/lib/storage/r2` — that chain triggers env validation in the browser
 
 #### ProjectShareButton (`src/components/app/project-share-button.tsx`)
 
 - Client component, uses Web Share API when available, falls back to `navigator.clipboard.writeText`
 - Shows transient "Copied!" state for 2 seconds after clipboard success
+
+#### SignedDownloadWrapper (`src/app/(app)/projects/[id]/page.tsx`)
+
+- Async Server Component that calls `getSignedDownloadUrl('videos', videoKey)` at SSR time
+- Passes the signed URL as `downloadUrl` prop to `ProjectDownloadButton`
+- Wraps both the download button and share button in a flex container
+- **This is the recommended pattern for any client component that needs server-only env data:** Server Component fetches/computes the value, passes as prop to client component. Avoids importing `r2.ts` (or any env-dependent module) in client components.
 
 ### Auth-First Server Action Pattern
 
@@ -994,7 +1005,7 @@ All DB access goes through feature-level `queries.ts` files. Components never ca
 - `src/features/pipeline/domain/generate-scene.ts` — Replicate SDXL + IP-Adapter
 - `src/features/pipeline/domain/synthesize-voice.ts` — ElevenLabs TTS (chunked)
 - `src/features/pipeline/domain/align-subtitles.ts` — Whisper ASR → SRT
-- `src/features/pipeline/domain/assemble-video.ts` — FFmpeg compositor (SRT temp file + Buffer readback)
+- `src/features/pipeline/domain/assemble-video.ts` — FFmpeg compositor (SRT temp file + Buffer readback). Uses `getFfmpegPath()` to resolve the FFmpeg binary path (`FFMPEG_PATH` env var, default `/usr/bin/ffmpeg`).
 - `src/features/billing/domain/tier-limits.ts` — `TIER_LIMITS` + `CREDIT_COSTS`
 
 ---
@@ -1727,7 +1738,7 @@ Run every item before claiming completion. All must pass.
 ```bash
 pnpm lint         # ESLint flat config — 0 warnings
 pnpm typecheck    # tsc --noEmit — 0 errors
-pnpm test         # Vitest — 227/227 unit tests pass
+pnpm test         # Vitest — 232/232 unit tests pass
 pnpm test:e2e     # Playwright — 48/48 E2E tests pass (requires `pnpm exec playwright install`)
 pnpm build        # next build — 0 errors
 pnpm format:check # Prettier — all files use Prettier code style
@@ -1831,7 +1842,7 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm build
 
 2. **Workflow is `'use client'`** — Uses `useState` for video loading choreography. Don't assume server components for "mostly static" sections. **Avoid:** check for `useState`/`useEffect`/event handlers before deciding server vs client.
 
-3. **Test counts drift from plans** — MEP planned 6+3, actual is now 227 unit + 48 E2E. **Avoid:** always verify against `pnpm test` output, never trust doc-stated counts blindly.
+3. **Test counts drift from plans** — MEP planned 6+3, actual is now 232 unit + 48 E2E. **Avoid:** always verify against `pnpm test` output, never trust doc-stated counts blindly.
 
 4. **File structure evolves** — `components/primitives/`, `lib/hooks/`, `lib/data/` were created during build. **Avoid:** update docs as you build; don't assume the initial structure is final.
 
@@ -2522,7 +2533,7 @@ This table validates the SKILL.md against the codebase. Every claim is verified.
 | 13 | `@utility` classes (7 total) | `globals.css:281-389` | ✅ |
 | 14 | `prefers-reduced-motion` global override | `globals.css:433-455` | ✅ |
 | 15 | `:focus-visible` outline 2px solid primary | `globals.css:269-272` | ✅ |
-| 16 | 5-layer architecture | `src/middleware.ts`, `src/app/`, `src/features/`, `src/features/*/domain/`, `src/lib/` | ✅ |
+| 16 | 5-layer architecture | `src/proxy.ts` (Layer 0), `src/app/`, `src/features/`, `src/features/*/domain/`, `src/lib/` | ✅ |
 | 17 | `verifySession()` throws NEXT_REDIRECT | `src/features/auth/domain/verify-session.ts` | ✅ |
 | 18 | `auth()` used in API routes (not verifySession) | `src/app/api/projects/[id]/progress/route.ts` | ✅ |
 | 19 | `useScrolled` hook | `src/lib/hooks/use-scrolled.ts` | ✅ |
@@ -2537,11 +2548,15 @@ This table validates the SKILL.md against the codebase. Every claim is verified.
 | 28 | `assemble-video.ts` rewrites with SRT temp file + Buffer readback | `src/features/pipeline/domain/assemble-video.ts` | ✅ |
 | 29 | `putObject` helper in `r2.ts` | `src/lib/storage/r2.ts:78-91` | ✅ |
 | 30 | `getProject()` LEFT JOINs videos | `src/features/projects/queries.ts:31-66` | ✅ |
-| 31 | 227 unit tests across 32 files | `pnpm test` output | ✅ |
+| 31 | 232 unit tests across 32 files | `pnpm test` output | ✅ |
 | 32 | 48 E2E tests across 9 files | `pnpm test:e2e` output | ✅ |
 | 33 | 14 routes total | `src/app/` file tree | ✅ |
 | 34 | husky + lint-staged pre-commit hook | `.husky/pre-commit`, `package.json:27-37` | ✅ |
 | 35 | `prepare: "husky \|\| true"` script | `package.json:27` | ✅ |
+| 36 | `ProjectDownloadButton` receives `downloadUrl` prop (no `r2.ts` import) | `src/components/app/project-download-button.tsx` | ✅ |
+| 37 | `SignedDownloadWrapper` signs URLs server-side | `src/app/(app)/projects/[id]/page.tsx` | ✅ |
+| 38 | System FFmpeg via `getFfmpegPath()` | `src/features/pipeline/domain/assemble-video.ts` | ✅ |
+| 39 | `Layer 0` is `src/proxy.ts` (not `middleware.ts`) | `src/proxy.ts` | ✅ |
 
 ---
 
@@ -2566,7 +2581,7 @@ You are successful when:
 
 - `pnpm lint` exits with 0 warnings
 - `pnpm typecheck` exits with 0 errors
-- `pnpm test` passes all 227 unit tests
+- `pnpm test` passes all 232 unit tests
 - `pnpm test:e2e` passes all 48 E2E tests (requires Playwright browsers installed)
 - `pnpm build` exits with 0 errors
 - Lighthouse scores ≥ 95 across Performance, Accessibility, Best Practices, SEO (marketing page)
