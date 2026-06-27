@@ -22,6 +22,10 @@ Awesome meticulous review, analysis and planning. Please keep up the good work. 
 
 ---
 
+please meticulously use the CLI browser tools, agent-browser and/or playwright-cli (run them in bash shell), to test `/sign-in`. next, meticulously plan to do E2E tests to validate the code changes involved in production readiness transformation.
+
+---
+
 Awesome meticulous review, analysis and planning. Please keep up the good work. now, please meticulously review the included gap analysis `storyintovideo_deviation_report.md` and validate it againt the codebase to check for alignment and to identify the root causes and the optimal fixes. then meticulously plan to create a comprehensive remediation plan with a detailed ToDo list to apply the optimal fixes. review and validat the remediation plan against the codebase to ensure alignment before proceeding to execute it meticulously. remember to use TDD approach to make code changes.
 
 ---
