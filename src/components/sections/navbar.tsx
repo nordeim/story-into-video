@@ -98,7 +98,7 @@ export function Navbar() {
 
           {/* Sign in (desktop only) */}
           <a
-            href="#"
+            href="/sign-in"
             className="hidden rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 sm:inline"
           >
             Sign in
@@ -106,7 +106,7 @@ export function Navbar() {
 
           {/* Get Started (desktop) */}
           <a
-            href="/auth/sign-up"
+            href="/sign-up"
             className="hidden rounded-full px-5 py-2 text-base font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 sm:inline"
           >
             Get Started
@@ -154,14 +154,14 @@ export function Navbar() {
                 ))}
                 <hr className="my-2 border-white/10" />
                 <a
-                  href="#"
+                  href="/sign-in"
                   onClick={() => setMobileOpen(false)}
                   className="rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
                 >
                   Sign in
                 </a>
                 <a
-                  href="/auth/sign-up"
+                  href="/sign-up"
                   onClick={() => setMobileOpen(false)}
                   className="rounded-lg px-3 py-2 text-base font-medium text-amber-400 transition-colors hover:bg-amber-400/10 hover:text-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
                 >

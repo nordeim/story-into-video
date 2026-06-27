@@ -7,7 +7,7 @@ export const WORKFLOW_STEPS: WorkflowStep[] = [
     description:
       'Paste your story in any language — novel, script, or narrative. Pick a visual style and aspect ratio.',
     ctaLabel: 'Start Your Story',
-    ctaHref: '#',
+    ctaHref: '/create',
     videoSrc: '/workflow/showcase-step1.mp4',
     videoPoster: '/workflow/showcase-step1-poster.webp',
     mediaPosition: 'right',
@@ -18,7 +18,7 @@ export const WORKFLOW_STEPS: WorkflowStep[] = [
     description:
       'AI reads your story and performs automatic scene breakdown — creating consistent character portraits.',
     ctaLabel: 'Create Your Characters',
-    ctaHref: '#',
+    ctaHref: '/create',
     videoSrc: '/workflow/showcase-step2.mp4',
     videoPoster: '/workflow/showcase-step2-poster.webp',
     mediaPosition: 'left',
@@ -29,7 +29,7 @@ export const WORKFLOW_STEPS: WorkflowStep[] = [
     description:
       'AI breaks your story into shots and generates storyboard images automatically, with full character consistency.',
     ctaLabel: 'Try AI Storyboard',
-    ctaHref: '#',
+    ctaHref: '/create',
     videoSrc: '/workflow/showcase-step3.mp4',
     videoPoster: '/workflow/showcase-step3-poster.webp',
     mediaPosition: 'right',
@@ -40,7 +40,7 @@ export const WORKFLOW_STEPS: WorkflowStep[] = [
     description:
       'Full creative control in the timeline editor. Add AI voiceover and background music, style subtitles.',
     ctaLabel: 'Create Your Video',
-    ctaHref: '#',
+    ctaHref: '/create',
     videoSrc: '/workflow/showcase-step4.mp4',
     videoPoster: '/workflow/showcase-step4-poster.webp',
     mediaPosition: 'left',

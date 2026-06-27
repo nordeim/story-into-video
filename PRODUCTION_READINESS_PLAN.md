@@ -1525,4 +1525,3 @@ NODE_ENV=development
 ---
 
 *End of Production Readiness Plan. Implement sprints in order. Follow the TDD task cards. Run the quality gate before every commit. Escalate when uncertain. Preserve the design system.*
-

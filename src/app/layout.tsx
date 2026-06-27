@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { fontVariables } from '@/lib/fonts';
+import { Providers } from '@/components/app/providers';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -67,7 +68,7 @@ export default function RootLayout({
         >
           Skip to content
         </a>
-        {children}
+        <Providers>{children}</Providers>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

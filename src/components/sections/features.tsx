@@ -78,7 +78,7 @@ export function Features() {
         </div>
 
         <ScrollReveal className="mt-12 text-center" delay={400}>
-          <CtaGhost href="#">Start Creating Your Video</CtaGhost>
+          <CtaGhost href="/create">Start Creating Your Video</CtaGhost>
         </ScrollReveal>
       </div>
     </section>

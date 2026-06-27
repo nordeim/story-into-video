@@ -53,7 +53,7 @@ export function Testimonials() {
         </div>
 
         <ScrollReveal className="mt-12 text-center" delay={400}>
-          <CtaGhost href="#">Join Creators — Start Free</CtaGhost>
+          <CtaGhost href="/create">Join Creators — Start Free</CtaGhost>
         </ScrollReveal>
       </div>
     </section>

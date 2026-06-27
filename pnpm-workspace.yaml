@@ -1,6 +1,10 @@
 allowBuilds:
+  '@ffmpeg-installer/linux-x64': set this to true or false
+  esbuild: true
+  protobufjs: set this to true or false
   sharp: true
   unrs-resolver: true
 onlyBuiltDependencies:
   - sharp
   - unrs-resolver
+  - esbuild

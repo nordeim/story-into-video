@@ -48,7 +48,7 @@ export function FinalCTA() {
           Join thousands of creators turning their stories into cinematic videos with AI. No editing
           skills required — just paste your story and watch it come alive.
         </p>
-        <CtaAmber href="/auth/sign-up">Start Creating — It&apos;s Free</CtaAmber>
+        <CtaAmber href="/create">Start Creating — It&apos;s Free</CtaAmber>
         <p className="mt-6 text-xs text-zinc-500">No credit card required · Free forever plan</p>
       </ScrollReveal>
     </section>

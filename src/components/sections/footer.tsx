@@ -56,22 +56,22 @@ export function Footer() {
           <p className="text-sm text-zinc-500">{FOOTER_COPYRIGHT}</p>
           <nav className="flex gap-6" aria-label="Legal">
             <a
-              href="#"
+              href="/privacy"
               className="text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
             >
               Privacy Policy
             </a>
             <a
-              href="#"
+              href="/terms"
               className="text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
             >
               Terms of Service
             </a>
             <a
-              href="#"
+              href="/contact"
               className="text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
             >
-              All AI Tools
+              Contact
             </a>
           </nav>
         </div>

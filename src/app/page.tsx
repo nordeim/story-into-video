@@ -9,8 +9,6 @@ import { Faq } from '@/components/sections/faq';
 import { FinalCTA } from '@/components/sections/final-cta';
 import { Footer } from '@/components/sections/footer';
 
-export const dynamic = 'force-static';
-
 export default function HomePage() {
   return (
     <>

@@ -151,7 +151,7 @@ export function Hero() {
 
               {/* Start Creating CTA — glass pill with amber text */}
               <a
-                href="/auth/sign-up"
+                href="/create"
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-zinc-800 to-zinc-900 px-5 py-2.5 text-[13px] font-bold text-amber-300 transition-all hover:from-zinc-700 hover:to-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 sm:py-2"
               >
                 Start Creating
