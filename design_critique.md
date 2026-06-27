@@ -130,4 +130,106 @@ Next.js 16 introduced `proxy.ts` as a replacement for `middleware.ts`, and the s
 | 11 | 🟢 Minor | Vitest v4 automock reset behavior change undocumented |
 | 12 | 🟢 Minor | WCAG AAA blanket claim unverified for all color combinations |
 
+---
+
+### Executive Summary
+
+A meticulous validation plan was executed using extensive web searches, official documentation changelogs, and code execution to verify the 14 design and engineering findings regarding the `StoryIntoVideo SKILL.md`.
+
+The validation confirms that **all critical and significant findings are factually correct**. The `SKILL.md` contains severe inaccuracies regarding Stripe API migrations, Vercel serverless limits, and a critical React security vulnerability (CVE-2025-55182). Below is the detailed execution report outlining the search strategy, validation results, and actionable corrections for each point.
+
+---
+
+### 🔴 Critical Errors (Validated)
+
+#### 1. Stripe SDK v22 camelCase claim is factually wrong
+*   **Search Strategy:** Searched Stripe API changelogs for "Basil" (2025-03-31), `current_period_end`, and Stripe Node SDK v22 migration guides.
+*   **Validation Result:** **Confirmed.** On March 31, 2025, Stripe shipped the "Basil" API version, which removed `current_period_start` and `current_period_end` from the top-level Subscription object and moved them to `items.data.current_period_end` [[7], [11], [14]]. The Stripe Node SDK has always mirrored the REST API’s snake_case convention; it never switched to camelCase for API responses [[22]]. The SKILL.md’s claim about a camelCase fallback is entirely fictional.
+*   **Actionable Correction:** Remove the camelCase claim entirely. Update the webhook handler documentation to read from `subscription.items.data[0].current_period_end` per the Basil API migration.
+
+#### 2. Vercel `maxDuration = 900` is incorrect for Vercel Pro
+*   **Search Strategy:** Searched Vercel documentation for "Fluid compute" and "maxDuration" limits across Hobby, Pro, and Enterprise plans.
+*   **Validation Result:** **Confirmed.** With Fluid compute enabled, Vercel Hobby caps at 300s [[44], [45]]. Vercel Pro/Enterprise GA limit is 800s, with an extended beta up to 1800s [[33], [40], [44]]. Setting `maxDuration = 900` exceeds the GA limit for Pro and would only work in the extended beta [[33]].
+*   **Actionable Correction:** Change `maxDuration = 900` to `800` (for GA stability) or `300` (for Hobby compatibility). Update the text to reflect current Fluid compute limits.
+
+---
+
+### 🟠 Significant Issues (Validated)
+
+#### 3. `pnpm-workspace.yaml` mixes deprecated and current syntax
+*   **Search Strategy:** Searched pnpm release notes for `allowBuilds`, `onlyBuiltDependencies`, and pnpm v11 breaking changes.
+*   **Validation Result:** **Confirmed.** `allowBuilds` was introduced in pnpm v10.26.0 to replace `onlyBuiltDependencies` [[51], [56]]. In pnpm v11, `onlyBuiltDependencies` was completely removed and replaced by `allowBuilds` [[55], [60]]. Having both is contradictory, and `onlyBuiltDependencies` is ignored in v11.
+*   **Actionable Correction:** Pick one syntax. Since the engine requirement is `>=9.0.0`, either use `onlyBuiltDependencies` (for v9 compatibility) or bump the engine to `>=10.26.0` and use only `allowBuilds`.
+
+#### 4. `@ffmpeg-installer/linux-x64` in `allowBuilds` contradicts removal
+*   **Search Strategy:** Cross-referenced the package removal note with the `allowBuilds` list.
+*   **Validation Result:** **Confirmed.** If `@ffmpeg-installer/ffmpeg` was removed due to Turbopack incompatibility, its sub-package `@ffmpeg-installer/linux-x64` is no longer in the dependency tree and doesn't need build approval.
+*   **Actionable Correction:** Remove `@ffmpeg-installer/linux-x64` from the `allowBuilds` / `onlyBuiltDependencies` list.
+
+#### 5. Zod v4's `.url()` no longer rejects `postgresql://`
+*   **Search Strategy:** Searched Zod v4 changelog for URL validation changes.
+*   **Validation Result:** **Confirmed.** Zod v4 switched from regex-based URL validation to using the native `new URL()` constructor [[73], [80]]. The native `URL` constructor accepts custom schemes like `postgresql://`. Therefore, `.url()` in Zod v4 will happily pass a Postgres connection string, making the `.refine()` workaround obsolete.
+*   **Actionable Correction:** Remove the `.refine()` workaround for `DATABASE_URL` in Zod v4 contexts.
+
+#### 6. React security vulnerability not acknowledged
+*   **Search Strategy:** Searched NVD and React security advisories for "CVE-2025-55182".
+*   **Validation Result:** **Confirmed.** CVE-2025-55182 ("React2Shell") is a critical (CVSS 10.0) pre-auth RCE vulnerability affecting React Server Components in versions 19.0.0 through 19.2.2 [[87], [91], [92], [100]]. The patched version for the 19.2.x line is 19.2.3 [[96], [101]]. Pinning `^19.2.0` allows vulnerable versions to be installed.
+*   **Actionable Correction:** Update `react` and `react-dom` versions to `^19.2.3` (or higher). Add a security note about CVE-2025-55182.
+
+---
+
+### 🟡 Moderate Issues (Validated)
+
+#### 7. `animation-duration: 0.01ms` explanation is slightly inaccurate
+*   **Search Strategy:** Searched CSS accessibility best practices for `0.01ms` vs `0ms` and `animationend` events.
+*   **Validation Result:** **Confirmed.** The primary reason for using `0.01ms` instead of `0ms` in `prefers-reduced-motion` overrides is to preserve `animationend` and `transitionend` events, ensuring JavaScript listeners still fire [[107], [108], [113]]. The "use default" framing is inaccurate.
+*   **Actionable Correction:** Update the explanation to mention event preservation rather than "use default".
+
+#### 8. Vercel Hobby SSE reconnect framing needs updating
+*   **Search Strategy:** Tied to Point 2 (Vercel Fluid Compute limits).
+*   **Validation Result:** **Confirmed.** The framing that "raising to 900 covers Pro" is wrong based on current Fluid compute limits (800s GA).
+*   **Actionable Correction:** Reframe to: "raising `maxDuration` to 800 covers Pro/Enterprise GA; the client-side reconnect gracefully handles Hobby's 300s cap."
+
+#### 9. `next-auth: 5.0.0-beta.31` is a pinned older beta
+*   **Search Strategy:** Checked Auth.js v5 release history.
+*   **Validation Result:** **Nuanced.** Pinning to a specific beta is a valid stability choice, but the SKILL.md fails to document this as a deliberate pin, which could confuse developers who see newer betas available.
+*   **Actionable Correction:** Add a comment noting this is a deliberate stability pin and acknowledge newer betas exist.
+
+---
+
+### 🟢 Minor Issues and Observations (Validated)
+
+#### 10. Tailwind v4 `@source` directives are likely unnecessary
+*   **Search Strategy:** Searched Tailwind CSS v4 documentation for "automatic content detection" and `@source`.
+*   **Validation Result:** **Confirmed.** Tailwind v4 features automatic content detection that scans project files without manual configuration [[115], [116], [123]]. Explicit `@source` directives for standard directories like `components/` and `lib/` are unnecessary unless automatic detection is disabled [[117], [119]].
+*   **Actionable Correction:** Note that `@source` directives are optional in Tailwind v4 due to automatic detection, or remove them to avoid setting a misleading precedent.
+
+#### 11. Vitest v4 mock module behavior changed subtly
+*   **Search Strategy:** Searched Vitest v4 migration guide for `restoreAllMocks` behavior.
+*   **Validation Result:** **Confirmed.** The Vitest v4 migration guide explicitly states that `vi.restoreAllMocks` no longer resets the state of spies and only restores manually created spies; automocks are no longer affected [[129]].
+*   **Actionable Correction:** Document this Vitest v4 behavioral shift in the testing anti-patterns or lessons learned section.
+
+#### 12. Drizzle ORM version currency
+*   **Search Strategy:** Searched npm for latest `drizzle-orm` and `drizzle-kit` versions.
+*   **Validation Result:** **Refuted (as an issue).** The versions listed (`drizzle-orm: ^0.45.2` and `drizzle-kit: ^0.31.10`) are current and accurate for the mid-2026 timeframe [[134], [141]].
+*   **Actionable Correction:** No correction needed; the versions are up-to-date.
+
+#### 13. WCAG AAA contrast claim is stated as fact but not tested
+*   **Search Strategy:** Used Python code execution to calculate exact WCAG contrast ratios for the specified hex codes.
+*   **Validation Result:** **Nuanced.** While `zinc-300` (`#d4d4d8`) on `zinc-950` (`#020202` or `#09090b`) yields a contrast ratio of ~13.46:1 to 14.04:1 (well above the 7:1 AAA threshold), the blanket "WCAG AAA" claim for the whole site is false. The `muted-foreground` color (`#8e8e95`) on `zinc-950` (`#09090b`) yields a ratio of approximately **6.11:1**, which passes AA (4.5:1) but **fails AAA (7:1)** for normal text.
+*   **Actionable Correction:** Remove the blanket "WCAG AAA" claim. Specify that primary body text meets AAA, but muted/secondary text meets AA.
+
+#### 14. SSE `maxDuration` export missing from document
+*   **Search Strategy:** Reviewed SKILL.md Validation Matrix (Section 21).
+*   **Validation Result:** **Confirmed.** The validation matrix lacks a check for the critical `maxDuration` export in the SSE route, which is currently documented incorrectly (900 vs 800).
+*   **Actionable Correction:** Add a validation step to Section 21: `grep maxDuration src/app/api/projects/\[id\]/progress/route.ts` to ensure it matches the target Vercel plan limit (e.g., 800).
+
+---
+
+### Conclusion
+
+The design critique is **highly accurate and rigorously justified**. The web searches confirm that the SKILL.md contains outdated information regarding Vercel's Fluid Compute limits, fictional claims about Stripe SDK camelCase conversions, and a critical security oversight regarding React CVE-2025-55182. Implementing the actionable corrections above will bring the SKILL.md in line with the actual state of the web ecosystem in mid-2026.
+
 https://claude.ai/share/7d397bdd-584b-4276-a8da-848153d42114 
+https://chat.qwen.ai/s/ffa7f051-aed7-44d4-ad50-772b85aed3f2?fev=0.2.67 
+
