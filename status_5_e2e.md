@@ -1150,3 +1150,120 @@ Key Changes Across All Docs
 7. Lessons Learned: 4 new entries (#28-31 in README, #28-31 in CLAUDE, #16-19 in AGENTS) 
 8. Outstanding Issues: Download button marked as fixed with server-side signing note 
 
+---
+
+Code Change Validation Report 
+ 
+Changes Reviewed 
+ 
+The diff in recent_code_changes_to_review_validate_2.txt contains exactly 3 files with changes: 
+ 
+┌────────────────────────────────────────────────┬────────┬─────────────────────────────────────────────┐ 
+│ File                                           │ Type   │ Lines Changed                               │ 
+├────────────────────────────────────────────────┼────────┼─────────────────────────────────────────────┤ 
+│ src/app/(app)/projects/[id]/page.tsx           │ Source │ +28 (added import + SignedDownloadWrapper)  │ 
+├────────────────────────────────────────────────┼────────┼─────────────────────────────────────────────┤ 
+│ src/components/app/project-download-button.tsx │ Source │ -34, +7 (simplified to pure presentational) │ 
+├────────────────────────────────────────────────┼────────┼─────────────────────────────────────────────┤ 
+│ src/tests/unit/project-download.test.tsx       │ Test   │ -11, +10 (updated for new architecture)     │ 
+└────────────────────────────────────────────────┴────────┴─────────────────────────────────────────────┘ 
+ 
+Validation Results 
+ 
+### ✅ 1. Code-Diff Alignment 
+ 
+The diff in the review file matches the actual codebase exactly: 
+- page.tsx: getSignedDownloadUrl import at line 7, SignedDownloadWrapper component at lines 73-99, usage at lines 65-71 
+- project-download-button.tsx: No r2.ts import, accepts downloadUrl prop, pure anchor render 
+- project-download.test.tsx: No r2.ts mock, tests prop-based rendering, adds source-level guarantee test 
+ 
+### ✅ 2. Architectural Compliance 
+ 
+┌──────────────────────────────────────────┬────────┬──────────────────────────────────────────────────────────────────────────────────────────┐ 
+│ Check                                    │ Result │ Evidence                                                                                 │ 
+├──────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ 5-layer architecture respected           │ ✅     │ Server Component (Layer 1) handles data, Client Component (Layer 2) handles presentation │ 
+├──────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ Server Component has no 'use client'     │ ✅     │ grep -c "use client" page.tsx returns 0                                                  │ 
+├──────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ r2.ts import is only in Server Component │ ✅     │ page.tsx line 7 — safe (Node.js has env vars)                                            │ 
+├──────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ Client Component has NO r2.ts import     │ ✅     │ grep -c "r2" project-download-button.tsx returns 1 (docblock comment only)               │ 
+├──────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ SignedDownloadWrapper is async           │ ✅     │ async function SignedDownloadWrapper — required for await getSignedDownloadUrl()         │ 
+├──────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ Props interface is clean                 │ ✅     │ { videoKey, children } — minimal, well-typed                                             │ 
+├──────────────────────────────────────────┼────────┼──────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ Children pattern used correctly          │ ✅     │ Share button passed as children, rendered alongside download button                      │ 
+└──────────────────────────────────────────┴────────┴──────────────────────────────────────────────────────────────────────────────────────────┘ 
+ 
+### ✅ 3. Test Coverage 
+ 
+┌────────────────────────────────────────┬────────┬───────────────────────────────────────────────────────────────┐ 
+│ Check                                  │ Result │ Evidence                                                      │ 
+├────────────────────────────────────────┼────────┼───────────────────────────────────────────────────────────────┤ 
+│ Test file updated for new architecture │ ✅     │ Tests prop-based rendering, no stale r2 mock                  │ 
+├────────────────────────────────────────┼────────┼───────────────────────────────────────────────────────────────┤ 
+│ Source-level guarantee test added      │ ✅     │ Line 87-93: asserts r2.ts is NOT imported in client component │ 
+├────────────────────────────────────────┼────────┼───────────────────────────────────────────────────────────────┤ 
+│ ShareButton tests preserved            │ ✅     │ Both share button tests still present and functional          │ 
+├────────────────────────────────────────┼────────┼───────────────────────────────────────────────────────────────┤ 
+│ No waitFor import issues               │ ✅     │ waitFor imported from @testing-library/react                  │ 
+├────────────────────────────────────────┼────────┼───────────────────────────────────────────────────────────────┤ 
+│ Test count consistent                  │ ✅     │ 10 tests in file (was 9, gained 1 new source-level test)      │ 
+└────────────────────────────────────────┴────────┴───────────────────────────────────────────────────────────────┘ 
+ 
+### ✅ 4. Documentation Alignment 
+ 
+┌─────────────────────────────────────────┬────────┬───────────────────────────────────────────────────────────────────────────────────────────────────┐ 
+│ Check                                   │ Result │ Evidence                                                                                          │ 
+├─────────────────────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ README.md mentions server-side signing  │ ✅     │ "Download button (signed R2 URL, server-side signing via SignedDownloadWrapper Server Component)" │ 
+├─────────────────────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ CLAUDE.md describes new pattern         │ ✅     │ File org: "receives downloadUrl prop (NO r2.ts import)"                                           │ 
+├─────────────────────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ AGENTS.md Interaction Inventory updated │ ✅     │ SignedDownloadWrapper (Server) → ProjectDownloadButton (Client, receives downloadUrl prop)        │ 
+├─────────────────────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ Pitfall documented across all docs      │ ✅     │ "Client components must NEVER import r2.ts at module level" in README, CLAUDE, AGENTS             │ 
+├─────────────────────────────────────────┼────────┼───────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ Troubleshooting entry exists            │ ✅     │ "Project detail page shows 'This page couldn't load'" in all three docs                           │ 
+└─────────────────────────────────────────┴────────┴───────────────────────────────────────────────────────────────────────────────────────────────────┘ 
+ 
+### ✅ 5. Build & Quality Gate 
+ 
+┌────────────────┬───────────────────────────────────────────────────────────────────────┐ 
+│ Check          │ Result                                                                │ 
+├────────────────┼───────────────────────────────────────────────────────────────────────┤ 
+│ pnpm typecheck │ ✅ Clean                                                              │ 
+├────────────────┼───────────────────────────────────────────────────────────────────────┤ 
+│ pnpm test      │ ✅ 232/232 pass (32 files)                                            │ 
+├────────────────┼───────────────────────────────────────────────────────────────────────┤ 
+│ pnpm build     │ ✅ Successful                                                         │ 
+├────────────────┼───────────────────────────────────────────────────────────────────────┤ 
+│ Browser E2E    │ ✅ Project detail loads, download button visible, zero console errors │ 
+└────────────────┴───────────────────────────────────────────────────────────────────────┘ 
+ 
+### ✅ 6. Edge Cases & Potential Issues 
+ 
+┌──────────────────────────────────────┬─────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐ 
+│ Concern                              │ Assessment      │ Mitigation                                                                                                                                                                    │ 
+├──────────────────────────────────────┼─────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ SignedDownloadWrapper has no error   │ ⚠ Minor        │ If getSignedDownloadUrl() throws (bad R2 creds), error propagates to Suspense fallback (skeleton). In production, R2 creds must be valid for the pipeline to work, so this is │ 
+│ handling                             │                 │ acceptable. Could add try/catch for graceful degradation but not required.                                                                                                    │ 
+├──────────────────────────────────────┼─────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ videoKey prop still passed but       │ ⚠ Minor        │ ProjectDownloadButton receives videoKey in its props interface but only uses downloadUrl. The videoKey is kept for interface consistency (parent passes it). Could be removed │ 
+│ unused                               │                 │ from the interface but is harmless.                                                                                                                                           │ 
+├──────────────────────────────────────┼─────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ URL could expire before click        │ ℹ              │ Signed URLs have 1-hour expiry. The URL is generated at SSR time. If the user leaves the tab open for >1 hour and then clicks, the URL will expire. This is the same behavior │ 
+│                                      │ Informational   │ as the original implementation (which generated at mount time). Acceptable for V1.                                                                                            │ 
+└──────────────────────────────────────┴─────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘ 
+ 
+Verdict 
+ 
+✅ All changes are correct, well-aligned with the codebase architecture, properly tested, and consistently documented. 
+ 
+The fix resolves the P0 env validation crash bug by moving the r2.ts import from the Client Component to a Server Component (SignedDownloadWrapper), following the recommended Next.js 16 pattern of server-side data fetching with prop   
+passing to client components. 
+ 
+No issues found. No additional changes needed. 
+
