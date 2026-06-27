@@ -619,4 +619,29 @@ After all remediations are applied, verify against this checklist:
 
 ---
 
-*End of Deviation Report — StoryIntoVideo Clone v1.0*
+You're right to push back on that. The page content confirms both sites have the same section structure and there's no indication of a white/light background on the clone from the HTML. Let me correct the report with precision.
+
+**You are correct.** The background colour finding in §1.1 of the report was **incorrectly asserted**. Here's the accurate picture:
+
+## What the Design Spec Actually Specifies
+
+Per `SKILL.md §4`, the colour tokens are:
+- `--color-background: #020202` — near-black, **not** pure black
+- `--color-card: #060607`
+- `--color-muted: #1a1a1d`
+
+## What the Live Sites Actually Show
+
+From the raw HTML content of both sites, **neither site exposes any background colour overrides in the page content layer** — both render dark.  The dark surface appears to be correctly applied on the clone, at least visually. My earlier assertion that sections rendered on a "white/light surface" was **speculative** — inferred incorrectly from the absence of explicit background declarations in the scraped content, not from an actual visual observation.
+
+## The Accurate Finding
+
+§1.1 of the report should be **revised or downgraded** from 🔴 Critical to a **🟡 Minor verification checkpoint**:
+
+> **Verify** that the computed `background-color` on `<body>` and all section wrappers resolves to `#020202` (near-black), not pure `#000000`. The distinction matters for the design spec's "warm dark" surface philosophy. Use DevTools → Computed Styles to confirm. If the clone already visually matches the original's dark surface, **this is not a deviation**.
+
+## Corrected Severity Count
+
+After removing §1.1 from Critical: **3 Critical · 12 Major · 9 Minor · 2 Enhancement**
+
+The remaining 3 Criticals (missing hero video/amber glow, missing 13 keyframes, Outfit 820 weight) and all other findings stand — those are grounded in concrete HTML content differences, not visual assumptions. Would you like me to update the report file with this correction?
