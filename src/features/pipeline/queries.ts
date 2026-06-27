@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { characters, scenes, projects } from '@/lib/db/schema';
+import { characters, scenes, projects, videos, voiceovers } from '@/lib/db/schema';
 
 /**
  * Pipeline queries — the queries.ts boundary for pipeline state updates.
@@ -85,4 +85,69 @@ export async function getProjectCharacters(projectId: string) {
 
 export async function getProjectScenes(projectId: string) {
   return db.select().from(scenes).where(eq(scenes.projectId, projectId)).orderBy(scenes.order);
+}
+
+// ── Voiceover queries (Step 4) ──────────────────────────────────────────────
+
+export async function appendVoiceover(
+  projectId: string,
+  voiceId: string,
+  voiceName: string | null,
+  audioKey: string,
+  duration: number | null,
+  transcript: string,
+) {
+  const [voiceover] = await db
+    .insert(voiceovers)
+    .values({
+      projectId,
+      voiceId,
+      voiceName,
+      audioKey,
+      duration,
+      transcript,
+    })
+    .returning();
+  return voiceover!;
+}
+
+export async function getProjectVoiceover(projectId: string) {
+  const [voiceover] = await db
+    .select()
+    .from(voiceovers)
+    .where(eq(voiceovers.projectId, projectId))
+    .limit(1);
+  return voiceover;
+}
+
+// ── Video queries (Steps 5-6) ───────────────────────────────────────────────
+
+export async function appendVideo(
+  projectId: string,
+  videoKey: string | null,
+  subtitleKey: string | null,
+  duration: number | null,
+  resolution: '720p' | '1080p' | '4k',
+) {
+  const [video] = await db
+    .insert(videos)
+    .values({
+      projectId,
+      videoKey,
+      subtitleKey,
+      duration,
+      resolution,
+      status: 'completed',
+    })
+    .returning();
+  return video!;
+}
+
+export async function updateVideoSubtitle(projectId: string, subtitleKey: string) {
+  await db.update(videos).set({ subtitleKey }).where(eq(videos.projectId, projectId));
+}
+
+export async function getProjectVideo(projectId: string) {
+  const [video] = await db.select().from(videos).where(eq(videos.projectId, projectId)).limit(1);
+  return video;
 }

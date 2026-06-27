@@ -3,12 +3,19 @@ import { Suspense } from 'react';
 
 import { verifySession } from '@/features/auth/domain/verify-session';
 import { getProject } from '@/features/projects/queries';
+import { env } from '@/lib/env';
+import { ProjectProgressPanel } from '@/components/app/project-progress-panel';
+import { ProjectDownloadButton } from '@/components/app/project-download-button';
+import { ProjectShareButton } from '@/components/app/project-share-button';
 
 /**
- * Project detail page — shows the project's analysis results + pipeline status.
+ * Project detail page — shows the project's analysis results + live pipeline status.
  *
  * Server Component. Auth-first. Owner-checked via getProject (returns null if
  * not owner → 404-equivalent). Wraps async data in <Suspense> per Next.js 16.
+ *
+ * The pipeline status panel is a client component that subscribes to the SSE
+ * progress stream at /api/projects/[id]/progress for live updates.
  */
 
 async function ProjectDetail({ projectId }: { projectId: string }) {
@@ -46,25 +53,23 @@ async function ProjectDetail({ projectId }: { projectId: string }) {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
-          <h2 className="font-heading mb-3 text-lg font-bold text-white">Pipeline Status</h2>
-          <p className="text-sm text-zinc-400">
-            {project.status === 'pending' && 'Your project is queued for processing.'}
-            {project.status === 'analyzing' && 'AI is analyzing your story…'}
-            {project.status === 'generating_characters' && 'Generating character portraits…'}
-            {project.status === 'generating_scenes' && 'Generating scene images…'}
-            {project.status === 'synthesizing_voice' && 'Synthesizing voiceover…'}
-            {project.status === 'aligning_subtitles' && 'Aligning subtitles…'}
-            {project.status === 'assembling_video' && 'Assembling your video…'}
-            {project.status === 'completed' && 'Your video is ready!'}
-            {project.status === 'failed' &&
-              `Generation failed: ${project.errorMessage ?? 'Unknown error'}`}
-            {project.status === 'draft' && 'Project created. Pipeline starting soon.'}
-          </p>
-          {project.progressDetail && (
-            <p className="mt-2 text-xs text-zinc-500">{project.progressDetail}</p>
-          )}
-        </div>
+        <ProjectProgressPanel
+          projectId={project.id}
+          initialStatus={project.status}
+          initialProgressDetail={project.progressDetail}
+          initialErrorMessage={project.errorMessage}
+        />
+
+        {/* Download + Share buttons — render only when the video is ready */}
+        {project.status === 'completed' && project.videoKey && (
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <ProjectDownloadButton videoKey={project.videoKey} />
+            <ProjectShareButton
+              url={`${env.NEXT_PUBLIC_APP_URL}/projects/${project.id}`}
+              title={project.title}
+            />
+          </div>
+        )}
       </div>
     </main>
   );

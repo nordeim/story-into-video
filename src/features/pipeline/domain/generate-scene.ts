@@ -26,6 +26,8 @@ export interface GenerateSceneInput {
 export interface GenerateSceneOutput {
   imageUrl: string;
   prompt: string;
+  /** Raw Replicate output — passed to moderateImage for safety checking */
+  raw: unknown;
 }
 
 const STYLE_PROMPTS: Record<GenerateSceneInput['style'], string> = {
@@ -76,5 +78,6 @@ export async function generateScene(input: GenerateSceneInput): Promise<Generate
   return {
     imageUrl: output[0]!,
     prompt,
+    raw: output,
   };
 }

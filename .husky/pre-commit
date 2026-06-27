@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Husky pre-commit hook — runs lint-staged on staged files.
+# Configured in package.json under "lint-staged".
+# Stages: .ts/.tsx → eslint --fix + prettier --write; .json/.md/.css/.mjs → prettier --write.
+pnpm lint-staged

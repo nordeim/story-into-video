@@ -52,3 +52,6 @@ yarn-error.log*
 
 # ── Vitest ──
 /coverage/
+
+# ── Husky (internal) ──
+.husky/_/

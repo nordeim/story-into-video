@@ -1,4 +1,9 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  type PutObjectCommandInput,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 import { env } from '@/lib/env';
@@ -57,6 +62,32 @@ export async function getSignedDownloadUrl(bucket: BucketName, key: string): Pro
     Key: key,
   });
   return awsGetSignedUrl(r2Client, command, { expiresIn: SIGNED_URL_EXPIRY });
+}
+
+/**
+ * Upload a Buffer directly to R2.
+ *
+ * Used by the Inngest pipeline (Steps 4-6) to persist AI-generated audio,
+ * SRT subtitles, and the final MP4 video. Inside an Inngest function we
+ * already have the bytes in memory — going through a presigned URL would
+ * add a redundant HTTP round-trip.
+ *
+ * Returns void on success. Callers use the known (bucket, key) pair for
+ * future reads via getSignedDownloadUrl.
+ */
+export async function putObject(
+  bucket: BucketName,
+  key: string,
+  body: Buffer,
+  contentType: string,
+): Promise<void> {
+  const input: PutObjectCommandInput = {
+    Bucket: BUCKET_MAP[bucket],
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+  };
+  await r2Client.send(new PutObjectCommand(input));
 }
 
 /** Build an R2 object key from a project ID + filename */

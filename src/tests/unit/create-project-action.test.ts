@@ -50,6 +50,14 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
+// Mock Inngest client — pipeline trigger
+vi.mock('@/lib/inngest/client', () => ({
+  inngest: {
+    send: vi.fn().mockResolvedValue({ ids: ['event-1'] }),
+  },
+  PIPELINE_EVENT: 'pipeline.started',
+}));
+
 import { verifySession } from '@/features/auth/domain/verify-session';
 import { moderateContent } from '@/features/pipeline/domain/moderate-content';
 import {
@@ -57,6 +65,7 @@ import {
   debitCredits,
   InsufficientCreditsError,
 } from '@/features/billing/queries';
+import { inngest, PIPELINE_EVENT } from '@/lib/inngest/client';
 import { createProjectAction } from '@/features/projects/actions';
 
 describe('S2-02: createProjectAction Server Action', () => {
@@ -161,5 +170,26 @@ describe('S2-02: createProjectAction Server Action', () => {
     }
 
     expect(verifySession).toHaveBeenCalled();
+  });
+
+  it('triggers Inngest pipeline event after successful project insert', async () => {
+    vi.mocked(verifySession).mockResolvedValue({
+      user: { id: 'user-123', email: 't@t.com' },
+      expires: '',
+    } as never);
+    vi.mocked(moderateContent).mockResolvedValue({ flagged: false, categories: [] });
+    vi.mocked(getOrCreateSubscription).mockResolvedValue({} as never);
+    vi.mocked(debitCredits).mockResolvedValue(undefined);
+
+    try {
+      await createProjectAction(validInput);
+    } catch {
+      // redirect throws NEXT_REDIRECT
+    }
+
+    expect(inngest.send).toHaveBeenCalledWith({
+      name: PIPELINE_EVENT,
+      data: { projectId: 'project-123' },
+    });
   });
 });

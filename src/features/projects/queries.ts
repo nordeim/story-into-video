@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { projects } from '@/lib/db/schema';
+import { projects, videos } from '@/lib/db/schema';
 
 /**
  * Projects queries — the queries.ts boundary.
@@ -29,12 +29,38 @@ export async function getUserProjects(userId: string) {
 }
 
 export async function getProject(projectId: string, userId: string) {
-  const [project] = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
+  // LEFT JOIN videos so the project detail page can render a download button
+  // when the video is ready. Returns videoKey + subtitleKey (both null if
+  // the project hasn't reached the assembly step yet).
+  const [row] = await db
+    .select({
+      id: projects.id,
+      userId: projects.userId,
+      title: projects.title,
+      story: projects.story,
+      style: projects.style,
+      aspectRatio: projects.aspectRatio,
+      status: projects.status,
+      progressDetail: projects.progressDetail,
+      progressPercent: projects.progressPercent,
+      creditsCost: projects.creditsCost,
+      errorMessage: projects.errorMessage,
+      createdAt: projects.createdAt,
+      updatedAt: projects.updatedAt,
+      videoKey: videos.videoKey,
+      subtitleKey: videos.subtitleKey,
+      videoDuration: videos.duration,
+      videoResolution: videos.resolution,
+    })
+    .from(projects)
+    .leftJoin(videos, eq(videos.projectId, projects.id))
+    .where(eq(projects.id, projectId))
+    .limit(1);
 
-  // Owner check — throws 403-equivalent if not owner
-  if (project && project.userId !== userId) {
+  // Owner check — returns null if not owner (treated as 404 by the caller)
+  if (row && row.userId !== userId) {
     return null;
   }
 
-  return project;
+  return row;
 }

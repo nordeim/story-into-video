@@ -19,6 +19,8 @@ export interface GenerateCharacterInput {
 export interface GenerateCharacterOutput {
   imageUrl: string;
   prompt: string;
+  /** Raw Replicate output — passed to moderateImage for safety checking */
+  raw: unknown;
 }
 
 const STYLE_PROMPTS: Record<GenerateCharacterInput['style'], string> = {
@@ -59,5 +61,6 @@ export async function generateCharacter(
   return {
     imageUrl: output[0]!,
     prompt,
+    raw: output,
   };
 }

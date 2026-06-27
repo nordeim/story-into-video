@@ -185,7 +185,7 @@ pnpm dev                        # Start dev server (Turbopack, port 3000)
 | `pnpm lint` | ESLint (flat config, zero warnings) | Before commit |
 | `pnpm typecheck` | `tsc --noEmit` (zero errors) | Before commit |
 | `pnpm test` | Vitest unit tests (164 tests, jsdom) | Before commit |
-| `pnpm test:e2e` | Playwright E2E tests (11 tests, Chromium) | Before deploy |
+| `pnpm test:e2e` | Playwright E2E tests (48 tests, Chromium) | Before deploy |
 | `pnpm format` | Prettier auto-fix | — |
 | `pnpm format:check` | Prettier verify | CI |
 | `pnpm drizzle-kit generate` | Create migration SQL from schema diff | After schema changes |
@@ -207,7 +207,7 @@ All four must pass with zero warnings/errors before any commit.
 | Type | Framework | Location | Count |
 |---|---|---|---|
 | Unit | Vitest + jsdom | `src/tests/unit/**/*.test.{ts,tsx}` | 164 (24 files) |
-| E2E | Playwright (Chromium) | `src/tests/e2e/**/*.spec.ts` | 11 (3 files) |
+| E2E | Playwright (Chromium) | `src/tests/e2e/**/*.spec.ts` | 48 (9 files) |
 
 ### Unit Test Coverage (24 files, 164 tests)
 
@@ -345,14 +345,14 @@ src/
 │   └── utils.ts                  # cn() utility
 ├── tests/
 │   ├── unit/                     # Vitest unit tests (24 files, 164 tests)
-│   ├── e2e/                      # Playwright E2E tests (3 files, 11 tests)
+│   ├── e2e/                      # Playwright E2E tests (9 files, 48 tests)
 │   └── setup.ts                  # Test setup (jest-dom + test env vars)
 ├── types/
 │   └── index.ts                  # TypeScript interfaces (12 marketing interfaces)
 └── middleware.ts                 # Layer 0: Auth route protection (Edge runtime)
 ```
 
-### Routes (11 total)
+### Routes (12 total)
 
 | Route | Type | Purpose |
 |---|---|---|
@@ -365,6 +365,7 @@ src/
 | `/api/auth/[...nextauth]` | ƒ Dynamic | Auth.js catch-all (Google OAuth, credentials) |
 | `/api/inngest` | ƒ Dynamic | Inngest webhook (6-step pipeline) |
 | `/api/stripe/webhook` | ƒ Dynamic | Stripe webhook (signature-verified, idempotent) |
+| `/api/health` | ƒ Dynamic | Health check endpoint (returns `{ status: 'ok' }`) |
 | Middleware | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing` |
 
 ### Database Schema (11 tables + 8 enums)
@@ -635,7 +636,7 @@ You are successful when:
 - `pnpm lint` exits with 0 warnings
 - `pnpm typecheck` exits with 0 errors
 - `pnpm test` passes all 164 unit tests
-- `pnpm test:e2e` passes all 11 E2E tests (requires Playwright browsers installed)
+- `pnpm test:e2e` passes all 48 E2E tests (requires Playwright browsers installed)
 - `pnpm build` exits with 0 errors
 - Lighthouse scores ≥95 across Performance, Accessibility, Best Practices, SEO (marketing page)
 - The marketing page is visually indistinguishable from `storyintovideo.com` at 1440×900

@@ -10,6 +10,7 @@ import { verifySession } from '@/features/auth/domain/verify-session';
 import { moderateContent } from '@/features/pipeline/domain/moderate-content';
 import { debitCredits, getOrCreateSubscription } from '@/features/billing/queries';
 import { CREDIT_COSTS } from '@/features/billing/domain/tier-limits';
+import { inngest, PIPELINE_EVENT } from '@/lib/inngest/client';
 
 /**
  * createProjectAction — Server Action that creates a new project from a story.
@@ -113,8 +114,11 @@ export async function createProjectAction(
     return { success: false, error: 'Failed to create project', code: 'INTERNAL' };
   }
 
-  // 6. (Sprint 3+) trigger Inngest pipeline event here
-  // await inngest.send({ name: 'pipeline.started', data: { projectId: project.id } })
+  // 6. TRIGGER INNGEST PIPELINE
+  await inngest.send({
+    name: PIPELINE_EVENT,
+    data: { projectId: project.id },
+  });
 
   // 7. REVALIDATE + REDIRECT
   revalidatePath('/dashboard');

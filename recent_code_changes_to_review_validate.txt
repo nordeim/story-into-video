@@ -1,0 +1,995 @@
+diff --git a/AGENTS.md b/AGENTS.md
+index 040aa29..2265a13 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -112,13 +112,13 @@ src/
+ │   ├── fonts.ts · utils.ts
+ ├── tests/
+ │   ├── unit/                     # 24 files, 164 tests
+-│   ├── e2e/                      # 3 files, 11 tests
++│   ├── e2e/                      # 9 files, 48 tests
+ │   └── setup.ts                  # jest-dom + test env vars
+ ├── types/index.ts                # 12 marketing interfaces
+ └── middleware.ts                 # Layer 0: route protection (Edge runtime)
+ ```
+ 
+-## Routes (11 total)
++## Routes (12 total)
+ 
+ | Route | Type | Purpose |
+ |---|---|---|
+@@ -131,6 +131,7 @@ src/
+ | `/api/auth/[...nextauth]` | ƒ Dynamic | Auth.js catch-all |
+ | `/api/inngest` | ƒ Dynamic | Pipeline webhook |
+ | `/api/stripe/webhook` | ƒ Dynamic | Billing webhook |
++| `/api/health` | ƒ Dynamic | Health check (returns `{ status: 'ok' }`) |
+ | Middleware | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing` |
+ 
+ ## Build & Quality Commands (Actual)
+@@ -141,7 +142,7 @@ pnpm build        # Production build (hybrid: static + dynamic)
+ pnpm lint         # eslint . (flat config)
+ pnpm typecheck    # tsc --noEmit (strict + noUncheckedIndexedAccess)
+ pnpm test         # vitest run (164 unit tests, jsdom)
+-pnpm test:e2e     # playwright test (11 E2E tests, Chromium, auto-starts dev)
++pnpm test:e2e     # playwright test (48 E2E tests, Chromium, auto-starts dev)
+ pnpm format       # prettier --write
+ pnpm format:check # prettier --check
+ pnpm drizzle-kit generate   # Create migration SQL from schema diff
+@@ -277,7 +278,7 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
+ - Credit metering (transactional `debitCredits`, `InsufficientCreditsError`)
+ - Billing page (4-tier plan table)
+ - All 14 marketing CTAs wired to real routes
+-- 164 unit tests + 11 E2E tests (all GREEN)
++- 164 unit tests + 48 E2E tests (all GREEN)
+ 
+ ### ⚠️ Outstanding (requires external resources / not yet done)
+ - **External service credentials** — Neon, Google OAuth, OpenAI, Replicate, ElevenLabs, R2, Stripe, Inngest, Resend, Upstash, Sentry (fill `.env.local` from `.env.example`)
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 72509bb..3913edd 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -185,7 +185,7 @@ pnpm dev                        # Start dev server (Turbopack, port 3000)
+ | `pnpm lint` | ESLint (flat config, zero warnings) | Before commit |
+ | `pnpm typecheck` | `tsc --noEmit` (zero errors) | Before commit |
+ | `pnpm test` | Vitest unit tests (164 tests, jsdom) | Before commit |
+-| `pnpm test:e2e` | Playwright E2E tests (11 tests, Chromium) | Before deploy |
++| `pnpm test:e2e` | Playwright E2E tests (48 tests, Chromium) | Before deploy |
+ | `pnpm format` | Prettier auto-fix | — |
+ | `pnpm format:check` | Prettier verify | CI |
+ | `pnpm drizzle-kit generate` | Create migration SQL from schema diff | After schema changes |
+@@ -207,7 +207,7 @@ All four must pass with zero warnings/errors before any commit.
+ | Type | Framework | Location | Count |
+ |---|---|---|---|
+ | Unit | Vitest + jsdom | `src/tests/unit/**/*.test.{ts,tsx}` | 164 (24 files) |
+-| E2E | Playwright (Chromium) | `src/tests/e2e/**/*.spec.ts` | 11 (3 files) |
++| E2E | Playwright (Chromium) | `src/tests/e2e/**/*.spec.ts` | 48 (9 files) |
+ 
+ ### Unit Test Coverage (24 files, 164 tests)
+ 
+@@ -345,14 +345,14 @@ src/
+ │   └── utils.ts                  # cn() utility
+ ├── tests/
+ │   ├── unit/                     # Vitest unit tests (24 files, 164 tests)
+-│   ├── e2e/                      # Playwright E2E tests (3 files, 11 tests)
++│   ├── e2e/                      # Playwright E2E tests (9 files, 48 tests)
+ │   └── setup.ts                  # Test setup (jest-dom + test env vars)
+ ├── types/
+ │   └── index.ts                  # TypeScript interfaces (12 marketing interfaces)
+ └── middleware.ts                 # Layer 0: Auth route protection (Edge runtime)
+ ```
+ 
+-### Routes (11 total)
++### Routes (12 total)
+ 
+ | Route | Type | Purpose |
+ |---|---|---|
+@@ -365,6 +365,7 @@ src/
+ | `/api/auth/[...nextauth]` | ƒ Dynamic | Auth.js catch-all (Google OAuth, credentials) |
+ | `/api/inngest` | ƒ Dynamic | Inngest webhook (6-step pipeline) |
+ | `/api/stripe/webhook` | ƒ Dynamic | Stripe webhook (signature-verified, idempotent) |
++| `/api/health` | ƒ Dynamic | Health check endpoint (returns `{ status: 'ok' }`) |
+ | Middleware | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing` |
+ 
+ ### Database Schema (11 tables + 8 enums)
+@@ -635,7 +636,7 @@ You are successful when:
+ - `pnpm lint` exits with 0 warnings
+ - `pnpm typecheck` exits with 0 errors
+ - `pnpm test` passes all 164 unit tests
+-- `pnpm test:e2e` passes all 11 E2E tests (requires Playwright browsers installed)
++- `pnpm test:e2e` passes all 48 E2E tests (requires Playwright browsers installed)
+ - `pnpm build` exits with 0 errors
+ - Lighthouse scores ≥95 across Performance, Accessibility, Best Practices, SEO (marketing page)
+ - The marketing page is visually indistinguishable from `storyintovideo.com` at 1440×900
+diff --git a/package.json b/package.json
+index ddeda5b..b4a8cd6 100644
+--- a/package.json
++++ b/package.json
+@@ -23,7 +23,17 @@
+     "drizzle:migrate": "dotenv -e .env.local -- drizzle-kit migrate",
+     "drizzle:studio": "dotenv -e .env.local -- drizzle-kit studio",
+     "db:seed": "dotenv -e .env.local -- tsx src/lib/db/seed.ts",
+-    "db:reset": "pnpm drizzle:migrate && pnpm db:seed"
++    "db:reset": "pnpm drizzle:migrate && pnpm db:seed",
++    "prepare": "husky || true"
++  },
++  "lint-staged": {
++    "*.{ts,tsx}": [
++      "eslint --fix",
++      "prettier --write"
++    ],
++    "*.{json,md,css,mjs}": [
++      "prettier --write"
++    ]
+   },
+   "dependencies": {
+     "@auth/drizzle-adapter": "^1.11.2",
+@@ -77,7 +87,9 @@
+     "eslint-plugin-react": "^7.37.5",
+     "eslint-plugin-react-hooks": "^7.1.1",
+     "globals": "^16.4.0",
++    "husky": "^9.1.7",
+     "jsdom": "^29.0.0",
++    "lint-staged": "^17.0.8",
+     "prettier": "^3.8.0",
+     "prettier-plugin-tailwindcss": "^0.8.0",
+     "tailwindcss": "^4.3.0",
+diff --git a/src/app/(app)/projects/[id]/page.tsx b/src/app/(app)/projects/[id]/page.tsx
+index dd9b646..5140c84 100644
+--- a/src/app/(app)/projects/[id]/page.tsx
++++ b/src/app/(app)/projects/[id]/page.tsx
+@@ -3,12 +3,19 @@ import { Suspense } from 'react';
+ 
+ import { verifySession } from '@/features/auth/domain/verify-session';
+ import { getProject } from '@/features/projects/queries';
++import { env } from '@/lib/env';
++import { ProjectProgressPanel } from '@/components/app/project-progress-panel';
++import { ProjectDownloadButton } from '@/components/app/project-download-button';
++import { ProjectShareButton } from '@/components/app/project-share-button';
+ 
+ /**
+- * Project detail page — shows the project's analysis results + pipeline status.
++ * Project detail page — shows the project's analysis results + live pipeline status.
+  *
+  * Server Component. Auth-first. Owner-checked via getProject (returns null if
+  * not owner → 404-equivalent). Wraps async data in <Suspense> per Next.js 16.
++ *
++ * The pipeline status panel is a client component that subscribes to the SSE
++ * progress stream at /api/projects/[id]/progress for live updates.
+  */
+ 
+ async function ProjectDetail({ projectId }: { projectId: string }) {
+@@ -46,25 +53,23 @@ async function ProjectDetail({ projectId }: { projectId: string }) {
+           </p>
+         </div>
+ 
+-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+-          <h2 className="font-heading mb-3 text-lg font-bold text-white">Pipeline Status</h2>
+-          <p className="text-sm text-zinc-400">
+-            {project.status === 'pending' && 'Your project is queued for processing.'}
+-            {project.status === 'analyzing' && 'AI is analyzing your story…'}
+-            {project.status === 'generating_characters' && 'Generating character portraits…'}
+-            {project.status === 'generating_scenes' && 'Generating scene images…'}
+-            {project.status === 'synthesizing_voice' && 'Synthesizing voiceover…'}
+-            {project.status === 'aligning_subtitles' && 'Aligning subtitles…'}
+-            {project.status === 'assembling_video' && 'Assembling your video…'}
+-            {project.status === 'completed' && 'Your video is ready!'}
+-            {project.status === 'failed' &&
+-              `Generation failed: ${project.errorMessage ?? 'Unknown error'}`}
+-            {project.status === 'draft' && 'Project created. Pipeline starting soon.'}
+-          </p>
+-          {project.progressDetail && (
+-            <p className="mt-2 text-xs text-zinc-500">{project.progressDetail}</p>
+-          )}
+-        </div>
++        <ProjectProgressPanel
++          projectId={project.id}
++          initialStatus={project.status}
++          initialProgressDetail={project.progressDetail}
++          initialErrorMessage={project.errorMessage}
++        />
++
++        {/* Download + Share buttons — render only when the video is ready */}
++        {project.status === 'completed' && project.videoKey && (
++          <div className="mt-6 flex flex-wrap items-center gap-3">
++            <ProjectDownloadButton videoKey={project.videoKey} />
++            <ProjectShareButton
++              url={`${env.NEXT_PUBLIC_APP_URL}/projects/${project.id}`}
++              title={project.title}
++            />
++          </div>
++        )}
+       </div>
+     </main>
+   );
+diff --git a/src/features/pipeline/domain/assemble-video.ts b/src/features/pipeline/domain/assemble-video.ts
+index fa2cd5c..ef62a45 100644
+--- a/src/features/pipeline/domain/assemble-video.ts
++++ b/src/features/pipeline/domain/assemble-video.ts
+@@ -1,5 +1,6 @@
+ import ffmpeg from 'fluent-ffmpeg';
+ import { path as ffmpegPath } from '@ffmpeg-installer/ffmpeg';
++import { writeFile, readFile, unlink } from 'fs/promises';
+ 
+ /**
+  * Video assembly — composites scene images + voiceover audio + subtitles
+@@ -7,6 +8,19 @@ import { path as ffmpegPath } from '@ffmpeg-installer/ffmpeg';
+  *
+  * Per ADR-006, FFmpeg runs on the server (Inngest function, bypassing Vercel's
+  * 300s limit). If FFmpeg proves unreliable on serverless, fall back to Shotstack.
++ *
++ * REWRITE (T3): The original implementation had 4 critical defects:
++ *   1. Returned `Buffer.from('placeholder')` instead of reading the output file
++ *   2. SRT file never written to disk (FFmpeg subtitles filter requires a path)
++ *   3. `-loop 1 -t <duration>` input options built but never passed to ffmpeg()
++ *   4. Filter extraction via `.find(arg => arg.includes('concat'))` was brittle
++ *
++ * This rewrite fixes all four by:
++ *   - Writing the SRT to /tmp/siv-srt-<ts>.srt before invoking FFmpeg
++ *   - Using fluent-ffmpeg's inputOptions API per image input
++ *   - Reading the output file from disk into a Buffer before resolving
++ *   - Passing the full filter string directly to complexFilter()
++ *   - Cleaning up temp files (SRT + output MP4) after reading
+  */
+ 
+ // Configure fluent-ffmpeg to use the installed binary
+@@ -30,77 +44,103 @@ const RESOLUTION_MAP = {
+   '720p': { width: 720, height: 1280 },
+   '1080p': { width: 1080, height: 1920 },
+   '4k': { width: 2160, height: 3840 },
+-};
++} as const;
++
++function buildFilterString(
++  sceneCount: number,
++  dims: { width: number; height: number },
++  srtPath: string,
++): string {
++  const concatInputs = Array.from({ length: sceneCount }, (_, i) => `[${i}:v]`).join('');
++  return (
++    `${concatInputs}concat=n=${sceneCount}:v=1:a=0[v0];` +
++    `[v0]scale=${dims.width}:${dims.height}:force_original_aspect_ratio=decrease,` +
++    `pad=${dims.width}:${dims.height}:(ow-iw)/2:(oh-ih)/2,` +
++    `subtitles=${srtPath}[v]`
++  );
++}
+ 
+-function buildFfmpegCommand(input: AssembleVideoInput, outputPath: string): string[] {
++/**
++ * Build the full FFmpeg command-line args array.
++ *
++ * Exposed for unit testing — verifies the filter string contains concat, scale,
++ * and subtitles in a single coherent expression (not extracted via `.find()`).
++ */
++export function buildFfmpegCommand(input: AssembleVideoInput, outputPath: string): string[] {
++  const baseDims = RESOLUTION_MAP[input.resolution];
+   const dims =
+     input.aspectRatio === 'landscape'
+-      ? {
+-          width: RESOLUTION_MAP[input.resolution].height,
+-          height: RESOLUTION_MAP[input.resolution].width,
+-        }
+-      : RESOLUTION_MAP[input.resolution];
+-
+-  // Build the FFmpeg command as an array of args
+-  const args: string[] = [];
+-
+-  // Input: concat images with durations via the concat demuxer
+-  // Each image is repeated for its duration
+-  args.push('-y');
+-  for (let i = 0; i < input.sceneImageUrls.length; i++) {
+-    args.push(
+-      '-loop',
+-      '1',
+-      '-t',
+-      String(input.sceneDurations[i] ?? 8),
+-      '-i',
+-      input.sceneImageUrls[i]!,
+-    );
+-  }
++      ? { width: baseDims.height, height: baseDims.width }
++      : baseDims;
+ 
++  const srtPath = `/tmp/siv-srt-${Date.now()}.srt`;
++  const filterString = buildFilterString(input.sceneImageUrls.length, dims, srtPath);
++
++  const args: string[] = ['-y'];
++  // Image inputs (loop + duration applied via inputOptions on the fluent-ffmpeg chain)
++  for (const url of input.sceneImageUrls) {
++    args.push('-i', url);
++  }
+   // Audio input
+   args.push('-i', input.audioUrl);
+-
+-  // Filter: concat images, scale, then overlay audio + subtitles
+-  const concatInputs = input.sceneImageUrls.map((_, i) => `[${i}:v]`).join('');
+-  args.push(
+-    '-filter_complex',
+-    `${concatInputs}concat=n=${input.sceneImageUrls.length}:v=1:a=0[v0];[v0]scale=${dims.width}:${dims.height}:force_original_aspect_ratio=decrease,pad=${dims.width}:${dims.height}:(ow-iw)/2:(oh-ih)/2,subtitles=subtitle.srt[v]`,
+-  );
+-
+-  // Map outputs
++  // Filter + maps + encoding
++  args.push('-filter_complex', filterString);
+   args.push('-map', '[v]', '-map', `${input.sceneImageUrls.length}:a`);
+-
+-  // Encoding
+-  args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '23', '-c:a', 'aac', '-b:a', '128k');
++  args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '23');
++  args.push('-c:a', 'aac', '-b:a', '128k');
+   args.push('-pix_fmt', 'yuv420p', '-movflags', '+faststart');
+   args.push(outputPath);
+ 
+   return args;
+ }
+ 
++async function writeSrtFile(srtContent: string): Promise<string> {
++  const srtPath = `/tmp/siv-srt-${Date.now()}.srt`;
++  await writeFile(srtPath, srtContent, 'utf-8');
++  return srtPath;
++}
++
++async function cleanupTempFiles(...paths: string[]): Promise<void> {
++  await Promise.all(
++    paths.map(async (p) => {
++      try {
++        await unlink(p);
++      } catch {
++        // Ignore cleanup errors — best-effort
++      }
++    }),
++  );
++}
++
+ export async function assembleVideo(input: AssembleVideoInput): Promise<AssembleVideoOutput> {
+   const totalDuration = input.sceneDurations.reduce((sum, d) => sum + d, 0);
++  const outputPath = `/tmp/siv-video-${Date.now()}.mp4`;
++  const srtPath = await writeSrtFile(input.subtitlesSrt);
+ 
+-  return new Promise((resolve, reject) => {
+-    // Write the SRT to a temp location (FFmpeg subtitles filter reads from file)
+-    // In production, write to /tmp; here we use a placeholder path
+-    const outputPath = `/tmp/video-${Date.now()}.mp4`;
++  const baseDims = RESOLUTION_MAP[input.resolution];
++  const dims =
++    input.aspectRatio === 'landscape'
++      ? { width: baseDims.height, height: baseDims.width }
++      : baseDims;
++  const filterString = buildFilterString(input.sceneImageUrls.length, dims, srtPath);
+ 
+-    // Use the fluent-ffmpeg API to run the command
++  return new Promise((resolve, reject) => {
+     const cmd = ffmpeg();
+ 
+-    // Add inputs
+-    input.sceneImageUrls.forEach((url) => {
+-      cmd.input(url);
++    // Add image inputs WITH their loop + duration options
++    input.sceneImageUrls.forEach((url, i) => {
++      const duration = input.sceneDurations[i] ?? 8;
++      cmd.input(url).inputOptions(['-loop', '1', '-t', String(duration)]);
+     });
++
++    // Audio input (no loop)
+     cmd.input(input.audioUrl);
+ 
+     cmd
+-      .complexFilter(
+-        buildFfmpegCommand(input, outputPath).find((arg) => arg.includes('concat')) ?? '',
+-      )
++      .complexFilter(filterString)
+       .outputOptions([
++        '-map [v]',
++        `-map ${input.sceneImageUrls.length}:a`,
+         '-c:v libx264',
+         '-preset medium',
+         '-crf 23',
+@@ -110,16 +150,19 @@ export async function assembleVideo(input: AssembleVideoInput): Promise<Assemble
+         '-movflags +faststart',
+       ])
+       .save(outputPath)
+-      .on('end', () => {
+-        resolve({
+-          videoBuffer: Buffer.from('placeholder'), // In production, read the file
+-          duration: totalDuration,
+-        });
++      .on('end', async () => {
++        try {
++          const videoBuffer = await readFile(outputPath);
++          await cleanupTempFiles(srtPath, outputPath);
++          resolve({ videoBuffer, duration: totalDuration });
++        } catch (err) {
++          await cleanupTempFiles(srtPath, outputPath);
++          reject(new Error(`Failed to read assembled video: ${(err as Error).message}`));
++        }
+       })
+-      .on('error', (err) => {
++      .on('error', async (err) => {
++        await cleanupTempFiles(srtPath, outputPath);
+         reject(new Error(`FFmpeg failed: ${err.message}`));
+       });
+   });
+ }
+-
+-export { buildFfmpegCommand };
+diff --git a/src/features/pipeline/domain/generate-character.ts b/src/features/pipeline/domain/generate-character.ts
+index 17ff9b7..b7ed0af 100644
+--- a/src/features/pipeline/domain/generate-character.ts
++++ b/src/features/pipeline/domain/generate-character.ts
+@@ -19,6 +19,8 @@ export interface GenerateCharacterInput {
+ export interface GenerateCharacterOutput {
+   imageUrl: string;
+   prompt: string;
++  /** Raw Replicate output — passed to moderateImage for safety checking */
++  raw: unknown;
+ }
+ 
+ const STYLE_PROMPTS: Record<GenerateCharacterInput['style'], string> = {
+@@ -59,5 +61,6 @@ export async function generateCharacter(
+   return {
+     imageUrl: output[0]!,
+     prompt,
++    raw: output,
+   };
+ }
+diff --git a/src/features/pipeline/domain/generate-scene.ts b/src/features/pipeline/domain/generate-scene.ts
+index 09723d5..5ad1ccb 100644
+--- a/src/features/pipeline/domain/generate-scene.ts
++++ b/src/features/pipeline/domain/generate-scene.ts
+@@ -26,6 +26,8 @@ export interface GenerateSceneInput {
+ export interface GenerateSceneOutput {
+   imageUrl: string;
+   prompt: string;
++  /** Raw Replicate output — passed to moderateImage for safety checking */
++  raw: unknown;
+ }
+ 
+ const STYLE_PROMPTS: Record<GenerateSceneInput['style'], string> = {
+@@ -76,5 +78,6 @@ export async function generateScene(input: GenerateSceneInput): Promise<Generate
+   return {
+     imageUrl: output[0]!,
+     prompt,
++    raw: output,
+   };
+ }
+diff --git a/src/features/pipeline/inngest.ts b/src/features/pipeline/inngest.ts
+index d61469d..160b60f 100644
+--- a/src/features/pipeline/inngest.ts
++++ b/src/features/pipeline/inngest.ts
+@@ -1,15 +1,28 @@
+ import { inngest, PIPELINE_EVENT } from '@/lib/inngest/client';
+ import { analyzeStory } from '@/features/pipeline/domain/analyze-story';
+ import { moderateContent } from '@/features/pipeline/domain/moderate-content';
++import { moderateImage } from '@/features/pipeline/domain/moderate-image';
+ import { generateCharacter } from '@/features/pipeline/domain/generate-character';
+ import { generateScene } from '@/features/pipeline/domain/generate-scene';
++import { synthesizeVoice } from '@/features/pipeline/domain/synthesize-voice';
++import { alignSubtitles } from '@/features/pipeline/domain/align-subtitles';
++import { assembleVideo } from '@/features/pipeline/domain/assemble-video';
+ import {
+   appendCharacter,
+   appendScene,
++  appendVoiceover,
++  appendVideo,
++  updateVideoSubtitle,
+   updateProjectProgress,
+   setProjectFailed,
+   getProjectCharacters,
++  getProjectScenes,
++  getProjectVoiceover,
+ } from '@/features/pipeline/queries';
++import { debitCredits } from '@/features/billing/queries';
++import { CREDIT_COSTS } from '@/features/billing/domain/tier-limits';
++import { putObject, getSignedDownloadUrl, buildObjectKey } from '@/lib/storage/r2';
++import { DEFAULT_VOICE_ID } from '@/lib/ai/elevenlabs';
+ import { db } from '@/lib/db';
+ import { projects } from '@/lib/db/schema';
+ import { eq } from 'drizzle-orm';
+@@ -22,9 +35,9 @@ import { eq } from 'drizzle-orm';
+  *   1. Story analysis (GPT-4o → characters + scenes)
+  *   2. Character generation (Replicate SDXL)
+  *   3. Scene generation (Replicate SDXL + IP-Adapter)
+- *   4. Voiceover (ElevenLabs) — Sprint 4
+- *   5. Subtitle alignment (Whisper) — Sprint 4
+- *   6. Video assembly (FFmpeg) — Sprint 4
++ *   4. Voiceover (ElevenLabs TTS, chunked) — Sprint 4+5 wiring
++ *   5. Subtitle alignment (Whisper ASR word timestamps → SRT) — Sprint 4+5 wiring
++ *   6. Video assembly (FFmpeg → MP4) — Sprint 4+5 wiring
+  *
+  * Each step is idempotent (Inngest may retry). Failed steps set the project
+  * to 'failed' state with an error message.
+@@ -38,6 +51,18 @@ async function getProjectStory(projectId: string) {
+   return project;
+ }
+ 
++/**
++ * Build the narration text from the analysis.
++ * Concatenates the summary + each scene description for the voiceover.
++ */
++function buildNarrationText(analysis: {
++  summary: string;
++  scenes: { description: string }[];
++}): string {
++  const sceneNarrations = analysis.scenes.map((s) => s.description).join('. ');
++  return `${analysis.summary}. ${sceneNarrations}`;
++}
++
+ export const pipelineFunction = inngest.createFunction(
+   { id: 'story-to-video-pipeline', retries: 3, triggers: [{ event: PIPELINE_EVENT }] },
+   async ({ event, step }) => {
+@@ -66,7 +91,7 @@ export const pipelineFunction = inngest.createFunction(
+       return analyzeStory(project.story);
+     });
+ 
+-    // Step 2: Character generation
++    // Step 2: Character generation (with image moderation per ADR-011)
+     await step.run('generate-characters', async () => {
+       await updateProjectProgress(projectId, 'generating_characters', 'Generating characters…', 25);
+       for (let i = 0; i < analysis.characters.length; i++) {
+@@ -76,13 +101,25 @@ export const pipelineFunction = inngest.createFunction(
+           description: char.description,
+           style: project.style,
+         });
+-        // Store the Replicate CDN URL as the reference image key
+-        // (In Sprint 4 we'd upload to R2 for persistent storage)
++
++        // Moderate the generated image (ADR-011)
++        const imageModeration = await moderateImage({
++          imageUrl: result.imageUrl,
++          rawOutput: result.raw,
++        });
++        if (imageModeration.flagged) {
++          await setProjectFailed(
++            projectId,
++            `Character image flagged by moderation: ${imageModeration.categories.join(', ')}`,
++          );
++          throw new Error(`Character image moderation blocked: ${imageModeration.categories.join(', ')}`);
++        }
++
+         await appendCharacter(projectId, char.name, char.description, result.imageUrl);
+       }
+     });
+ 
+-    // Step 3: Scene generation with IP-Adapter
++    // Step 3: Scene generation with IP-Adapter (with image moderation per ADR-011)
+     await step.run('generate-scenes', async () => {
+       await updateProjectProgress(projectId, 'generating_scenes', 'Generating scenes…', 50);
+       const characters = await getProjectCharacters(projectId);
+@@ -98,6 +135,20 @@ export const pipelineFunction = inngest.createFunction(
+           })),
+           aspectRatio: project.aspectRatio,
+         });
++
++        // Moderate the generated scene image (ADR-011)
++        const imageModeration = await moderateImage({
++          imageUrl: result.imageUrl,
++          rawOutput: result.raw,
++        });
++        if (imageModeration.flagged) {
++          await setProjectFailed(
++            projectId,
++            `Scene image flagged by moderation: ${imageModeration.categories.join(', ')}`,
++          );
++          throw new Error(`Scene image moderation blocked: ${imageModeration.categories.join(', ')}`);
++        }
++
+         await appendScene(
+           projectId,
+           scene.order,
+@@ -108,13 +159,141 @@ export const pipelineFunction = inngest.createFunction(
+       }
+     });
+ 
+-    // Steps 4-6 are implemented in Sprint 4 (voiceover, subtitles, assembly)
+-    await step.run('complete-phase-3', async () => {
++    // Step 4: Voiceover synthesis (ElevenLabs TTS, chunked)
++    await step.run('synthesize-voiceover', async () => {
++      await updateProjectProgress(
++        projectId,
++        'synthesizing_voice',
++        'Synthesizing voiceover…',
++        65,
++      );
++
++      const narrationText = buildNarrationText(analysis);
++      const voiceResult = await synthesizeVoice({
++        text: narrationText,
++        voiceId: DEFAULT_VOICE_ID,
++      });
++
++      // Upload the audio buffer to R2 (generated bucket)
++      const audioKey = buildObjectKey(projectId, 'voiceover.mp3');
++      await putObject('generated', audioKey, voiceResult.audioBuffer, 'audio/mpeg');
++
++      // Insert the voiceover row
++      await appendVoiceover(
++        projectId,
++        DEFAULT_VOICE_ID,
++        'Rachel',
++        audioKey,
++        voiceResult.duration,
++        narrationText,
++      );
++
++      // Debit voiceover credits
++      await debitCredits(project.userId, CREDIT_COSTS.voiceover, 'voiceover', projectId);
++    });
++
++    // Step 5: Subtitle alignment (Whisper ASR → SRT)
++    await step.run('align-subtitles', async () => {
++      await updateProjectProgress(
++        projectId,
++        'aligning_subtitles',
++        'Aligning subtitles…',
++        80,
++      );
++
++      // Fetch the voiceover we just created
++      const voiceover = await getProjectVoiceover(projectId);
++      if (!voiceover?.audioKey) {
++        throw new Error('Voiceover not found for subtitle alignment');
++      }
++
++      // Download the audio from R2 to feed Whisper
++      const audioDownloadUrl = await getSignedDownloadUrl('generated', voiceover.audioKey);
++      const audioResponse = await fetch(audioDownloadUrl);
++      const audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
++
++      // Run Whisper ASR
++      const subtitleResult = await alignSubtitles(audioBuffer);
++
++      // Upload the SRT to R2
++      const subtitleKey = buildObjectKey(projectId, 'subtitles.srt');
++      await putObject(
++        'generated',
++        subtitleKey,
++        Buffer.from(subtitleResult.srt, 'utf-8'),
++        'text/plain',
++      );
++
++      // Create the video row (so we can attach the subtitle to it)
++      await appendVideo(projectId, null, subtitleKey, null, '720p');
++      await updateVideoSubtitle(projectId, subtitleKey);
++
++      // Debit subtitle alignment credits
++      await debitCredits(
++        project.userId,
++        CREDIT_COSTS.subtitle_alignment,
++        'subtitle_alignment',
++        projectId,
++      );
++    });
++
++    // Step 6: Video assembly (FFmpeg → MP4)
++    await step.run('assemble-video', async () => {
++      await updateProjectProgress(
++        projectId,
++        'assembling_video',
++        'Assembling your video…',
++        90,
++      );
++
++      // Gather inputs for FFmpeg
++      const scenes = await getProjectScenes(projectId);
++      const voiceover = await getProjectVoiceover(projectId);
++      if (!voiceover?.audioKey) {
++        throw new Error('Voiceover not found for video assembly');
++      }
++
++      const audioUrl = await getSignedDownloadUrl('generated', voiceover.audioKey);
++
++      // Fetch the SRT content (we wrote it in Step 5)
++      const subtitleKey = buildObjectKey(projectId, 'subtitles.srt');
++      const srtDownloadUrl = await getSignedDownloadUrl('generated', subtitleKey);
++      const srtResponse = await fetch(srtDownloadUrl);
++      const subtitlesSrt = await srtResponse.text();
++
++      // Assemble the video
++      const assembleResult = await assembleVideo({
++        sceneImageUrls: scenes.map((s) => s.generatedImageKey!),
++        sceneDurations: scenes.map((s) => s.duration ?? 8),
++        audioUrl,
++        subtitlesSrt,
++        aspectRatio: project.aspectRatio,
++        resolution: '720p',
++      });
++
++      // Upload the final MP4 to R2 (videos bucket)
++      const videoKey = buildObjectKey(projectId, 'final.mp4');
++      await putObject('videos', videoKey, assembleResult.videoBuffer, 'video/mp4');
++
++      // Update the video row with the actual video key + duration
++      await appendVideo(projectId, videoKey, subtitleKey, assembleResult.duration, '720p');
++
++      // Debit video assembly credits
++      await debitCredits(
++        project.userId,
++        CREDIT_COSTS.video_assembly,
++        'video_assembly',
++        projectId,
++      );
++    });
++
++    // Final step: mark project as completed
++    await step.run('complete', async () => {
+       await updateProjectProgress(
+         projectId,
+         'completed',
+-        'Storyboard ready (Sprint 4 will add video)',
+-        75,
++        'Your video is ready!',
++        100,
+       );
+     });
+ 
+diff --git a/src/features/pipeline/queries.ts b/src/features/pipeline/queries.ts
+index 6af3593..db72db1 100644
+--- a/src/features/pipeline/queries.ts
++++ b/src/features/pipeline/queries.ts
+@@ -1,7 +1,7 @@
+ import { eq } from 'drizzle-orm';
+ 
+ import { db } from '@/lib/db';
+-import { characters, scenes, projects } from '@/lib/db/schema';
++import { characters, scenes, projects, videos, voiceovers } from '@/lib/db/schema';
+ 
+ /**
+  * Pipeline queries — the queries.ts boundary for pipeline state updates.
+@@ -86,3 +86,75 @@ export async function getProjectCharacters(projectId: string) {
+ export async function getProjectScenes(projectId: string) {
+   return db.select().from(scenes).where(eq(scenes.projectId, projectId)).orderBy(scenes.order);
+ }
++
++// ── Voiceover queries (Step 4) ──────────────────────────────────────────────
++
++export async function appendVoiceover(
++  projectId: string,
++  voiceId: string,
++  voiceName: string | null,
++  audioKey: string,
++  duration: number | null,
++  transcript: string,
++) {
++  const [voiceover] = await db
++    .insert(voiceovers)
++    .values({
++      projectId,
++      voiceId,
++      voiceName,
++      audioKey,
++      duration,
++      transcript,
++    })
++    .returning();
++  return voiceover!;
++}
++
++export async function getProjectVoiceover(projectId: string) {
++  const [voiceover] = await db
++    .select()
++    .from(voiceovers)
++    .where(eq(voiceovers.projectId, projectId))
++    .limit(1);
++  return voiceover;
++}
++
++// ── Video queries (Steps 5-6) ───────────────────────────────────────────────
++
++export async function appendVideo(
++  projectId: string,
++  videoKey: string | null,
++  subtitleKey: string | null,
++  duration: number | null,
++  resolution: '720p' | '1080p' | '4k',
++) {
++  const [video] = await db
++    .insert(videos)
++    .values({
++      projectId,
++      videoKey,
++      subtitleKey,
++      duration,
++      resolution,
++      status: 'completed',
++    })
++    .returning();
++  return video!;
++}
++
++export async function updateVideoSubtitle(projectId: string, subtitleKey: string) {
++  await db
++    .update(videos)
++    .set({ subtitleKey })
++    .where(eq(videos.projectId, projectId));
++}
++
++export async function getProjectVideo(projectId: string) {
++  const [video] = await db
++    .select()
++    .from(videos)
++    .where(eq(videos.projectId, projectId))
++    .limit(1);
++  return video;
++}
+diff --git a/src/features/projects/actions.ts b/src/features/projects/actions.ts
+index eb3c67a..b088b3d 100644
+--- a/src/features/projects/actions.ts
++++ b/src/features/projects/actions.ts
+@@ -10,6 +10,7 @@ import { verifySession } from '@/features/auth/domain/verify-session';
+ import { moderateContent } from '@/features/pipeline/domain/moderate-content';
+ import { debitCredits, getOrCreateSubscription } from '@/features/billing/queries';
+ import { CREDIT_COSTS } from '@/features/billing/domain/tier-limits';
++import { inngest, PIPELINE_EVENT } from '@/lib/inngest/client';
+ 
+ /**
+  * createProjectAction — Server Action that creates a new project from a story.
+@@ -113,8 +114,11 @@ export async function createProjectAction(
+     return { success: false, error: 'Failed to create project', code: 'INTERNAL' };
+   }
+ 
+-  // 6. (Sprint 3+) trigger Inngest pipeline event here
+-  // await inngest.send({ name: 'pipeline.started', data: { projectId: project.id } })
++  // 6. TRIGGER INNGEST PIPELINE
++  await inngest.send({
++    name: PIPELINE_EVENT,
++    data: { projectId: project.id },
++  });
+ 
+   // 7. REVALIDATE + REDIRECT
+   revalidatePath('/dashboard');
+diff --git a/src/features/projects/queries.ts b/src/features/projects/queries.ts
+index 166625b..4c53cbe 100644
+--- a/src/features/projects/queries.ts
++++ b/src/features/projects/queries.ts
+@@ -1,7 +1,7 @@
+ import { eq } from 'drizzle-orm';
+ 
+ import { db } from '@/lib/db';
+-import { projects } from '@/lib/db/schema';
++import { projects, videos } from '@/lib/db/schema';
+ 
+ /**
+  * Projects queries — the queries.ts boundary.
+@@ -29,12 +29,38 @@ export async function getUserProjects(userId: string) {
+ }
+ 
+ export async function getProject(projectId: string, userId: string) {
+-  const [project] = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
++  // LEFT JOIN videos so the project detail page can render a download button
++  // when the video is ready. Returns videoKey + subtitleKey (both null if
++  // the project hasn't reached the assembly step yet).
++  const [row] = await db
++    .select({
++      id: projects.id,
++      userId: projects.userId,
++      title: projects.title,
++      story: projects.story,
++      style: projects.style,
++      aspectRatio: projects.aspectRatio,
++      status: projects.status,
++      progressDetail: projects.progressDetail,
++      progressPercent: projects.progressPercent,
++      creditsCost: projects.creditsCost,
++      errorMessage: projects.errorMessage,
++      createdAt: projects.createdAt,
++      updatedAt: projects.updatedAt,
++      videoKey: videos.videoKey,
++      subtitleKey: videos.subtitleKey,
++      videoDuration: videos.duration,
++      videoResolution: videos.resolution,
++    })
++    .from(projects)
++    .leftJoin(videos, eq(videos.projectId, projects.id))
++    .where(eq(projects.id, projectId))
++    .limit(1);
+ 
+-  // Owner check — throws 403-equivalent if not owner
+-  if (project && project.userId !== userId) {
++  // Owner check — returns null if not owner (treated as 404 by the caller)
++  if (row && row.userId !== userId) {
+     return null;
+   }
+ 
+-  return project;
++  return row;
+ }
+diff --git a/src/lib/storage/r2.ts b/src/lib/storage/r2.ts
+index e00c361..03d6152 100644
+--- a/src/lib/storage/r2.ts
++++ b/src/lib/storage/r2.ts
+@@ -1,4 +1,9 @@
+-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
++import {
++  S3Client,
++  PutObjectCommand,
++  GetObjectCommand,
++  type PutObjectCommandInput,
++} from '@aws-sdk/client-s3';
+ import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
+ 
+ import { env } from '@/lib/env';
+@@ -59,6 +64,32 @@ export async function getSignedDownloadUrl(bucket: BucketName, key: string): Pro
+   return awsGetSignedUrl(r2Client, command, { expiresIn: SIGNED_URL_EXPIRY });
+ }
+ 
++/**
++ * Upload a Buffer directly to R2.
++ *
++ * Used by the Inngest pipeline (Steps 4-6) to persist AI-generated audio,
++ * SRT subtitles, and the final MP4 video. Inside an Inngest function we
++ * already have the bytes in memory — going through a presigned URL would
++ * add a redundant HTTP round-trip.
++ *
++ * Returns void on success. Callers use the known (bucket, key) pair for
++ * future reads via getSignedDownloadUrl.
++ */
++export async function putObject(
++  bucket: BucketName,
++  key: string,
++  body: Buffer,
++  contentType: string,
++): Promise<void> {
++  const input: PutObjectCommandInput = {
++    Bucket: BUCKET_MAP[bucket],
++    Key: key,
++    Body: body,
++    ContentType: contentType,
++  };
++  await r2Client.send(new PutObjectCommand(input));
++}
++
+ /** Build an R2 object key from a project ID + filename */
+ export function buildObjectKey(projectId: string, filename: string): string {
+   return `${projectId}/${filename}`;
+diff --git a/src/tests/unit/create-project-action.test.ts b/src/tests/unit/create-project-action.test.ts
+index e5e1398..446af81 100644
+--- a/src/tests/unit/create-project-action.test.ts
++++ b/src/tests/unit/create-project-action.test.ts
+@@ -50,6 +50,14 @@ vi.mock('next/navigation', () => ({
+   }),
+ }));
+ 
++// Mock Inngest client — pipeline trigger
++vi.mock('@/lib/inngest/client', () => ({
++  inngest: {
++    send: vi.fn().mockResolvedValue({ ids: ['event-1'] }),
++  },
++  PIPELINE_EVENT: 'pipeline.started',
++}));
++
+ import { verifySession } from '@/features/auth/domain/verify-session';
+ import { moderateContent } from '@/features/pipeline/domain/moderate-content';
+ import {
+@@ -57,6 +65,7 @@ import {
+   debitCredits,
+   InsufficientCreditsError,
+ } from '@/features/billing/queries';
++import { inngest, PIPELINE_EVENT } from '@/lib/inngest/client';
+ import { createProjectAction } from '@/features/projects/actions';
+ 
+ describe('S2-02: createProjectAction Server Action', () => {
+@@ -162,4 +171,25 @@ describe('S2-02: createProjectAction Server Action', () => {
+ 
+     expect(verifySession).toHaveBeenCalled();
+   });
++
++  it('triggers Inngest pipeline event after successful project insert', async () => {
++    vi.mocked(verifySession).mockResolvedValue({
++      user: { id: 'user-123', email: 't@t.com' },
++      expires: '',
++    } as never);
++    vi.mocked(moderateContent).mockResolvedValue({ flagged: false, categories: [] });
++    vi.mocked(getOrCreateSubscription).mockResolvedValue({} as never);
++    vi.mocked(debitCredits).mockResolvedValue(undefined);
++
++    try {
++      await createProjectAction(validInput);
++    } catch {
++      // redirect throws NEXT_REDIRECT
++    }
++
++    expect(inngest.send).toHaveBeenCalledWith({
++      name: PIPELINE_EVENT,
++      data: { projectId: 'project-123' },
++    });
++  });
+ });

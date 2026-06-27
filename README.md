@@ -75,7 +75,7 @@ pnpm lint
 # Unit tests (Vitest) — 164 tests across 24 files
 pnpm test
 
-# E2E tests (Playwright) — 11 tests, auto-starts dev server
+# E2E tests (Playwright) — 48 tests, auto-starts dev server
 # (requires `pnpm exec playwright install` first)
 pnpm test:e2e
 
@@ -127,7 +127,7 @@ Layer 4: src/lib/                 — Infrastructure: Drizzle, Auth.js, Inngest,
 
 **Golden Rule:** A lower layer may never import from a higher layer. Domain may import types from Infrastructure but never runtime code.
 
-### Routes (11 total)
+### Routes (12 total)
 
 | Route | Type | Purpose |
 |---|---|---|
@@ -140,6 +140,7 @@ Layer 4: src/lib/                 — Infrastructure: Drizzle, Auth.js, Inngest,
 | `/api/auth/[...nextauth]` | ƒ Dynamic | Auth.js catch-all |
 | `/api/inngest` | ƒ Dynamic | Inngest webhook (6-step pipeline) |
 | `/api/stripe/webhook` | ƒ Dynamic | Stripe webhook (signature-verified, idempotent) |
+| `/api/health` | ƒ Dynamic | Health check (returns `{ status: 'ok' }`) |
 | Middleware | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing` |
 
 ### Marketing Page — Component Rendering Strategy
@@ -312,7 +313,7 @@ src/
 │   ├── fonts.ts · utils.ts
 ├── tests/
 │   ├── unit/                     # 24 files, 164 tests
-│   ├── e2e/                      # 3 files, 11 tests
+│   ├── e2e/                      # 9 files, 48 tests
 │   └── setup.ts                  # jest-dom + test env vars
 ├── types/index.ts                # 12 marketing interfaces
 └── middleware.ts                 # Layer 0: route protection (Edge runtime)
@@ -416,13 +417,19 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 
 ### E2E Tests (Playwright)
 
-11 tests across 3 spec files, all GREEN (Chromium):
+48 tests across 9 spec files, all GREEN (Chromium):
 
 | Spec file | Tests | What it covers |
 |---|---|---|
 | `hero-cta.spec.ts` | 3 | Hero CTA + Final CTA → `/create`, Navbar Get Started → `/sign-up` |
 | `mobile-nav.spec.ts` | 5 | Hamburger opens Sheet, all links present, close button works, desktop links hidden on mobile |
 | `faq-accordion.spec.ts` | 3 | Expand/collapse, single-open behavior, all 6 questions present |
+| `auth-flow.spec.ts` | 8 | Sign-in, sign-out, middleware redirects |
+| `dashboard.spec.ts` | 6 | Project list, navigation |
+| `project-detail.spec.ts` | 6 | Story, status, metadata |
+| `create-project.spec.ts` | 8 | Form elements, validation, counter |
+| `billing.spec.ts` | 6 | Plan tiers, buttons |
+| `seed-data.spec.ts` | 6 | Seed data accessibility |
 
 ## Implementation Notes
 
@@ -516,7 +523,7 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 **Marketing layer (inherited):**
 1. **`suppressHydrationWarning` belongs on `<body>`, not just `<html>`** — Browser extensions like Grammarly inject attributes into `<body>` before React hydrates.
 2. **Workflow component needs `'use client'`** — Uses `useState` for poster→video fade-in choreography.
-3. **Test counts drift from plans** — The MEP planned 6 unit + 3 E2E; actual is now 164 unit + 11 E2E. Always verify against `pnpm test` output.
+3. **Test counts drift from plans** — The MEP planned 6 unit + 3 E2E; actual is now 164 unit + 48 E2E. Always verify against `pnpm test` output.
 4. **File structure evolves during implementation** — Update docs as you build.
 5. **Playwright requires browser binary installation** — `pnpm install` doesn't install browser binaries.
 
@@ -568,7 +575,7 @@ This project has a fixed marketing spec (`Project_Requirements_Document.md`) and
 1. `pnpm lint` — zero warnings
 2. `pnpm typecheck` — zero errors
 3. `pnpm test` — 164 unit tests pass
-4. `pnpm test:e2e` — 11 E2E tests pass (requires Playwright browsers)
+4. `pnpm test:e2e` — 48 E2E tests pass (requires Playwright browsers)
 5. `pnpm format:check` — all files use Prettier code style
 6. `pnpm build` — zero errors
 7. Visual verification of marketing page against live site at 1440×900

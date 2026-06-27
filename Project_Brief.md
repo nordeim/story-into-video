@@ -329,7 +329,7 @@ Summary of All Changes
 ---
 
 1. Migration generated and applied (drizzle/0000_parched_wind_dancer.sql) 
-- 8 enums, 11 tables, 9 FK constraints 
+- 8 enums, 11 tables, 10 FK constraints 
 - All ON DELETE behaviors correct (CASCADE for owned entities, SET null for usage_events.project_id) 
  
 2. Seed script created (src/lib/db/seed.ts) 
@@ -459,7 +459,7 @@ Summary of All Changes
 ┌─────────────────┬──────────────────────────────────────────────────────────────────────┐ 
 │ Item            │ Details                                                              │ 
 ├─────────────────┼──────────────────────────────────────────────────────────────────────┤ 
-│ Migration       │ drizzle/0000_parched_wind_dancer.sql — 8 enums, 11 tables, 9 FKs     │ 
+│ Migration       │ drizzle/0000_parched_wind_dancer.sql — 8 enums, 11 tables, 10 FKs     │ 
 ├─────────────────┼──────────────────────────────────────────────────────────────────────┤ 
 │ Seed script     │ src/lib/db/seed.ts — 1 user, 2 projects, full pipeline data          │ 
 ├─────────────────┼──────────────────────────────────────────────────────────────────────┤ 

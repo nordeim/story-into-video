@@ -112,13 +112,13 @@ src/
 │   ├── fonts.ts · utils.ts
 ├── tests/
 │   ├── unit/                     # 24 files, 164 tests
-│   ├── e2e/                      # 3 files, 11 tests
+│   ├── e2e/                      # 9 files, 48 tests
 │   └── setup.ts                  # jest-dom + test env vars
 ├── types/index.ts                # 12 marketing interfaces
 └── middleware.ts                 # Layer 0: route protection (Edge runtime)
 ```
 
-## Routes (11 total)
+## Routes (12 total)
 
 | Route | Type | Purpose |
 |---|---|---|
@@ -131,6 +131,7 @@ src/
 | `/api/auth/[...nextauth]` | ƒ Dynamic | Auth.js catch-all |
 | `/api/inngest` | ƒ Dynamic | Pipeline webhook |
 | `/api/stripe/webhook` | ƒ Dynamic | Billing webhook |
+| `/api/health` | ƒ Dynamic | Health check (returns `{ status: 'ok' }`) |
 | Middleware | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing` |
 
 ## Build & Quality Commands (Actual)
@@ -141,7 +142,7 @@ pnpm build        # Production build (hybrid: static + dynamic)
 pnpm lint         # eslint . (flat config)
 pnpm typecheck    # tsc --noEmit (strict + noUncheckedIndexedAccess)
 pnpm test         # vitest run (164 unit tests, jsdom)
-pnpm test:e2e     # playwright test (11 E2E tests, Chromium, auto-starts dev)
+pnpm test:e2e     # playwright test (48 E2E tests, Chromium, auto-starts dev)
 pnpm format       # prettier --write
 pnpm format:check # prettier --check
 pnpm drizzle-kit generate   # Create migration SQL from schema diff
@@ -277,7 +278,7 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 - Credit metering (transactional `debitCredits`, `InsufficientCreditsError`)
 - Billing page (4-tier plan table)
 - All 14 marketing CTAs wired to real routes
-- 164 unit tests + 11 E2E tests (all GREEN)
+- 164 unit tests + 48 E2E tests (all GREEN)
 
 ### ⚠️ Outstanding (requires external resources / not yet done)
 - **External service credentials** — Neon, Google OAuth, OpenAI, Replicate, ElevenLabs, R2, Stripe, Inngest, Resend, Upstash, Sentry (fill `.env.local` from `.env.example`)
