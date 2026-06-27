@@ -25,7 +25,12 @@ import { eq } from 'drizzle-orm';
  */
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300; // 5min — max for SSE on Vercel
+// T6 (remediation): Raised from 300 to 900. The pipeline runs 5-15min;
+// 300s (Vercel Hobby ceiling) caused mid-stream disconnects. 900s is the
+// Vercel Pro/Enterprise ceiling. If deploying on Hobby, either upgrade
+// or rely on the client-side reconnect in useProjectProgress (which will
+// reopen the stream after a 1s/2s/4s backoff).
+export const maxDuration = 900;
 
 const POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATUSES = new Set(['completed', 'failed']);

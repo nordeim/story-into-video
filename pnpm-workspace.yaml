@@ -1,9 +1,22 @@
+# pnpm configuration
+# The `packages` field is required by pnpm 9+ even for single-package repos
+# when this file exists. Listing '.' declares the repo root as the only
+# workspace package. Without it, `pnpm install` fails with:
+#   ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION  packages field missing or empty
+packages:
+  - '.'
+
+# Allow specific native build scripts to run during install (pnpm 9 default
+# is to skip them unless explicitly approved).
 allowBuilds:
   '@ffmpeg-installer/linux-x64': true
   esbuild: true
   protobufjs: true
   sharp: true
   unrs-resolver: true
+
+# Only run postinstall scripts for these packages (security hardening —
+# prevents malicious packages from running arbitrary code on install).
 onlyBuiltDependencies:
   - sharp
   - unrs-resolver

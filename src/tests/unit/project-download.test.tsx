@@ -58,6 +58,45 @@ describe('T10: download/share source-level guarantees', () => {
     const source = readFileSync(path, 'utf-8');
     expect(source).toMatch(/^['"]use client['"]/m);
   });
+
+  // T1 (remediation): SignedDownloadWrapper is extracted to its own file so
+  // the app/components directory count matches documentation and the wrapper
+  // is independently testable + reusable.
+  it('SignedDownloadWrapper is extracted to its own file (not inline in page.tsx)', () => {
+    const path = resolve(__dirname, '../../components/app/signed-download-wrapper.tsx');
+    expect(() => readFileSync(path, 'utf-8')).not.toThrow();
+  });
+
+  it('SignedDownloadWrapper is a Server Component (no "use client" directive)', () => {
+    const path = resolve(__dirname, '../../components/app/signed-download-wrapper.tsx');
+    const source = readFileSync(path, 'utf-8');
+    const codeOnly = stripComments(source);
+    expect(codeOnly).not.toMatch(/^['"]use client['"]/m);
+  });
+
+  it('SignedDownloadWrapper imports getSignedDownloadUrl from @/lib/storage/r2', () => {
+    const path = resolve(__dirname, '../../components/app/signed-download-wrapper.tsx');
+    const source = readFileSync(path, 'utf-8');
+    expect(source).toMatch(/from ['"]@\/lib\/storage\/r2['"]/);
+    expect(source).toMatch(/getSignedDownloadUrl/);
+  });
+
+  it('SignedDownloadWrapper exports a named function (composition over inline)', () => {
+    const path = resolve(__dirname, '../../components/app/signed-download-wrapper.tsx');
+    const source = readFileSync(path, 'utf-8');
+    expect(source).toMatch(/export (async )?function SignedDownloadWrapper/);
+  });
+
+  it('project detail page imports SignedDownloadWrapper (no inline definition)', () => {
+    const pageSource = readFileSync(
+      resolve(__dirname, '../../app/(app)/projects/[id]/page.tsx'),
+      'utf-8',
+    );
+    const codeOnly = stripComments(pageSource);
+    expect(codeOnly).toMatch(/from ['"]@\/components\/app\/signed-download-wrapper['"]/);
+    // The inline definition must be removed — only the import should remain
+    expect(codeOnly).not.toMatch(/async function SignedDownloadWrapper/);
+  });
 });
 
 // ── Functional tests for the buttons ────────────────────────────────────────

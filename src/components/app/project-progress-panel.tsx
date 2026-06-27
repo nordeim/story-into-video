@@ -75,6 +75,12 @@ export function ProjectProgressPanel({
           Live updates disconnected. Refresh the page to retry.
         </p>
       )}
+
+      {progress.connectionState === 'reconnecting' && (
+        <p className="mt-2 text-xs text-zinc-500">
+          Reconnecting to live updates…
+        </p>
+      )}
     </div>
   );
 }

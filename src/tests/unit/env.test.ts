@@ -97,4 +97,100 @@ describe('env module — Zod validation', () => {
     expect(env.DATABASE_URL).toMatch(/^postgresql:\/\//);
     expect(env.AUTH_SECRET.length).toBeGreaterThanOrEqual(32);
   });
+
+  // T2 (remediation): When AUTH_URL and NEXT_PUBLIC_APP_URL have different
+  // hosts, Auth.js v5 may redirect auth callbacks to the wrong host (e.g.,
+  // http://localhost:3000 in production). The env module emits a console.warn
+  // at module load to surface this misconfiguration early.
+  it('warns when AUTH_URL host differs from NEXT_PUBLIC_APP_URL host', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const mismatched = {
+      ...VALID_ENV,
+      AUTH_URL: 'http://localhost:3000',
+      NEXT_PUBLIC_APP_URL: 'https://storyintovideo.jesspete.shop',
+    };
+    Object.assign(process.env, mismatched);
+    await import('@/lib/env');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/AUTH_URL.*NEXT_PUBLIC_APP_URL.*host/i),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('does NOT warn when AUTH_URL and NEXT_PUBLIC_APP_URL hosts match', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const matched = {
+      ...VALID_ENV,
+      AUTH_URL: 'https://storyintovideo.jesspete.shop',
+      NEXT_PUBLIC_APP_URL: 'https://storyintovideo.jesspete.shop',
+    };
+    Object.assign(process.env, matched);
+    await import('@/lib/env');
+    expect(warnSpy).not.toHaveBeenCalledWith(
+      expect.stringMatching(/AUTH_URL.*NEXT_PUBLIC_APP_URL.*host/i),
+    );
+    warnSpy.mockRestore();
+  });
+
+  // T3 (remediation): OPENAI_API_KEY must accept all valid OpenAI key prefixes,
+  // not just 'sk-'. Modern OpenAI keys use prefix-scoped formats:
+  //   - sk-...           (legacy)
+  //   - sk-proj-...      (project-scoped, the new default)
+  //   - sk-svcacct-...   (service account)
+  //   - sk-admin-...     (admin)
+  // The old `startsWith('sk-')` check rejected all but the first, breaking
+  // production rotations to project-scoped keys.
+  it.each([
+    ['legacy sk- prefix', 'sk-abc123'],
+    ['project-scoped sk-proj- prefix', 'sk-proj-abc123XYZ'],
+    ['service account sk-svcacct- prefix', 'sk-svcacct-abc123'],
+    ['admin sk-admin- prefix', 'sk-admin-abc123'],
+  ])('accepts OPENAI_API_KEY with %s', async (_label, key) => {
+    const withKey = { ...VALID_ENV, OPENAI_API_KEY: key };
+    Object.assign(process.env, withKey);
+    const { env } = await import('@/lib/env');
+    expect(env.OPENAI_API_KEY).toBe(key);
+  });
+
+  it('rejects OPENAI_API_KEY that does not start with any known prefix', async () => {
+    const invalid = { ...VALID_ENV, OPENAI_API_KEY: 'not-an-openai-key' };
+    Object.assign(process.env, invalid);
+    await expect(import('@/lib/env')).rejects.toThrow(/OPENAI_API_KEY/i);
+  });
+
+  // T4 (remediation): SDXL model IDs are now env-configurable so they can be
+  // rotated without code changes. Both are optional with sensible defaults
+  // (the existing hardcoded values). When set, they must match Replicate's
+  // `owner/model:sha` format to fail fast on typos.
+  it('accepts REPLICATE_SDXL_MODEL matching owner/model:sha format', async () => {
+    const withModel = {
+      ...VALID_ENV,
+      REPLICATE_SDXL_MODEL: 'stability-ai/sdxl:39ed52f2a788939d832ec6675557c771a6b0f9b6ce8bcd3ff0f4e4f3f1e0a6e3',
+    };
+    Object.assign(process.env, withModel);
+    const { env } = await import('@/lib/env');
+    expect(env.REPLICATE_SDXL_MODEL).toBe(withModel.REPLICATE_SDXL_MODEL);
+  });
+
+  it('rejects REPLICATE_SDXL_MODEL with invalid format', async () => {
+    const invalid = { ...VALID_ENV, REPLICATE_SDXL_MODEL: 'not-a-valid-model-id' };
+    Object.assign(process.env, invalid);
+    await expect(import('@/lib/env')).rejects.toThrow(/REPLICATE_SDXL_MODEL/i);
+  });
+
+  it('uses default SDXL model when REPLICATE_SDXL_MODEL is not set', async () => {
+    Object.assign(process.env, VALID_ENV);
+    const { env } = await import('@/lib/env');
+    expect(env.REPLICATE_SDXL_MODEL).toMatch(/^[a-z0-9-]+\/[a-z0-9-]+:[a-f0-9]+$/i);
+  });
+
+  it('accepts REPLICATE_SDXL_IPADAPTER_MODEL matching owner/model:sha format', async () => {
+    const withModel = {
+      ...VALID_ENV,
+      REPLICATE_SDXL_IPADAPTER_MODEL: 'lucataco/sdxl-ipadapter:39ed52f2a788939d832ec6675557c771a6b0f9b6ce8bcd3ff0f4e4f3f1e0a6e3',
+    };
+    Object.assign(process.env, withModel);
+    const { env } = await import('@/lib/env');
+    expect(env.REPLICATE_SDXL_IPADAPTER_MODEL).toBe(withModel.REPLICATE_SDXL_IPADAPTER_MODEL);
+  });
 });

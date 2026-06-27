@@ -64,6 +64,34 @@ const envSchema = z
     REPLICATE_API_TOKEN: z.string().min(1).startsWith('r8_'),
     ELEVENLABS_API_KEY: z.string().min(1),
 
+    // ── Replicate Model IDs (optional, format-validated) ──
+    // T4: Both default to the existing hardcoded constants. Operators can
+    // override via env to rotate models without code changes. The regex
+    // matches Replicate's `owner/model:sha` format (owner + model are
+    // lowercase alphanumeric + dashes; sha is a 64-char hex string).
+    REPLICATE_SDXL_MODEL: z
+      .string()
+      .regex(
+        /^[a-z0-9-]+\/[a-z0-9-]+:[a-f0-9]{8,}$/,
+        'REPLICATE_SDXL_MODEL must match Replicate format: owner/model:sha (e.g. stability-ai/sdxl:39ed52f2...)',
+      )
+      .default('stability-ai/sdxl:39ed52f2a788939d832ec6675557c771a6b0f9b6ce8bcd3ff0f4e4f3f1e0a6e3'),
+    REPLICATE_SDXL_IPADAPTER_MODEL: z
+      .string()
+      .regex(
+        /^[a-z0-9-]+\/[a-z0-9-]+:[a-f0-9]{8,}$/,
+        'REPLICATE_SDXL_IPADAPTER_MODEL must match Replicate format: owner/model:sha (e.g. lucataco/sdxl-ipadapter:39ed52f2...)',
+      )
+      // NOTE: The previous hardcoded placeholder
+      // 'lucataco/sdxl-ipadapter:6f288a8d-7e5e-4f0c-8b3f-3e1f3e6e3e3e' did NOT
+      // match the format above (the SHA contained hyphens and was 36 chars —
+      // looked like a UUID, not a Replicate version hash). The default here
+      // uses the SDXL base model hash as a placeholder until a real IP-Adapter
+      // version hash is configured via env. **Operators must set
+      // REPLICATE_SDXL_IPADAPTER_MODEL to a real lucataco/sdxl-ipadapter
+      // version before the pipeline can generate consistent scenes.**
+      .default('stability-ai/sdxl:39ed52f2a788939d832ec6675557c771a6b0f9b6ce8bcd3ff0f4e4f3f1e0a6e3'),
+
     // ── Stripe ──
     STRIPE_SECRET_KEY: z.string().min(1).startsWith('sk_'),
     STRIPE_WEBHOOK_SECRET: z.string().min(1).startsWith('whsec_'),
@@ -115,6 +143,19 @@ const envSchema = z
 type EnvData = z.infer<typeof envSchema>;
 
 /**
+ * Extract the host portion of a URL string. Returns null for invalid URLs
+ * (used in the AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-match warning below).
+ */
+function extractHost(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).host;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Parse env vars. In production, fail fast on invalid config. In build/test
  * contexts where env vars may be absent, fall back to placeholder values so
  * the module can be imported without crashing.
@@ -122,10 +163,34 @@ type EnvData = z.infer<typeof envSchema>;
  * The IS_BUILD_CONTEXT check detects when we're in a build or test context
  * (no real env vars available) and uses placeholders. At runtime with real env
  * vars, full validation applies.
+ *
+ * HOST-MISMATCH WARNING (T2 remediation): If AUTH_URL and NEXT_PUBLIC_APP_URL
+ * resolve to different hosts, Auth.js v5 (without `trustHost: true`) would
+ * redirect auth callbacks to the AUTH_URL host — breaking authentication in
+ * production (e.g., when AUTH_URL=http://localhost:3000 leaks to prod). We
+ * emit a console.warn (not throw) so the app still boots, but the misconfig
+ * is loud and visible in server logs.
  */
 function parseEnv(): EnvData {
   const result = envSchema.safeParse(process.env);
-  if (result.success) return result.data;
+  if (result.success) {
+    // Surface AUTH_URL ↔ NEXT_PUBLIC_APP_URL host mismatches. This is a
+    // warning, not an error — the app should still boot so operators can
+    // diagnose via logs. With trustHost: true on the NextAuth config, the
+    // mismatch is no longer fatal, but it's still a misconfiguration that
+    // should be fixed (AUTH_URL is used for email magic links, etc.).
+    const authHost = extractHost(result.data.AUTH_URL);
+    const appHost = extractHost(result.data.NEXT_PUBLIC_APP_URL);
+    if (authHost && appHost && authHost !== appHost) {
+      console.warn(
+        `[env] AUTH_URL host ("${authHost}") differs from NEXT_PUBLIC_APP_URL host ("${appHost}"). ` +
+          `This is a common cause of auth redirect loops in production. ` +
+          `Set AUTH_URL to the same host as NEXT_PUBLIC_APP_URL, or rely on trustHost:true ` +
+          `(already set in src/lib/auth/config.ts) to use the incoming request's Host header.`,
+      );
+    }
+    return result.data;
+  }
 
   // Build/test fallback — only used during Next.js build (NEXT_PHASE) or tests.
   // At runtime (dev server, production with real NODE_ENV), real env vars MUST
@@ -143,6 +208,8 @@ function parseEnv(): EnvData {
       AUTH_URL: 'http://localhost:3000',
       OPENAI_API_KEY: 'sk-placeholder',
       REPLICATE_API_TOKEN: 'r8_placeholder',
+      REPLICATE_SDXL_MODEL: 'stability-ai/sdxl:39ed52f2a788939d832ec6675557c771a6b0f9b6ce8bcd3ff0f4e4f3f1e0a6e3',
+      REPLICATE_SDXL_IPADAPTER_MODEL: 'stability-ai/sdxl:39ed52f2a788939d832ec6675557c771a6b0f9b6ce8bcd3ff0f4e4f3f1e0a6e3',
       ELEVENLABS_API_KEY: 'placeholder',
       STRIPE_SECRET_KEY: 'sk_placeholder',
       STRIPE_WEBHOOK_SECRET: 'whsec_placeholder',

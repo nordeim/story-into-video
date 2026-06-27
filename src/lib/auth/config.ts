@@ -70,6 +70,13 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
   session: { strategy: 'jwt' },
   providers,
   secret: env.AUTH_SECRET,
+  // trustHost: true makes Auth.js v5 use the incoming request's Host header
+  // instead of falling back to AUTH_URL. This is critical for deployments
+  // behind a reverse proxy (Cloudflare Tunnel, Nginx, etc.) — without it,
+  // auth callback redirects resolve to whatever AUTH_URL is set to
+  // (often http://localhost:3000 if the dev default leaked to production),
+  // breaking authentication entirely.
+  trustHost: true,
   pages: {
     signIn: '/sign-in',
   },

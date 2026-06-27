@@ -1,0 +1,71 @@
+# StoryIntoVideo — Continuous Integration
+#
+# Runs the full quality gate on every push to main and every PR:
+#   1. Install dependencies (pnpm, frozen lockfile)
+#   2. Lint (eslint .)
+#   3. Typecheck (tsc --noEmit, strict mode)
+#   4. Unit tests (vitest run, 257+ tests)
+#   5. Build (next build — exercises the build-context env fallback)
+#
+# E2E tests (Playwright) are NOT run in CI yet — they require a live dev
+# server + Playwright browser binaries + seeded DB. Add a separate job
+# once a CI Postgres service is wired up.
+#
+# Caching: pnpm store cache keyed on pnpm-lock.yaml hash. Node version
+# pinned to 20 (matches the engines field in package.json).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs when a new commit is pushed to the same PR.
+# Saves CI minutes and avoids race conditions on the cache.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    name: Lint + Typecheck + Test + Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (eslint .)
+        run: pnpm lint
+
+      - name: Typecheck (tsc --noEmit)
+        run: pnpm typecheck
+
+      - name: Unit tests (vitest run)
+        run: pnpm test
+
+      - name: Build (next build)
+        run: pnpm build
+        env:
+          # The env module has a build-context fallback that returns
+          # placeholders when NEXT_PHASE=phase-production-build. No real
+          # secrets are needed for the build step.
+          NEXT_PHASE: phase-production-build
+          NODE_ENV: production

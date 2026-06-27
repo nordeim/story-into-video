@@ -41,6 +41,35 @@ const r2Client = new S3Client({
 
 const SIGNED_URL_EXPIRY = 3600; // 1 hour
 
+/**
+ * Maximum body size for a single putObject call.
+ *
+ * R2's hard per-PUT limit is 5 GB, but Vercel/Inngest function memory is
+ * typically 1-8 GB. A 4K FFmpeg output (~4 GB) would OOM the function
+ * before reaching R2. We cap at 500 MB — comfortably above any reasonable
+ * 720p/1080p MP4 (typically 50-200 MB) and well below R2's limit, giving
+ * us a safety margin for memory pressure.
+ *
+ * If you need to upload larger files, use multipart upload via the AWS SDK
+ * (CreateMultipartUploadCommand) instead of putObject.
+ */
+export const MAX_PUT_OBJECT_BYTES = 500 * 1024 * 1024; // 500 MB
+
+/** Error thrown when a putObject body exceeds MAX_PUT_OBJECT_BYTES. */
+export class PayloadTooLargeError extends Error {
+  constructor(
+    public readonly actualBytes: number,
+    public readonly maxBytes: number,
+  ) {
+    super(
+      `putObject payload exceeds size limit: ${actualBytes} bytes ` +
+        `(max ${maxBytes} bytes / ${Math.round(maxBytes / 1024 / 1024)} MB). ` +
+        `Use multipart upload for larger files.`,
+    );
+    this.name = 'PayloadTooLargeError';
+  }
+}
+
 /** Generate a signed URL for uploading a file to R2 */
 export async function getSignedUploadUrl(
   bucket: BucketName,
@@ -81,6 +110,12 @@ export async function putObject(
   body: Buffer,
   contentType: string,
 ): Promise<void> {
+  // T7 (remediation): Fail fast on oversized payloads. R2's limit is 5 GB,
+  // but function memory is the real constraint. See MAX_PUT_OBJECT_BYTES.
+  if (body.length > MAX_PUT_OBJECT_BYTES) {
+    throw new PayloadTooLargeError(body.length, MAX_PUT_OBJECT_BYTES);
+  }
+
   const input: PutObjectCommandInput = {
     Bucket: BUCKET_MAP[bucket],
     Key: key,

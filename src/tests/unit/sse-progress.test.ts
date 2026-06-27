@@ -161,3 +161,97 @@ describe('T9: use-project-progress hook functional behavior', () => {
     expect(closeMock).toHaveBeenCalled();
   });
 });
+
+// T6 (remediation): The hook must reconnect with exponential backoff when
+// the SSE stream drops mid-pipeline (Vercel caps SSE at 300-900s; pipeline
+// runs 5-15min). The old impl only set connectionState:'error' and never
+// retried — users saw "Live updates disconnected" indefinitely.
+describe('T6: use-project-progress reconnect behavior', () => {
+  it('attempts reconnect after an SSE error (constructor called twice)', async () => {
+    vi.useFakeTimers();
+    const { renderHook, act } = await import('@testing-library/react');
+    const { useProjectProgress } = await import('@/lib/hooks/use-project-progress');
+
+    const constructorSpy = vi.fn();
+    const closeMock = vi.fn();
+    const instances: Array<{
+      onerror: ((ev: unknown) => void) | null;
+      onmessage: ((ev: { data: string }) => void) | null;
+      onopen: ((ev: unknown) => void) | null;
+    }> = [];
+
+    class MockEventSource {
+      static CLOSED = 2;
+      onopen: ((ev: unknown) => void) | null = null;
+      onmessage: ((ev: { data: string }) => void) | null = null;
+      onerror: ((ev: unknown) => void) | null = null;
+      readyState = 1;
+
+      constructor(public readonly src: string) {
+        constructorSpy(src);
+        instances.push(this);
+      }
+
+      close = closeMock;
+      dispatchEvent() {
+        return true;
+      }
+    }
+
+    vi.stubGlobal('EventSource', MockEventSource);
+
+    renderHook(() => useProjectProgress('proj-456'));
+
+    // Initial EventSource created in useEffect (advance microtasks + 0ms timers)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(constructorSpy).toHaveBeenCalledTimes(1);
+    expect(instances[0]?.onerror).not.toBeNull();
+
+    // Simulate an SSE error on the first instance
+    await act(async () => {
+      instances[0]?.onerror?.(new Event('error'));
+    });
+
+    // Advance through the 1s backoff. The hook calls setTimeout(openStream, 1000).
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    // After error + backoff, the hook should have created a second EventSource
+    expect(constructorSpy).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
+  });
+
+  it('source contains reconnect logic with exponential backoff', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const hookSource = readFileSync(
+      resolve(__dirname, '../../lib/hooks/use-project-progress.ts'),
+      'utf-8',
+    );
+
+    // Must declare a max reconnect attempts constant
+    expect(hookSource).toMatch(/MAX_RECONNECT_ATTEMPTS\s*=/);
+    // Must reference backoff delay (1s, 2s, 4s = exponential)
+    expect(hookSource).toMatch(/setTimeout|backoff/i);
+    // Must call new EventSource in the reconnect path
+    expect(hookSource).toMatch(/new EventSource/);
+    // Must track attempt count
+    expect(hookSource).toMatch(/reconnectAttempt|attempt/i);
+  });
+
+  it('source raises maxDuration on the SSE route to 900s', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const routeSource = readFileSync(
+      resolve(__dirname, '../../app/api/projects/[id]/progress/route.ts'),
+      'utf-8',
+    );
+    // Was 300, must be raised to 900 (Vercel Pro ceiling) so a 5-15min
+    // pipeline doesn't disconnect mid-stream.
+    expect(routeSource).toMatch(/maxDuration\s*=\s*900/);
+  });
+});

@@ -31,6 +31,7 @@ AI-powered story-into-video generator with a luxury-dark, cinematic marketing fr
 | Billing | Stripe (Checkout + Portal + Webhooks) | ^22.3.0 |
 | Validation | Zod (env + all Server Action inputs) | ^4.4.3 |
 | Video | FFmpeg (fluent-ffmpeg + system binary) | `FFMPEG_PATH` env var (default `/usr/bin/ffmpeg`) |
+| CI/CD | GitHub Actions | `.github/workflows/ci.yml` — lint + typecheck + test + build |
 | Package Manager | pnpm | >=9.0.0 |
 | Node | — | >=20.0.0 |
 
@@ -321,6 +322,7 @@ src/
 │       ├── empty-state.tsx              # Reusable empty-state primitive
 │       ├── providers.tsx                # 'use client' — SessionProvider wrapper
 │       ├── project-progress-panel.tsx   # 'use client' — SSE subscriber + progress bar
+│       ├── signed-download-wrapper.tsx  # Server Component — signs R2 URL, passes as prop
 │       ├── project-download-button.tsx  # 'use client' — receives `downloadUrl` prop (NO r2.ts import)
 │       └── project-share-button.tsx     # 'use client' — Web Share API + clipboard fallback
 ├── features/                     # Layer 2 + 3: Feature modules with domain isolation
@@ -703,6 +705,69 @@ Final: Mark project status='completed', progressPercent=100
 - **Do not use default exports for components** — use named exports
 - **Do not skip the verification chain** — `pnpm lint && pnpm typecheck && pnpm test && pnpm build`
 - **Do not use `db push` in production** — always `drizzle-kit generate` + `migrate`
+
+## Remediation Sprint 2 (Post-Review Hardening)
+
+The following changes were applied after a meticulous code review identified
+critical/high/medium gaps. Every change follows TDD (RED → GREEN → REFACTOR)
+and the verification chain passes clean.
+
+### New Environment Variables (all optional)
+
+| Var | Default | Purpose |
+|---|---|---|
+| `REPLICATE_SDXL_MODEL` | `stability-ai/sdxl:39ed52f2...` | Override the SDXL base model used for character portraits |
+| `REPLICATE_SDXL_IPADAPTER_MODEL` | `stability-ai/sdxl:39ed52f2...` (PLACEHOLDER) | Override the IP-Adapter model used for scene generation. **⚠️ Operators must set this to a real `lucataco/sdxl-ipadapter:<sha>` before character consistency will work.** |
+| `IMAGE_MODERATION_FAIL_OPEN` | `true` | When `false`, `moderateImage` fails CLOSED on unknown output shapes (returns `flagged:true` with `categories:['unknown-output-shape']`). Recommended for production launches. |
+
+### Code-Level Fixes
+
+1. **`trustHost: true` on NextAuth config** — Auth.js v5 now uses the
+   incoming request's Host header instead of `AUTH_URL`. Fixes the P0
+   production outage where the live site redirected auth callbacks to
+   `http://localhost:3000`. (T2)
+2. **AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch warning** — The env
+   module emits a `console.warn` at module load when the two hosts differ.
+   With `trustHost: true` this is no longer fatal, but it's still a
+   misconfiguration that should be fixed. (T2)
+3. **`SignedDownloadWrapper` extracted to its own file** — Was inline in
+   `projects/[id]/page.tsx`. Now in `src/components/app/signed-download-wrapper.tsx`
+   for independent testability + reuse. App component count is now 8 (matches
+   the documented count). (T1)
+4. **SDXL model IDs moved to env vars** — Both `SDXL_MODEL` and
+   `SDXL_IPADAPTER_MODEL` are now read from the validated `env` module.
+   The Zod schema validates the `owner/model:sha` format — typos fail fast
+   at module load. The placeholder IP-Adapter hash
+   (`6f288a8d-7e5e-4f0c-8b3f-3e1f3e6e3e3e`) was replaced with the SDXL
+   base model + an explicit operator warning. (T4)
+5. **`moderationSkipped` field on `ImageModerationResult`** — The fail-open
+   bypass is now observable. A `console.warn` is emitted on every skip.
+   The policy is env-configurable via `IMAGE_MODERATION_FAIL_OPEN`. (T5)
+6. **SSE reconnect with exponential backoff** — `useProjectProgress` now
+   reopens the EventSource after errors, with 1s → 2s → 4s backoff, up to
+   3 attempts. New `connectionState: 'reconnecting'` value surfaces in the
+   UI as "Reconnecting to live updates…". `maxDuration` on the SSE route
+   raised from 300 → 900 (Vercel Pro ceiling). (T6)
+7. **`putObject` size guard** — `MAX_PUT_OBJECT_BYTES = 500 MB` constant +
+   `PayloadTooLargeError` thrown when exceeded. R2's hard limit is 5 GB,
+   but function memory is the real constraint. The guard fails fast with
+   a clear message instead of an opaque OOM. (T7)
+8. **GitHub Actions CI** — `.github/workflows/ci.yml` runs
+   `pnpm lint && pnpm typecheck && pnpm test && pnpm build` on every push
+   to main and every PR. pnpm store cache keyed on lockfile hash. E2E
+   tests not yet in CI (need Postgres service + Playwright browsers). (T8)
+9. **`pnpm-workspace.yaml` fixed** — Added the missing `packages: ['.']`
+   field. Fresh clones with pnpm 9+ were failing with
+   `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION  packages field missing or empty`.
+   (T0)
+
+### What Was Investigated But Not Fixed (No Code Change Needed)
+
+- **`OPENAI_API_KEY` Zod validation too strict** — Investigation revealed
+   that `startsWith('sk-')` already accepts all modern OpenAI key prefixes
+   (`sk-proj-`, `sk-svcacct-`, `sk-admin-`) since they all literally start
+   with `sk-`. The original concern was unfounded. 5 regression-guard tests
+   were added to lock this behavior in. (T3)
 
 ## Reference Documents
 

@@ -94,4 +94,35 @@ describe('T1: R2 putObject helper', () => {
     const result = await putObject('generated', 'k', Buffer.from('x'), 'image/png');
     expect(result).toBeUndefined();
   });
+
+  // T7 (remediation): putObject must refuse uploads exceeding a sane size cap.
+  // R2's per-PUT limit is 5 GB, but Vercel/Inngest function memory is far
+  // smaller (1-8 GB typically). A 4K FFmpeg output (~4 GB) would OOM the
+  // function before reaching R2. We fail fast with a typed error so callers
+  // can surface a clear message instead of an opaque OOM.
+  it('throws a typed error when body exceeds MAX_PUT_OBJECT_BYTES', async () => {
+    sendMock.mockResolvedValue({});
+    // Create a buffer just over the limit. We can't allocate 500MB in a unit
+    // test, so we mock the buffer's length property via a proxy.
+    // Instead, we'll create a small buffer and stub Buffer.byteLength to
+    // return a value over the limit. Actually simpler: test via source-level
+    // assertion below + a focused size-check test with a smaller limit.
+    //
+    // Direct test: the function should call .length on the buffer and compare
+    // against the cap. We pass a buffer whose length we can control.
+    const hugeBuffer = Buffer.alloc(1);
+    // Override length to simulate a huge buffer without allocating 500MB
+    Object.defineProperty(hugeBuffer, 'length', { value: 600 * 1024 * 1024 });
+
+    await expect(
+      putObject('videos', 'project-1/final.mp4', hugeBuffer, 'video/mp4'),
+    ).rejects.toThrow(/exceeds.*limit|too large|size/i);
+  });
+
+  it('source contains MAX_PUT_OBJECT_BYTES constant', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const r2Source = readFileSync(resolve(__dirname, '../../lib/storage/r2.ts'), 'utf-8');
+    expect(r2Source).toMatch(/MAX_PUT_OBJECT_BYTES\s*=/);
+  });
 });

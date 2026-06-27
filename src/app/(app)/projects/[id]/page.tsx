@@ -4,9 +4,8 @@ import { Suspense } from 'react';
 import { verifySession } from '@/features/auth/domain/verify-session';
 import { getProject } from '@/features/projects/queries';
 import { env } from '@/lib/env';
-import { getSignedDownloadUrl } from '@/lib/storage/r2';
 import { ProjectProgressPanel } from '@/components/app/project-progress-panel';
-import { ProjectDownloadButton } from '@/components/app/project-download-button';
+import { SignedDownloadWrapper } from '@/components/app/signed-download-wrapper';
 import { ProjectShareButton } from '@/components/app/project-share-button';
 
 /**
@@ -79,28 +78,12 @@ async function ProjectDetail({ projectId }: { projectId: string }) {
 }
 
 /**
- * SignedDownloadWrapper — Server Component that generates a signed R2 URL
- * at SSR time and passes it to the ProjectDownloadButton client component.
- *
- * This keeps the r2.ts import (and its env validation) on the server side,
- * preventing the "Invalid environment variables" crash in the browser.
+ * SignedDownloadWrapper is now imported from
+ * `@/components/app/signed-download-wrapper` (extracted in T1) so it can be
+ * independently tested and reused. It signs the URL server-side and passes
+ * it as a prop to ProjectDownloadButton (client), avoiding the env validation
+ * crash in the browser.
  */
-async function SignedDownloadWrapper({
-  videoKey,
-  children,
-}: {
-  videoKey: string;
-  children: React.ReactNode;
-}) {
-  const downloadUrl = await getSignedDownloadUrl('videos', videoKey);
-
-  return (
-    <div className="mt-6 flex flex-wrap items-center gap-3">
-      <ProjectDownloadButton videoKey={videoKey} downloadUrl={downloadUrl} />
-      {children}
-    </div>
-  );
-}
 
 function ProjectDetailSkeleton() {
   return (
