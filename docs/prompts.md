@@ -14,7 +14,15 @@ awesome meticulous job so far. please keep up the good work. now, please meticul
 
 ---
 
+please meticulously review @CLAUDE.md , @AGENTS.md and @README.md to have a deep understanding of the WHAT, WHY and HOW of the project and its codebase design and architecture, then meticulously validate your understanding against the codebase to check for alignment and to confirm the current project status.
+
+---
+
 Awesome meticulous review, analysis and planning. Please keep up the good work. now, please meticulously review and update @README.md , @CLAUDE.md and @AGENTS.md to align with the latest code changes, issues fixed, gotchas to look out for, troubleshooting tips, lessons learnt, outstanding issues and recommendations.
+
+---
+
+Awesome meticulous review, analysis and planning. Please keep up the good work. now, please meticulously review the included gap analysis `storyintovideo_deviation_report.md` and validate it againt the codebase to check for alignment and to identify the root causes and the optimal fixes. then meticulously plan to create a comprehensive remediation plan with a detailed ToDo list to apply the optimal fixes. review and validat the remediation plan against the codebase to ensure alignment before proceeding to execute it meticulously. remember to use TDD approach to make code changes.
 
 ---
 
