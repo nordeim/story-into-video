@@ -1,4 +1,5 @@
-import { Page, expect } from '@playwright/test';
+import type { Page, BrowserContext } from '@playwright/test';
+import { expect } from '@playwright/test';
 
 /**
  * E2E test helpers for authentication flows.
@@ -39,7 +40,7 @@ export async function signOut(page: Page): Promise<void> {
  * Use for testing unauthenticated access.
  */
 export async function createUnauthenticatedPage(
-  context: import('@playwright/test').BrowserContext,
+  context: BrowserContext,
 ): Promise<Page> {
   return context.newPage();
 }
