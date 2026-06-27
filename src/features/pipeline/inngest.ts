@@ -112,9 +112,7 @@ export const pipelineFunction = inngest.createFunction(
             projectId,
             `Character image flagged by moderation: ${imageModeration.categories.join(', ')}`,
           );
-          throw new Error(
-            `Character image moderation blocked: ${imageModeration.categories.join(', ')}`,
-          );
+          throw new Error(`Character image moderation blocked: ${imageModeration.categories.join(', ')}`);
         }
 
         await appendCharacter(projectId, char.name, char.description, result.imageUrl);
@@ -148,9 +146,7 @@ export const pipelineFunction = inngest.createFunction(
             projectId,
             `Scene image flagged by moderation: ${imageModeration.categories.join(', ')}`,
           );
-          throw new Error(
-            `Scene image moderation blocked: ${imageModeration.categories.join(', ')}`,
-          );
+          throw new Error(`Scene image moderation blocked: ${imageModeration.categories.join(', ')}`);
         }
 
         await appendScene(
@@ -165,7 +161,12 @@ export const pipelineFunction = inngest.createFunction(
 
     // Step 4: Voiceover synthesis (ElevenLabs TTS, chunked)
     await step.run('synthesize-voiceover', async () => {
-      await updateProjectProgress(projectId, 'synthesizing_voice', 'Synthesizing voiceover…', 65);
+      await updateProjectProgress(
+        projectId,
+        'synthesizing_voice',
+        'Synthesizing voiceover…',
+        65,
+      );
 
       const narrationText = buildNarrationText(analysis);
       const voiceResult = await synthesizeVoice({
@@ -193,7 +194,12 @@ export const pipelineFunction = inngest.createFunction(
 
     // Step 5: Subtitle alignment (Whisper ASR → SRT)
     await step.run('align-subtitles', async () => {
-      await updateProjectProgress(projectId, 'aligning_subtitles', 'Aligning subtitles…', 80);
+      await updateProjectProgress(
+        projectId,
+        'aligning_subtitles',
+        'Aligning subtitles…',
+        80,
+      );
 
       // Fetch the voiceover we just created
       const voiceover = await getProjectVoiceover(projectId);
@@ -233,7 +239,12 @@ export const pipelineFunction = inngest.createFunction(
 
     // Step 6: Video assembly (FFmpeg → MP4)
     await step.run('assemble-video', async () => {
-      await updateProjectProgress(projectId, 'assembling_video', 'Assembling your video…', 90);
+      await updateProjectProgress(
+        projectId,
+        'assembling_video',
+        'Assembling your video…',
+        90,
+      );
 
       // Gather inputs for FFmpeg
       const scenes = await getProjectScenes(projectId);
@@ -268,12 +279,22 @@ export const pipelineFunction = inngest.createFunction(
       await appendVideo(projectId, videoKey, subtitleKey, assembleResult.duration, '720p');
 
       // Debit video assembly credits
-      await debitCredits(project.userId, CREDIT_COSTS.video_assembly, 'video_assembly', projectId);
+      await debitCredits(
+        project.userId,
+        CREDIT_COSTS.video_assembly,
+        'video_assembly',
+        projectId,
+      );
     });
 
     // Final step: mark project as completed
     await step.run('complete', async () => {
-      await updateProjectProgress(projectId, 'completed', 'Your video is ready!', 100);
+      await updateProjectProgress(
+        projectId,
+        'completed',
+        'Your video is ready!',
+        100,
+      );
     });
 
     return { success: true, projectId };

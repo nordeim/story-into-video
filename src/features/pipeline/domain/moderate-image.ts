@@ -32,7 +32,14 @@ export interface ImageModerationResult {
   categories: string[];
 }
 
-const FLAGGED_KEYWORDS = new Set(['nsfw', 'sexual', 'violence', 'gore', 'hate', 'self-harm']);
+const FLAGGED_KEYWORDS = new Set([
+  'nsfw',
+  'sexual',
+  'violence',
+  'gore',
+  'hate',
+  'self-harm',
+]);
 
 function extractSafetyCategories(rawOutput: unknown): string[] {
   if (typeof rawOutput !== 'object' || rawOutput === null) {
@@ -61,7 +68,9 @@ function extractSafetyCategories(rawOutput: unknown): string[] {
   return [];
 }
 
-export async function moderateImage(input: ModerateImageInput): Promise<ImageModerationResult> {
+export async function moderateImage(
+  input: ModerateImageInput,
+): Promise<ImageModerationResult> {
   const categories = extractSafetyCategories(input.rawOutput);
   return {
     flagged: categories.length > 0,

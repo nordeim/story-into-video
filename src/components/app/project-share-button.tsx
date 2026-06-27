@@ -15,10 +15,7 @@ interface ProjectShareButtonProps {
   title?: string;
 }
 
-export function ProjectShareButton({
-  url,
-  title = 'My StoryIntoVideo project',
-}: ProjectShareButtonProps) {
+export function ProjectShareButton({ url, title = 'My StoryIntoVideo project' }: ProjectShareButtonProps) {
   const [copied, setCopied] = useState(false);
 
   async function handleShare() {

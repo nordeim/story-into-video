@@ -74,7 +74,9 @@ describe('T10: ProjectDownloadButton functional behavior', () => {
   });
 
   it('renders a download link with the signed URL', async () => {
-    const { ProjectDownloadButton } = await import('@/components/app/project-download-button');
+    const { ProjectDownloadButton } = await import(
+      '@/components/app/project-download-button'
+    );
 
     render(<ProjectDownloadButton videoKey="proj-1/final.mp4" />);
 

@@ -51,7 +51,9 @@ export function ProjectProgressPanel({
     <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
       <h2 className="font-heading mb-3 text-lg font-bold text-white">Pipeline Status</h2>
       <p className="text-sm text-zinc-400">
-        {status === 'failed' && errorMessage ? `${label} ${errorMessage}` : label}
+        {status === 'failed' && errorMessage
+          ? `${label} ${errorMessage}`
+          : label}
       </p>
       {progressDetail && <p className="mt-2 text-xs text-zinc-500">{progressDetail}</p>}
 

@@ -144,10 +144,17 @@ export async function appendVideo(
 }
 
 export async function updateVideoSubtitle(projectId: string, subtitleKey: string) {
-  await db.update(videos).set({ subtitleKey }).where(eq(videos.projectId, projectId));
+  await db
+    .update(videos)
+    .set({ subtitleKey })
+    .where(eq(videos.projectId, projectId));
 }
 
 export async function getProjectVideo(projectId: string) {
-  const [video] = await db.select().from(videos).where(eq(videos.projectId, projectId)).limit(1);
+  const [video] = await db
+    .select()
+    .from(videos)
+    .where(eq(videos.projectId, projectId))
+    .limit(1);
   return video;
 }

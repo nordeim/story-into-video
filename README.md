@@ -72,7 +72,7 @@ pnpm typecheck
 # Lint — must pass with zero warnings
 pnpm lint
 
-# Unit tests (Vitest) — 164 tests across 24 files
+# Unit tests (Vitest) — 227 tests across 32 files
 pnpm test
 
 # E2E tests (Playwright) — 48 tests, auto-starts dev server
@@ -127,7 +127,7 @@ Layer 4: src/lib/                 — Infrastructure: Drizzle, Auth.js, Inngest,
 
 **Golden Rule:** A lower layer may never import from a higher layer. Domain may import types from Infrastructure but never runtime code.
 
-### Routes (12 total)
+### Routes (14 total)
 
 | Route | Type | Purpose |
 |---|---|---|
@@ -135,11 +135,14 @@ Layer 4: src/lib/                 — Infrastructure: Drizzle, Auth.js, Inngest,
 | `/sign-in`, `/sign-up` | ○ Static | Auth pages (Google OAuth + email/password) |
 | `/dashboard` | ƒ Dynamic | Project list (auth-protected, Suspense + empty state) |
 | `/create` | ○ Static | Project creation wizard (auth-protected) |
-| `/projects/[id]` | ƒ Dynamic | Project detail + pipeline status (owner-checked) |
+| `/projects/[id]` | ƒ Dynamic | Project detail + live pipeline status (SSE, owner-checked) |
 | `/billing` | ○ Static | 4-tier plan table + upgrade CTAs |
+| `/privacy` | ○ Static | Privacy Policy (mandatory for launch) |
+| `/terms` | ○ Static | Terms of Service (mandatory for launch) |
 | `/api/auth/[...nextauth]` | ƒ Dynamic | Auth.js catch-all |
 | `/api/inngest` | ƒ Dynamic | Inngest webhook (6-step pipeline) |
 | `/api/stripe/webhook` | ƒ Dynamic | Stripe webhook (signature-verified, idempotent) |
+| `/api/projects/[id]/progress` | ƒ Dynamic | SSE progress stream (2s polling, owner-checked) |
 | `/api/health` | ƒ Dynamic | Health check (returns `{ status: 'ok' }`) |
 | Middleware | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing` |
 
@@ -195,21 +198,22 @@ Navbar (fixed)
  → Footer
 ```
 
-### The AI Pipeline (Inngest, 6 Steps)
+### The AI Pipeline (Inngest, 6 Steps — fully wired)
 
-The core product is a multi-step async pipeline that transforms a user's story into a finished video. Orchestrated by Inngest (per-step retries, idempotent, 5–15 min total):
+The core product is a multi-step async pipeline that transforms a user's story into a finished video. Orchestrated by Inngest (per-step retries, idempotent, 5–15 min total). Triggered automatically by `createProjectAction` via `inngest.send({ name: PIPELINE_EVENT, data: { projectId } })`:
 
 ```
-Step 0: Moderate (OpenAI Moderation API — block if flagged)
+Step 0: Moderate story (OpenAI Moderation API — block if flagged)
 Step 1: Analyze story (GPT-4o JSON mode → characters + scenes)
-Step 2: Generate characters (Replicate SDXL → reference portraits)
-Step 3: Generate scenes (Replicate SDXL + IP-Adapter → consistent faces)
-Step 4: Synthesize voiceover (ElevenLabs TTS, chunked for long text)
-Step 5: Align subtitles (Whisper ASR word timestamps → SRT)
-Step 6: Assemble video (FFmpeg → MP4)
+Step 2: Generate characters (Replicate SDXL → moderateImage per ADR-011)
+Step 3: Generate scenes (Replicate SDXL + IP-Adapter → moderateImage per ADR-011)
+Step 4: Synthesize voiceover (ElevenLabs TTS → R2 putObject → appendVoiceover row)
+Step 5: Align subtitles (fetch audio from R2 → Whisper ASR → SRT → R2 → updateVideoSubtitle)
+Step 6: Assemble video (FFmpeg → R2 putObject('videos') → appendVideo row)
+Final: Mark project status='completed', progressPercent=100
 ```
 
-Each step is a pure domain function in `src/features/pipeline/domain/` (no Next.js or DB runtime imports), debits credits via a Drizzle transaction, and updates `project.status` + `progressDetail`.
+Each step is a pure domain function in `src/features/pipeline/domain/` (no Next.js or DB runtime imports), debits credits via a Drizzle transaction (analysis=5, char=10, scene=8, voiceover=15, subtitle_alignment=3, video_assembly=30), and updates `project.status` + `progressDetail`. Image moderation (Steps 2 & 3) parses Replicate's `safety_concept` / `api_safety_concept` fields (fail-open for unknown shapes — deliberate tradeoff). Live progress is streamed to the project detail page via SSE at `/api/projects/[id]/progress`.
 
 ## Design System
 
@@ -309,14 +313,17 @@ src/
 │   ├── storage/r2.ts                       # R2 signed URLs
 │   ├── stripe/client.ts
 │   ├── data/                               # Static marketing data (10 files)
-│   ├── hooks/                              # 3 hooks (use-scrolled, use-reveal, use-reduced-motion)
+│   ├── hooks/                              # 4 hooks (use-scrolled, use-reveal, use-reduced-motion, use-project-progress)
 │   ├── fonts.ts · utils.ts
 ├── tests/
-│   ├── unit/                     # 24 files, 164 tests
+│   ├── unit/                     # 32 files, 227 tests
 │   ├── e2e/                      # 9 files, 48 tests
 │   └── setup.ts                  # jest-dom + test env vars
 ├── types/index.ts                # 12 marketing interfaces
 └── middleware.ts                 # Layer 0: route protection (Edge runtime)
+
+.husky/
+└── pre-commit                    # Runs `pnpm lint-staged` on staged files
 ```
 
 ## Database Schema
@@ -379,7 +386,7 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 
 ### Unit Tests (Vitest)
 
-164 tests across 24 files, all GREEN:
+227 tests across 32 files, all GREEN:
 
 **Marketing layer (inherited from clone):**
 
@@ -395,7 +402,7 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 | `layout-hydration.test.tsx` | 5 | `suppressHydrationWarning` on `<body>`, skip-to-content, JSON-LD, children |
 | `metadata.test.ts` | 2 | Canonical URL (`alternates.canonical`) presence + clone-domain resolution |
 
-**Production app layer (new):**
+**Production app layer (Sprints 1-4):**
 
 | Test file | Tests | What it covers |
 |---|---|---|
@@ -409,11 +416,24 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 | `dashboard.test.ts` | 8 | Dashboard shell, Suspense, EmptyState, queries.ts boundary |
 | `cta-routes.test.ts` | 11 | All 14 marketing CTAs wired to real routes |
 | `create-wizard.test.ts` | 9 | Create page, textarea, style selector, ratio toggle, submit |
-| `create-project-action.test.ts` | 7 | Server Action (auth-first, Zod, moderation, credits, DB insert) |
+| `create-project-action.test.ts` | 8 | Server Action (auth-first, Zod, moderation, credits, DB insert, **Inngest trigger**) |
 | `analyze-story.test.ts` | 7 | GPT-4o story analysis + Moderation API (mocked OpenAI) |
 | `credit-metering.test.ts` | 8 | Tier limits, credit costs, `debitCredits` transaction |
 | `pipeline-sprint3.test.ts` | 10 | R2 storage, Replicate character/scene generation, IP-Adapter |
 | `sprint4.test.ts` | 12 | ElevenLabs TTS, Whisper ASR, Stripe config + webhook + billing page |
+
+**Remediation sprint (pipeline wiring + UX + compliance):**
+
+| Test file | Tests | What it covers |
+|---|---|---|
+| `r2-putobject.test.ts` | 4 | R2 `putObject` helper (Buffer → S3 via `PutObjectCommand`) |
+| `pipeline-queries.test.ts` | 5 | `appendVoiceover`, `getProjectVoiceover`, `appendVideo`, `updateVideoSubtitle` |
+| `assemble-video.test.ts` | 9 | FFmpeg rewrite: SRT temp file, inputOptions per image, Buffer readback, cleanup |
+| `pipeline-sprint5.test.ts` | 8 | Steps 4-6 wiring: voiceover, subtitles, video assembly, credit debits, completion |
+| `sse-progress.test.ts` | 12 | SSE route source guarantees + `useProjectProgress` hook with mocked EventSource |
+| `project-download.test.tsx` | 9 | `getProject` LEFT JOIN videos, download button, share button clipboard fallback |
+| `moderate-image.test.ts` | 5 | `moderateImage` parses Replicate safety output, fail-open for unknown shapes |
+| `legal-pages.test.ts` | 10 | `/privacy` + `/terms` source guarantees (server components, required sections) |
 
 ### E2E Tests (Playwright)
 
@@ -455,40 +475,64 @@ The engineering blueprint is `PRODUCTION_READINESS_PLAN.md` (11 ADRs, 27 TDD tas
 5. **Stripe webhook dual camelCase/snake_case support** — `subscription.currentPeriodEnd ?? subscription.current_period_end` for SDK v22+ compatibility.
 6. **Inngest v4 `createFunction` signature** — trigger is in the config object (`triggers: [{ event: '...' }]`), not a second argument. The blueprint's pseudocode used the v3 signature.
 
+### Deviations from Blueprint (Remediation Sprint)
+
+The remediation sprint closed 9 of the blueprint's outstanding gaps. The following implementation choices were made:
+
+1. **`assemble-video.ts` full rewrite** — the blueprint specified a placeholder FFmpeg integration; the rewrite writes SRT to `/tmp`, uses `inputOptions` per image, reads the output MP4 into a Buffer, and cleans up temp files. The `buildFfmpegCommand` helper is exported for unit testing.
+2. **SSE progress via DB polling (not LISTEN/NOTIFY)** — the blueprint suggested either approach. Polling every 2s was chosen because serverless can't hold long-lived Postgres connections for LISTEN/NOTIFY. 2s is fast enough for a 5-15min pipeline without DB load concerns.
+3. **Image moderation via Replicate safety output (not OpenAI vision)** — ADR-011 specified moderation on generated images but didn't prescribe the provider. Parsing Replicate's `safety_concept` / `api_safety_concept` fields adds zero latency/cost vs. a second OpenAI vision API call. Fail-open for unknown output shapes (deliberate tradeoff).
+4. **`getProject()` LEFT JOIN videos** — the blueprint didn't specify how the download button should fetch video data. LEFT JOIN in the existing query is cheaper than a second `getProjectVideo()` round-trip.
+5. **`putObject` for pipeline uploads** — the blueprint only specified `getSignedUploadUrl` (presigned URLs). `putObject` was added for Inngest pipeline steps that already have the Buffer in memory (TTS audio, FFmpeg output) — direct S3 PUT is faster than round-tripping through a presigned URL.
+6. **husky `prepare` script with `|| true`** — prevents `pnpm install` from failing on first install (when husky isn't yet installed). This is a common pattern; the `|| true` is intentional.
+
 ### What's Implemented vs. Outstanding
 
-**✅ Fully implemented (code layer, 164 tests passing):**
+**✅ Fully implemented (code layer — 227 unit tests + 48 E2E tests, all GREEN):**
 - Auth.js v5 (Google OAuth + Credentials, Drizzle adapter, JWT sessions, middleware)
 - Drizzle schema (11 tables, 8 enums) + migration config
 - `verifySession()` DAL + route protection
 - Sign-in / sign-up pages + AuthForm
 - Dashboard with Suspense + empty state
 - Create wizard (reuses Hero's glass-input pattern)
-- `createProjectAction` Server Action (auth-first, Zod, moderation, credits)
-- All 6 AI pipeline domain functions (analyze, moderate, generate-character, generate-scene, synthesize-voice, align-subtitles, assemble-video)
-- Inngest 6-step pipeline function
-- R2 storage layer (signed URLs, 3 buckets)
+- `createProjectAction` Server Action (auth-first, Zod, moderation, credits, **Inngest trigger**)
+- All 7 AI pipeline domain functions (analyze, moderate-content, moderate-image, generate-character, generate-scene, synthesize-voice, align-subtitles, assemble-video)
+- Inngest 6-step pipeline function (**fully wired: Steps 0-6 + final completion**)
+- Image moderation on generated characters + scenes (ADR-011 — `moderateImage` parses Replicate safety output)
+- R2 storage layer (signed URLs + `putObject` for pipeline Buffer uploads, 3 buckets)
 - Stripe (Checkout, Portal, webhook with signature verification + idempotency)
 - Credit metering (transactional `debitCredits`)
 - Billing page (4-tier plan table)
+- SSE progress stream (`/api/projects/[id]/progress` — 2s polling, owner-checked)
+- `useProjectProgress` client hook + `ProjectProgressPanel` (live progress bar)
+- Download button (signed R2 URL) + Share button (Web Share API + clipboard fallback)
+- `getProject()` LEFT JOINs videos — returns `videoKey` for conditional download render
+- Privacy Policy + Terms of Service pages (Server Components, AI-specific clauses)
 - All 14 marketing CTAs wired to real routes
+- husky + lint-staged pre-commit hook (`.husky/pre-commit`)
 
 **⚠️ Outstanding (requires external resources or not yet done):**
 - **External service credentials** — Neon, Google OAuth, OpenAI, Replicate, ElevenLabs, R2, Stripe, Inngest, Resend, Upstash, Sentry (fill `.env.local` from `.env.example`)
 - **Database migrations applied** — run `pnpm drizzle-kit generate && migrate` against real Neon
 - **Stripe products configured** — `PRICE_IDS` are placeholders
 - **Replicate model IDs verified** — `SDXL_MODEL` / `SDXL_IPADAPTER_MODEL` need real version hashes
-- **Character consistency validated** — manual R&D test (Risk R1, highest-risk component)
-- **FFmpeg assembly validated** — real end-to-end test needed
-- **Inngest pipeline trigger wired** — `inngest.send()` in `createProjectAction` is commented out
-- **SSE progress stream** — not yet implemented
-- **Download/share** — project detail page has no download button
-- **Content pages** — `/pricing`, `/blog`, `/contact`, `/privacy`, `/terms` not yet implemented (Privacy + Terms mandatory for launch)
-- **Rate limiting** — Upstash Ratelimit not implemented
-- **Content moderation on generated images** — currently only story input is moderated
-- **Monitoring** — Sentry, Vercel Analytics, Axiom not integrated
+- **Character consistency validated end-to-end** — manual R&D test (Risk R1, highest-risk component). Code is wired; needs real API keys.
+- **FFmpeg assembly validated end-to-end** — rewritten + unit-tested with mocked fluent-ffmpeg; needs real-world test with actual scene images + audio + SRT
+- **Rate limiting** — Upstash Ratelimit not implemented (env vars already in schema)
+- **Monitoring** — Sentry, Vercel Analytics, Axiom not integrated (env var `SENTRY_DSN` in schema)
 - **CI/CD** — GitHub Actions not configured
-- **GDPR/CCPA** — cookie consent, data export/deletion not implemented
+- **GDPR/CCPA** — cookie consent banner + data export/deletion endpoints not implemented (Privacy/Terms pages exist)
+- **Other content pages** — `/pricing`, `/blog`, `/contact` linked but not implemented
+
+**✅ Recently closed (remediation sprint):**
+- ~~Steps 4-6 not wired into Inngest~~ → Fixed
+- ~~`inngest.send()` commented out~~ → Fixed
+- ~~FFmpeg placeholder implementation~~ → Fixed (rewrite)
+- ~~No SSE progress stream~~ → Fixed
+- ~~No download/share~~ → Fixed
+- ~~No image moderation (ADR-011)~~ → Fixed
+- ~~No legal pages~~ → Fixed
+- ~~No pre-commit hooks~~ → Fixed (husky + lint-staged)
 
 See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 
@@ -517,13 +561,21 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 | Stripe webhook 400 "Invalid signature" | Wrong secret or body parsed as JSON | Use `await req.text()` (not `.json()`); verify `STRIPE_WEBHOOK_SECRET` |
 | `pnpm install` warns "Ignored build scripts: esbuild" | `pnpm-workspace.yaml` missing approval | Add `esbuild` to `onlyBuiltDependencies` |
 | Tests fail: "Cannot find module 'next/server'" | jsdom can't load Next.js server modules | Mock `next-auth`, `next/navigation`, `@/lib/db` in tests |
+| Tests fail: "Cannot access 'X' before initialization" | `vi.mock()` factory references outer `vi.fn()` | Use `vi.hoisted()`: `const { mockFn } = vi.hoisted(() => ({ mockFn: vi.fn() }))` |
+| Tests fail: "X is not a constructor" | Mock factory returns arrow fn, real code does `new X()` | Use `class` syntax: `class MockS3Client { send = sendMock; }` |
+| Tests fail: "[PARSE_ERROR] Expected '>' but found 'Identifier'" | Test file has JSX but `.test.ts` extension | Rename to `*.test.tsx` |
+| Pipeline tests fail: "fetch failed: ENOTFOUND r2.example.com" | Steps 5 & 6 use `fetch()` for R2 downloads | `vi.stubGlobal('fetch', fetchMock)` |
+| SSE route returns 307 redirect instead of 401 JSON | Used `verifySession()` (redirects) instead of `auth()` | API routes use `auth()` directly: returns null → 401 JSON |
+| SSE stream hangs / never closes | `controller.close()` not called on terminal status | Poll DB every 2s; close when `status ∈ {completed, failed}` |
+| `EventSource` leaks across navigations | `useEffect` cleanup missing `eventSource.close()` | Return cleanup fn from `useEffect` |
+| husky pre-commit hook doesn't run | `pnpm install` didn't run `prepare` script | Run `pnpm install`; ensure `.husky/pre-commit` is executable |
 
 ### Lessons Learned
 
 **Marketing layer (inherited):**
 1. **`suppressHydrationWarning` belongs on `<body>`, not just `<html>`** — Browser extensions like Grammarly inject attributes into `<body>` before React hydrates.
 2. **Workflow component needs `'use client'`** — Uses `useState` for poster→video fade-in choreography.
-3. **Test counts drift from plans** — The MEP planned 6 unit + 3 E2E; actual is now 164 unit + 48 E2E. Always verify against `pnpm test` output.
+3. **Test counts drift from plans** — The MEP planned 6 unit + 3 E2E; actual is now 227 unit + 48 E2E. Always verify against `pnpm test` output.
 4. **File structure evolves during implementation** — Update docs as you build.
 5. **Playwright requires browser binary installation** — `pnpm install` doesn't install browser binaries.
 
@@ -539,19 +591,34 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 14. **ElevenLabs returns `Readable`, not `ReadableStream`** — duck-type the input in `streamToBuffer`.
 15. **TDD with mocked AI providers works well** — all 6 pipeline domain functions are fully unit-tested; real API calls only needed for manual E2E validation.
 
+**Remediation sprint (pipeline wiring + UX + compliance):**
+16. **Vitest mock hoisting is the #1 test bug** — `vi.mock()` factories are hoisted above imports. Use `vi.hoisted()` for shared `vi.fn()` state. Symptom: `Cannot access 'X' before initialization`.
+17. **Mock constructors must be `class`, not arrow fns** — `new S3Client(...)` requires `new`-able mock. Arrow fns throw `"X is not a constructor"`.
+18. **`.tsx` extension is mandatory for JSX tests** — oxc throws parse error for JSX in `*.test.ts`. Rename to `*.test.tsx`.
+19. **SSE in Next.js 16** — `ReadableStream` + `text/event-stream` content-type + 2s DB polling. Simpler than Postgres LISTEN/NOTIFY for serverless (no long-lived connection).
+20. **`auth()` vs `verifySession()` for API routes** — `verifySession()` throws redirect (wrong for JSON). API routes use `auth()` → null → 401 JSON. Server Components/Actions use `verifySession()` (redirects to `/sign-in`).
+21. **`EventSource` cleanup is non-negotiable** — `useEffect` must return `() => eventSource.close()`. Otherwise the connection leaks when the user navigates away.
+22. **Image moderation via Replicate safety output is preferred** — parsing `safety_concept` / `api_safety_concept` adds zero latency/cost vs. a second OpenAI vision moderation API call. Fail-open for unknown shapes (deliberate tradeoff).
+23. **`getProject()` LEFT JOIN videos is cheaper than two queries** — the project detail page needs video data for the download button. LEFT JOIN adds <1ms; second query adds 5-15ms.
+24. **`putObject` (pipeline) vs `getSignedUploadUrl` (client)** — pipeline steps have Buffer in memory → direct PUT. Client uploads use presigned URL → browser uploads directly to R2.
+25. **TDD exposed 4 latent defects in `assemble-video.ts`** — placeholder Buffer, missing SRT write, missing input options, brittle filter extraction. All discoverable only by writing tests first.
+26. **Source-reading tests must strip comments** — `src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')` before regex, else docblocks trigger false positives.
+27. **husky `prepare` script with `|| true` is intentional** — prevents `pnpm install` failure on first install. Don't remove.
+
 ### Recommendations
 
 1. **Run `pnpm exec playwright install` after fresh clone** — Required for E2E tests to work.
-2. **Provision all external services** before first run — see `.env.example` for the full list.
-3. **Run `pnpm drizzle-kit generate && migrate`** to create the database schema.
-4. **Validate the AI pipeline end-to-end** — sign up, paste a story, verify characters/scenes/video generate. This is the highest-risk validation.
-5. **Implement legal pages** — Privacy Policy and Terms of Service are mandatory before launch.
-6. **Add pre-commit hooks** — `husky` + `lint-staged` enforcing `pnpm lint && pnpm typecheck && pnpm test`.
+2. **Run `pnpm install` to activate husky** — the `prepare` script sets up `.husky/pre-commit`. Verify the hook fires on your first commit.
+3. **Provision all external services** before first run — see `.env.example` for the full list.
+4. **Run `pnpm drizzle-kit generate && migrate`** to create the database schema.
+5. **Validate the AI pipeline end-to-end** — sign up, paste a story, verify characters/scenes/video generate. Steps 4-6 are wired but untested with real API keys. This is the highest-risk validation.
+6. **Add rate limiting** — Upstash Ratelimit on auth, AI, export endpoints. Env vars already in schema.
 7. **Add CI/CD** — GitHub Actions with the quality gate on every PR.
 8. **Add monitoring** — Sentry (errors), Vercel Analytics (product), Axiom (logs).
-9. **Run the pre-launch checklist** — `PRODUCTION_READINESS_PLAN.md` §8 before going live.
-10. **Visual regression testing** — Playwright screenshot comparison against the live marketing site.
-11. **Bundle size monitoring** — `next/bundle-analyzer` to track against the <150KB JS / <30KB CSS budget.
+9. **Add cookie consent banner** — required for GDPR/CCPA. Privacy Policy page exists; the banner is the missing piece.
+10. **Run the pre-launch checklist** — `PRODUCTION_READINESS_PLAN.md` §8 before going live.
+11. **Visual regression testing** — Playwright screenshot comparison against the live marketing site.
+12. **Bundle size monitoring** — `next/bundle-analyzer` to track against the <150KB JS / <30KB CSS budget.
 
 ### Document Hierarchy
 
@@ -574,13 +641,15 @@ This project has a fixed marketing spec (`Project_Requirements_Document.md`) and
 
 1. `pnpm lint` — zero warnings
 2. `pnpm typecheck` — zero errors
-3. `pnpm test` — 164 unit tests pass
+3. `pnpm test` — 227 unit tests pass
 4. `pnpm test:e2e` — 48 E2E tests pass (requires Playwright browsers)
 5. `pnpm format:check` — all files use Prettier code style
 6. `pnpm build` — zero errors
 7. Visual verification of marketing page against live site at 1440×900
 8. Lighthouse ≥ 95 across all categories (marketing page)
 9. For production app changes: follow the 5-layer architecture and auth-first Server Action pattern
+
+**Pre-commit hook:** husky + lint-staged automatically runs ESLint + Prettier on staged `.ts/.tsx` files via `.husky/pre-commit`. Run `pnpm install` to activate (the `prepare` script sets up the hook). The hook only checks staged files — run the full quality gate manually before pushing.
 
 ## License
 
