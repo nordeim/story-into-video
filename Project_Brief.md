@@ -304,3 +304,25 @@ Line commented: // await inngest.send({ name: 'pipeline.started', data: { projec
 The codebase is in a feature-complete state relative to the documented Sprint 3-4 scope, with the only outstanding item being the full pipeline wiring (steps 4-6) and the Inngest trigger. The documentation accurately reflects this 
 state.
 
+---
+
+Summary of All Changes 
+ 
+┌───┬─────────────────────┬─────────────────────────────┬──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐ 
+│ # │ Fix                 │ File(s)                     │ What Changed                                                                                                                                                     │ 
+├───┼─────────────────────┼─────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ 1 │ Fix .env.local      │ .env.local                  │ Corrected DATABASE_URL and DATABASE_URL_UNPOOLED to use storyintovideo:storyintovideo_dev_password@localhost:5432/storyintovideo_dev (matching compose Postgres) │ 
+├───┼─────────────────────┼─────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ 2 │ Create .env.docker  │ .env.docker (new)           │ Created with DB_PASSWORD, AUTH_SECRET, and all app vars. Referenced by compose's env_file: for web service                                                       │ 
+├───┼─────────────────────┼─────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ 3 │ Remove worker       │ docker-compose-dev.yml      │ Removed the entire worker: service block (referenced non-existent Dockerfile.worker.dev)                                                                         │ 
+├───┼─────────────────────┼─────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ 4 │ Keep Redis          │ docker-compose-dev.yml      │ No changes — Redis container preserved as requested                                                                                                              │ 
+├───┼─────────────────────┼─────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ 5 │ Simplify extensions │ scripts/init-extensions.sql │ Removed unused uuid-ossp and pg_trgm — gen_random_uuid() is built into PG13+                                                                                     │ 
+├───┼─────────────────────┼─────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ 6 │ Real AUTH_SECRET    │ .env.local, .env.docker     │ Generated via openssl rand -base64 32 — passes Zod's weak-secret rejection                                                                                       │ 
+├───┼─────────────────────┼─────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ 
+│ 7 │ Fix healthcheck     │ Dockerfile.dev              │ Changed from /api/health (didn't exist) to / (marketing page). Also created src/app/api/health/route.ts for future use                                           │ 
+└───┴─────────────────────┴─────────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+

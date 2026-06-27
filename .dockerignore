@@ -1,0 +1,52 @@
+# Dependencies
+node_modules
+.pnpm-store
+.next
+
+# Build outputs
+dist
+build
+.cache
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Environment files (except the template)
+.env
+.env.*
+!.env.docker
+
+# Git & IDE
+.git
+.gitignore
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker files (so they are not copied into the image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Test & coverage
+coverage
+.nyc_output
+test-results
+playwright-report
+
+# Documentation
+README.md
+AGENTS.md
+*.md
+!scripts/init-extensions.sql   # but we DO need the SQL script
+
+# Misc
+*.log
+dump.rdb

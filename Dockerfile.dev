@@ -29,9 +29,9 @@ USER storyintovideo
 # Expose Next.js default port
 EXPOSE 3000
 
-# Healthcheck (uses the MEP-defined /api/health endpoint)
+# Healthcheck — hits the marketing page (200 = healthy)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+  CMD curl -f http://localhost:3000/ || exit 1
 
 # Start Next.js in development mode with Turbopack
 CMD ["pnpm", "dev", "--", "--hostname", "0.0.0.0"]

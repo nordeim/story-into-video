@@ -1,5 +1,5 @@
 # Development environment for StoryIntoVideo
-# Services: PostgreSQL 17, Redis 7, Next.js web app, BullMQ worker
+# Services: PostgreSQL 17, Redis 7, Next.js web app
 # Usage: docker compose -f docker-compose-dev.yml up -d
 # See also: docker-compose-nginx.yml for optional HTTPS proxy.
 
@@ -101,34 +101,6 @@ services:
       - storyintovideo-network
     restart: unless-stopped
     # CMD is defined in Dockerfile
-
-  # ==========================================================================
-  # BullMQ Worker (TypeScript with watch mode)
-  # ==========================================================================
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker.dev
-    container_name: storyintovideo-worker-dev
-    env_file:
-      - .env.docker
-    environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://storyintovideo:${DB_PASSWORD:-storyintovideo_dev_password}@postgres:5432/storyintovideo_dev
-      REDIS_URL: redis://redis:6379
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - pnpm_store:/root/.local/share/pnpm/store
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - storyintovideo-network
-    restart: unless-stopped
-    # CMD is defined in Dockerfile.worker.dev
 
 # ==========================================================================
 # Named Volumes
