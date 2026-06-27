@@ -1,0 +1,205 @@
+$ git diff src/app/\(app\)/projects/\[id\]/page.tsx
+diff --git a/src/app/(app)/projects/[id]/page.tsx b/src/app/(app)/projects/[id]/page.tsx
+index 5140c84..b58c75b 100644
+--- a/src/app/(app)/projects/[id]/page.tsx
++++ b/src/app/(app)/projects/[id]/page.tsx
+@@ -4,6 +4,7 @@ import { Suspense } from 'react';
+ import { verifySession } from '@/features/auth/domain/verify-session';
+ import { getProject } from '@/features/projects/queries';
+ import { env } from '@/lib/env';
++import { getSignedDownloadUrl } from '@/lib/storage/r2';
+ import { ProjectProgressPanel } from '@/components/app/project-progress-panel';
+ import { ProjectDownloadButton } from '@/components/app/project-download-button';
+ import { ProjectShareButton } from '@/components/app/project-share-button';
+@@ -60,21 +61,47 @@ async function ProjectDetail({ projectId }: { projectId: string }) {
+           initialErrorMessage={project.errorMessage}
+         />
+ 
+-        {/* Download + Share buttons — render only when the video is ready */}
++        {/* Download + Share buttons — render only when the video is ready.
++            The signed URL is generated server-side (safe — env vars exist in
++            Node.js) and passed as a prop to the client component. This avoids
++            importing r2.ts in the browser where env vars are undefined. */}
+         {project.status === 'completed' && project.videoKey && (
+-          <div className="mt-6 flex flex-wrap items-center gap-3">
+-            <ProjectDownloadButton videoKey={project.videoKey} />
++          <SignedDownloadWrapper videoKey={project.videoKey}>
+             <ProjectShareButton
+               url={`${env.NEXT_PUBLIC_APP_URL}/projects/${project.id}`}
+               title={project.title}
+             />
+-          </div>
++          </SignedDownloadWrapper>
+         )}
+       </div>
+     </main>
+   );
+ }
+ 
++/**
++ * SignedDownloadWrapper — Server Component that generates a signed R2 URL
++ * at SSR time and passes it to the ProjectDownloadButton client component.
++ *
++ * This keeps the r2.ts import (and its env validation) on the server side,
++ * preventing the "Invalid environment variables" crash in the browser.
++ */
++async function SignedDownloadWrapper({
++  videoKey,
++  children,
++}: {
++  videoKey: string;
++  children: React.ReactNode;
++}) {
++  const downloadUrl = await getSignedDownloadUrl('videos', videoKey);
++
++  return (
++    <div className="mt-6 flex flex-wrap items-center gap-3">
++      <ProjectDownloadButton videoKey={videoKey} downloadUrl={downloadUrl} />
++      {children}
++    </div>
++  );
++}
++
+ function ProjectDetailSkeleton() {
+   return (
+     <div className="min-h-screen bg-zinc-950 px-6 py-16">
+(venv) pete@pop-os:/home/project/story-into-video-prod
+$ git diff src/components/app/project-download-button.tsx
+diff --git a/src/components/app/project-download-button.tsx b/src/components/app/project-download-button.tsx
+index f35b8c3..6168837 100644
+--- a/src/components/app/project-download-button.tsx
++++ b/src/components/app/project-download-button.tsx
+@@ -1,60 +1,26 @@
+ 'use client';
+ 
+-import { useEffect, useState } from 'react';
+ import { Download } from 'lucide-react';
+ 
+-import { getSignedDownloadUrl } from '@/lib/storage/r2';
+-
+ /**
+- * ProjectDownloadButton — fetches a signed R2 download URL on mount and
+- * renders an anchor styled as a button.
++ * ProjectDownloadButton — renders an anchor styled as a button that links
++ * to a pre-signed R2 download URL for the final MP4.
+  *
+- * The URL is fetched client-side (not server-side) so the 1-hour signed
+- * URL is fresh at click time, not at page load time.
++ * The signed URL is generated server-side (in the ProjectDetail Server
++ * Component) and passed as a prop. This avoids importing @/lib/storage/r2
++ * in the browser, which would trigger env validation (all server-only env
++ * vars are undefined in the client context).
+  *
+- * Server-side fetching would also work but means the URL could expire
+- * for users who leave the tab open. Client-side fetch on mount is a
+- * good tradeoff.
++ * Pattern: Server Component handles data fetching, Client Component handles
++ * presentation. This is the recommended Next.js 16 pattern for signed URLs.
+  */
+ 
+ interface ProjectDownloadButtonProps {
+   videoKey: string;
++  downloadUrl: string;
+ }
+ 
+-export function ProjectDownloadButton({ videoKey }: ProjectDownloadButtonProps) {
+-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+-  const [error, setError] = useState<string | null>(null);
+-
+-  useEffect(() => {
+-    let cancelled = false;
+-    getSignedDownloadUrl('videos', videoKey)
+-      .then((url) => {
+-        if (!cancelled) setDownloadUrl(url);
+-      })
+-      .catch(() => {
+-        if (!cancelled) setError('Failed to generate download link');
+-      });
+-    return () => {
+-      cancelled = true;
+-    };
+-  }, [videoKey]);
+-
+-  if (error) {
+-    return <p className="text-xs text-amber-400">{error}</p>;
+-  }
+-
+-  if (!downloadUrl) {
+-    return (
+-      <span
+-        className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-zinc-500"
+-        aria-label="Preparing download link…"
+-      >
+-        <Download className="h-4 w-4" />
+-        Preparing…
+-      </span>
+-    );
+-  }
+-
++export function ProjectDownloadButton({ downloadUrl }: ProjectDownloadButtonProps) {
+   return (
+     <a
+       href={downloadUrl}
+(venv) pete@pop-os:/home/project/story-into-video-prod
+$ git diff src/tests/unit/project-download.test.tsx
+diff --git a/src/tests/unit/project-download.test.tsx b/src/tests/unit/project-download.test.tsx
+index 765da36..dbb3135 100644
+--- a/src/tests/unit/project-download.test.tsx
++++ b/src/tests/unit/project-download.test.tsx
+@@ -61,34 +61,37 @@ describe('T10: download/share source-level guarantees', () => {
+ });
+ 
+ // ── Functional tests for the buttons ────────────────────────────────────────
+-vi.mock('@/lib/storage/r2', () => ({
+-  getSignedDownloadUrl: vi.fn().mockResolvedValue('https://r2.example.com/signed-download'),
+-}));
+-
+-import { getSignedDownloadUrl } from '@/lib/storage/r2';
++// T1 (REMEDIATION): ProjectDownloadButton now receives the signed URL as a prop
++// from the Server Component. It no longer imports r2.ts or fetches client-side.
++// This eliminates the env validation crash in the browser.
+ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+ 
+-describe('T10: ProjectDownloadButton functional behavior', () => {
+-  beforeEach(() => {
+-    vi.clearAllMocks();
+-  });
+-
+-  it('renders a download link with the signed URL', async () => {
++describe('T10: ProjectDownloadButton functional behavior (post-T1 fix)', () => {
++  it('renders a download link using the pre-signed URL passed as a prop', async () => {
+     const { ProjectDownloadButton } = await import(
+       '@/components/app/project-download-button'
+     );
+ 
+-    render(<ProjectDownloadButton videoKey="proj-1/final.mp4" />);
+-
+-    // Wait for the signed URL to resolve
+-    await waitFor(() => {
+-      expect(getSignedDownloadUrl).toHaveBeenCalledWith('videos', 'proj-1/final.mp4');
+-    });
++    render(
++      <ProjectDownloadButton
++        videoKey="proj-1/final.mp4"
++        downloadUrl="https://r2.example.com/signed-download"
++      />,
++    );
+ 
+-    const link = await screen.findByRole('link', { name: /download/i });
++    const link = screen.getByRole('link', { name: /download/i });
+     expect(link).toHaveAttribute('href', 'https://r2.example.com/signed-download');
+     expect(link).toHaveAttribute('download');
+   });
++
++  it('does NOT import r2.ts at module level (no client-side env dependency)', () => {
++    const source = readFileSync(
++      resolve(__dirname, '../../components/app/project-download-button.tsx'),
++      'utf-8',
++    );
++    // Must not import from @/lib/storage/r2 — that chain triggers env validation
++    expect(source).not.toMatch(/from ['"]@\/lib\/storage\/r2['"]/);
++  });
+ });
+ 
+ describe('T10: ProjectShareButton functional behavior', () => {
+

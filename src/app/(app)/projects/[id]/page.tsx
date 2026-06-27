@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { verifySession } from '@/features/auth/domain/verify-session';
 import { getProject } from '@/features/projects/queries';
 import { env } from '@/lib/env';
+import { getSignedDownloadUrl } from '@/lib/storage/r2';
 import { ProjectProgressPanel } from '@/components/app/project-progress-panel';
 import { ProjectDownloadButton } from '@/components/app/project-download-button';
 import { ProjectShareButton } from '@/components/app/project-share-button';
@@ -60,18 +61,44 @@ async function ProjectDetail({ projectId }: { projectId: string }) {
           initialErrorMessage={project.errorMessage}
         />
 
-        {/* Download + Share buttons — render only when the video is ready */}
+        {/* Download + Share buttons — render only when the video is ready.
+            The signed URL is generated server-side (safe — env vars exist in
+            Node.js) and passed as a prop to the client component. This avoids
+            importing r2.ts in the browser where env vars are undefined. */}
         {project.status === 'completed' && project.videoKey && (
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <ProjectDownloadButton videoKey={project.videoKey} />
+          <SignedDownloadWrapper videoKey={project.videoKey}>
             <ProjectShareButton
               url={`${env.NEXT_PUBLIC_APP_URL}/projects/${project.id}`}
               title={project.title}
             />
-          </div>
+          </SignedDownloadWrapper>
         )}
       </div>
     </main>
+  );
+}
+
+/**
+ * SignedDownloadWrapper — Server Component that generates a signed R2 URL
+ * at SSR time and passes it to the ProjectDownloadButton client component.
+ *
+ * This keeps the r2.ts import (and its env validation) on the server side,
+ * preventing the "Invalid environment variables" crash in the browser.
+ */
+async function SignedDownloadWrapper({
+  videoKey,
+  children,
+}: {
+  videoKey: string;
+  children: React.ReactNode;
+}) {
+  const downloadUrl = await getSignedDownloadUrl('videos', videoKey);
+
+  return (
+    <div className="mt-6 flex flex-wrap items-center gap-3">
+      <ProjectDownloadButton videoKey={videoKey} downloadUrl={downloadUrl} />
+      {children}
+    </div>
   );
 }
 

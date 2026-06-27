@@ -1,60 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
 
-import { getSignedDownloadUrl } from '@/lib/storage/r2';
-
 /**
- * ProjectDownloadButton — fetches a signed R2 download URL on mount and
- * renders an anchor styled as a button.
+ * ProjectDownloadButton — renders an anchor styled as a button that links
+ * to a pre-signed R2 download URL for the final MP4.
  *
- * The URL is fetched client-side (not server-side) so the 1-hour signed
- * URL is fresh at click time, not at page load time.
+ * The signed URL is generated server-side (in the ProjectDetail Server
+ * Component) and passed as a prop. This avoids importing @/lib/storage/r2
+ * in the browser, which would trigger env validation (all server-only env
+ * vars are undefined in the client context).
  *
- * Server-side fetching would also work but means the URL could expire
- * for users who leave the tab open. Client-side fetch on mount is a
- * good tradeoff.
+ * Pattern: Server Component handles data fetching, Client Component handles
+ * presentation. This is the recommended Next.js 16 pattern for signed URLs.
  */
 
 interface ProjectDownloadButtonProps {
   videoKey: string;
+  downloadUrl: string;
 }
 
-export function ProjectDownloadButton({ videoKey }: ProjectDownloadButtonProps) {
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    getSignedDownloadUrl('videos', videoKey)
-      .then((url) => {
-        if (!cancelled) setDownloadUrl(url);
-      })
-      .catch(() => {
-        if (!cancelled) setError('Failed to generate download link');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [videoKey]);
-
-  if (error) {
-    return <p className="text-xs text-amber-400">{error}</p>;
-  }
-
-  if (!downloadUrl) {
-    return (
-      <span
-        className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-zinc-500"
-        aria-label="Preparing download link…"
-      >
-        <Download className="h-4 w-4" />
-        Preparing…
-      </span>
-    );
-  }
-
+export function ProjectDownloadButton({ downloadUrl }: ProjectDownloadButtonProps) {
   return (
     <a
       href={downloadUrl}

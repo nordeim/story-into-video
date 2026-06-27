@@ -61,33 +61,36 @@ describe('T10: download/share source-level guarantees', () => {
 });
 
 // ── Functional tests for the buttons ────────────────────────────────────────
-vi.mock('@/lib/storage/r2', () => ({
-  getSignedDownloadUrl: vi.fn().mockResolvedValue('https://r2.example.com/signed-download'),
-}));
-
-import { getSignedDownloadUrl } from '@/lib/storage/r2';
+// T1 (REMEDIATION): ProjectDownloadButton now receives the signed URL as a prop
+// from the Server Component. It no longer imports r2.ts or fetches client-side.
+// This eliminates the env validation crash in the browser.
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
-describe('T10: ProjectDownloadButton functional behavior', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('renders a download link with the signed URL', async () => {
+describe('T10: ProjectDownloadButton functional behavior (post-T1 fix)', () => {
+  it('renders a download link using the pre-signed URL passed as a prop', async () => {
     const { ProjectDownloadButton } = await import(
       '@/components/app/project-download-button'
     );
 
-    render(<ProjectDownloadButton videoKey="proj-1/final.mp4" />);
+    render(
+      <ProjectDownloadButton
+        videoKey="proj-1/final.mp4"
+        downloadUrl="https://r2.example.com/signed-download"
+      />,
+    );
 
-    // Wait for the signed URL to resolve
-    await waitFor(() => {
-      expect(getSignedDownloadUrl).toHaveBeenCalledWith('videos', 'proj-1/final.mp4');
-    });
-
-    const link = await screen.findByRole('link', { name: /download/i });
+    const link = screen.getByRole('link', { name: /download/i });
     expect(link).toHaveAttribute('href', 'https://r2.example.com/signed-download');
     expect(link).toHaveAttribute('download');
+  });
+
+  it('does NOT import r2.ts at module level (no client-side env dependency)', () => {
+    const source = readFileSync(
+      resolve(__dirname, '../../components/app/project-download-button.tsx'),
+      'utf-8',
+    );
+    // Must not import from @/lib/storage/r2 — that chain triggers env validation
+    expect(source).not.toMatch(/from ['"]@\/lib\/storage\/r2['"]/);
   });
 });
 

@@ -573,3 +573,272 @@ Screenshots Saved
 - /tmp/e2e-mobile.png (85KB) — Mobile viewport (375×812) 
 - /tmp/e2e-signin.png (32KB) — Sign-in page 
 
+---
+`
+Phase 1: ANALYSE — Deep Validation of Identified Issues 
+ 
+Let me validate each finding against the actual codebase to confirm root causes before planning fixes. 
+
+ 
+read /home/project/story-into-video-prod/src/components/app/project-download-button.tsx 
+ 
+
+ 
+read /home/project/story-into-video-prod/src/components/app/project-share-button.tsx 
+ 
+
+ 
+read /home/project/story-into-video-prod/src/lib/storage/r2.ts 
+ 
+
+ 
+read /home/project/story-into-video-prod/src/lib/env/index.ts 
+ 
+
+Now I fully understand the env validation. Let me check the project detail page to see the full import chain: 
+
+ 
+read /home/project/story-into-video-prod/src/app/(app)/projects/[id]/page.tsx 
+ 
+
+Now let me verify the createProjectAction to understand the OpenAI 401 issue: 
+
+ 
+read /home/project/story-into-video-prod/src/features/projects/actions.ts:60-119 
+ 
+
+Now let me check the moderate-content.ts to understand the OpenAI 401: 
+
+ 
+read /home/project/story-into-video-prod/src/features/pipeline/domain/moderate-content.ts 
+ 
+
+Good. Now let me check the create-project-action.test.ts to understand how the test mocks this: 
+
+ 
+read /home/project/story-into-video-prod/src/tests/unit/create-project-action.test.ts:1-60 
+ 
+
+Good — the unit test mocks moderateContent so it doesn't hit the real API. The 401 in the dev log is purely from the live browser test hitting the real endpoint with placeholder keys. This is expected behavior, not a bug. 
+ 
+Now let me verify the project-progress-panel.tsx to check if it also has the env import issue: 
+
+ 
+read /home/project/story-into-video-prod/src/components/app/project-progress-panel.tsx:1-15 
+ 
+
+Good — project-progress-panel.tsx only imports useProjectProgress from hooks, not from r2.ts. It's clean. 
+ 
+Now let me check the use-project-progress.ts hook: 
+
+ 
+read /home/project/story-into-video-prod/src/lib/hooks/use-project-progress.ts 
+ 
+
+Good — the hook is clean, no env imports. 
+ 
+Now let me check the existing tests for the project-download-button: 
+
+ 
+$ ls src/tests/unit/project-download* src/tests/unit/known-env* src/tests/e2e/project-detail* 2>&1 
+ 
+... (1 earlier lines, ctrl+o to expand) 
+src/tests/e2e/project-detail.spec.ts 
+src/tests/unit/project-download.test.tsx 
+ 
+ 
+Command exited with code 2 
+ 
+Took 0.0s 
+ 
+
+ 
+read /home/project/story-into-video-prod/src/tests/unit/project-download.test.tsx 
+ 
+
+Now I have a complete picture. Let me also check the getProject query to understand the video data flow: 
+
+ 
+$ grep -n "getProject\|videoKey\|LEFT JOIN\|leftJoin" src/features/projects/queries.ts | head -15 
+ 
+31:export async function getProject(projectId: string, userId: string) { 
+32:  // LEFT JOIN videos so the project detail page can render a download button 
+33:  // when the video is ready. Returns videoKey + subtitleKey (both null if 
+50:      videoKey: videos.videoKey, 
+56:    .leftJoin(videos, eq(videos.projectId, projects.id)) 
+ 
+Took 0.0s 
+ 
+
+Good. Now let me verify the create-project-action.test.ts to see how it handles the moderateContent mock: 
+
+ 
+read /home/project/story-into-video-prod/src/tests/unit/create-project-action.test.ts:61-140 
+ 
+
+Good — the unit tests mock moderateContent so they don't hit the real API. The 401 in the dev log is purely from the live browser test hitting the real endpoint with placeholder keys. This is expected behavior, not a bug. 
+ 
+Now let me verify the project-detail.spec.ts E2E test to understand what it tests: 
+
+ 
+read /home/project/story-into-video-prod/src/tests/e2e/project-detail.spec.ts 
+ 
+
+Now I have a complete understanding of the issue. Let me verify one more thing — the auth helper used by the E2E tests: 
+
+ 
+read /home/project/story-into-video-prod/src/tests/e2e/helpers/auth.ts 
+ 
+
+Now I have a complete picture. Let me compile the comprehensive remediation plan. 
+ 
+---
+ 
+Phase 2: PLAN — Comprehensive Remediation Plan 
+ 
+Issue Classification 
+ 
+After meticulous validation against the codebase, here are the confirmed findings: 
+ 
+### 🔴 Issue 1: CRITICAL — Project Detail Page Crash (Env Validation in Client Bundle) 
+ 
+Confirmed root cause: project-download-button.tsx is a 'use client' component that imports getSignedDownloadUrl from @/lib/storage/r2 at module level (line 6). The r2.ts module imports env from @/lib/env at module level (line 9). The  
+env module runs parseEnv() at module evaluation time. In the browser, process.env only contains NEXT_PUBLIC_* prefixed variables — all 23 server-only vars are undefined, so validation throws. 
+ 
+Why the build-context fallback doesn't help: The fallback only activates when NEXT_PHASE === 'phase-production-build' or NODE_ENV === 'test'. During runtime SSR/hydration, neither condition is met, so it throws. 
+ 
+Impact: The /projects/[id] page is completely broken for all projects. Any user who clicks a project from the dashboard sees "This page couldn't load." 
+ 
+Optimal fix: Move the signed URL generation to the server side. The ProjectDetail Server Component already has access to env vars. Sign the URL server-side and pass it as a prop to a simplified client component. This: 
+1. Eliminates the client-side env dependency entirely 
+2. Is more secure (R2 credentials never touch the browser) 
+3. Follows Next.js best practices (server components handle data fetching) 
+4. Removes the r2.ts import from the client bundle 
+ 
+### ⚠ Issue 2: EXPECTED — OpenAI 401 with Placeholder Keys 
+ 
+Confirmed root cause: The .env.local has OPENAI_API_KEY=sk-test-key. When the "Generate Video" button is clicked, createProjectAction calls moderateContent() which calls the real OpenAI Moderation API, which rejects the key with 401.  
+ 
+Impact: The create-project flow hangs at "Generating…" state. This is expected behavior with placeholder keys — the flow works correctly with real API keys. 
+ 
+Fix: No code change needed. This is an environment configuration issue. Document that real API keys are required for the create flow to work. 
+ 
+### ℹ Issue 3: Known Gap — No Sign-Out Button 
+ 
+Confirmed: No sign-out functionality exists in the codebase. The dashboard has no user menu or sign-out button. 
+ 
+Fix: Out of scope for this remediation. Should be addressed in a future UX sprint. 
+ 
+---
+ 
+Remediation Plan 
+ 
+### Task List (TDD) 
+ 
+┌────┬────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────────┬─────────────────────────────────────────────────────────────────────────┬────────┐ 
+│ ID │ Task                                                       │ Files                                               │ TDD                                                                     │ Effort │ 
+├────┼────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────┼────────┤ 
+│ T1 │ Sign URL server-side in ProjectDetail, pass as prop        │ projects/[id]/page.tsx, project-download-button.tsx │ RED: test that page signs URL server-side → GREEN: implement → REFACTOR │ 45 min │ 
+├────┼────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────┼────────┤ 
+│ T2 │ Update project-download.test.tsx to match new architecture │ project-download.test.tsx                           │ Update tests to assert server-side signing                              │ 15 min │ 
+├────┼────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────┼────────┤ 
+│ T3 │ Full quality gate                                          │ —                                                   │ pnpm lint && typecheck && test && build                                 │ 15 min │ 
+└────┴────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────────┴─────────────────────────────────────────────────────────────────────────┴────────┘ 
+ 
+### Detailed Task Specifications 
+ 
+#### T1 — Server-Side URL Signing for Project Download 
+ 
+Current architecture (broken): 
+ 
+``` 
+  ProjectDetail (Server Component) 
+    → ProjectDownloadButton (Client Component) 
+      → imports getSignedDownloadUrl from @/lib/storage/r2 (module-level) 
+        → imports env from @/lib/env (module-level validation) 
+          → THROWS in browser (env vars undefined) 
+``` 
+ 
+Target architecture (fixed): 
+ 
+``` 
+  ProjectDetail (Server Component) 
+    → calls getSignedDownloadUrl('videos', project.videoKey) server-side 
+    → passes downloadUrl as prop to ProjectDownloadButton (Client Component) 
+      → renders anchor with the pre-signed URL (no r2 import needed) 
+``` 
+ 
+TDD Steps: 
+ 
+1. RED: Write a test that renders ProjectDetail with a completed project and asserts that getSignedDownloadUrl is called server-side (mocked) and the URL is passed to the download button. The test should fail because the current code  
+   doesn't sign server-side. 
+ 
+2. GREEN: 
+    - In projects/[id]/page.tsx: Import getSignedDownloadUrl from @/lib/storage/r2 (safe — this is a Server Component). Call it during SSR when project.status === 'completed' && project.videoKey. Pass downloadUrl as a prop. 
+    - In project-download-button.tsx: Remove the r2.ts import. Accept downloadUrl as a prop instead of fetching it client-side. Simplify to a pure presentational component. 
+ 
+3. REFACTOR: Clean up the component — remove useEffect/useState since the URL is now passed as a prop. The component becomes a simple anchor render. 
+ 
+Key design decisions: 
+- The ProjectDetail Server Component already imports env from @/lib/env (line 5) — this is safe because Server Components run in Node.js where all env vars are available. 
+- The getSignedDownloadUrl function from r2.ts is safe to import in a Server Component — it only uses env vars at call time (not at module level for the function itself, though the module does validate at import time). Since the 
+  Server Component runs in Node.js with real env vars, this works. 
+- The ProjectDownloadButton becomes a pure presentational component — no state, no effects, no server imports. 
+ 
+Wait — there's a subtlety: The r2.ts module validates env at module level (the BUCKET_MAP and r2Client are constructed at import time). This means importing getSignedDownloadUrl in a Server Component will trigger env validation — but  
+that's fine because Server Components run in Node.js where env vars ARE available. The validation only fails in the browser. So importing r2.ts in the Server Component is safe. 
+ 
+Let me verify this: 
+
+ 
+$ grep -n "env\." src/lib/storage/r2.ts | head -15 
+ 
+... (1 earlier lines, ctrl+o to expand) 
+29:  generated: env.R2_BUCKET_GENERATED, 
+30:  videos: env.R2_BUCKET_VIDEOS, 
+35:  endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`, 
+37:    accessKeyId: env.R2_ACCESS_KEY_ID, 
+38:    secretAccessKey: env.R2_SECRET_ACCESS_KEY, 
+ 
+Took 0.1s 
+ 
+
+Confirmed — r2.ts uses env.* at module scope (lines 28-38). This means importing it in a Server Component is safe (env vars exist in Node.js), but importing it in a Client Component crashes (env vars are undefined in browser). 
+ 
+This confirms the fix is correct: Move the r2.ts import from the Client Component to the Server Component. 
+ 
+---
+ 
+#### T2 — Update Tests 
+ 
+The existing project-download.test.tsx tests the current (broken) architecture where the button fetches its own URL. After the fix: 
+- The button receives downloadUrl as a prop 
+- No useEffect/useState needed 
+- The test should render the button with a prop and assert the anchor href 
+ 
+---
+ 
+#### T3 — Quality Gate 
+ 
+Run full validation suite. 
+ 
+---
+ 
+Phase 3: VALIDATE — Plan Review Against Codebase 
+ 
+┌───────────────────────────────────────┬───────────────────────────────────────────────────────────────────────────┐ 
+│ Check                                 │ Status                                                                    │ 
+├───────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────┤ 
+│ Fix doesn't break existing unit tests │ ✅ T2 updates tests to match                                              │ 
+├───────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────┤ 
+│ Fix doesn't break existing E2E tests  │ ✅ project-detail.spec.ts tests page-level behavior, not button internals │ 
+├───────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────┤ 
+│ Fix follows 5-layer architecture      │ ✅ Server Component handles data, Client Component handles presentation   │ 
+├───────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────┤ 
+│ Fix maintains security                │ ✅ R2 credentials never touch browser                                     │ 
+├───────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────┤ 
+│ Fix is minimal                        │ ✅ Only 2 files changed + tests                                           │ 
+├───────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────┤ 
+│ Fix is testable                       │ ✅ TDD approach with clear RED/GREEN                                      │ 
+└───────────────────────────────────────┴───────────────────────────────────────────────────────────────────────────┘ 
+ 
