@@ -2,9 +2,10 @@
 name: super-frontend-design
 description: >
   Master frontend UI/UX design and development skill combining the top 10 validated skills.
-  Covers anti-generic strategy, Next.js 16 + Tailwind v4 tech stack, design systems,
-  component architecture, Vercel-grade performance, WCAG AAA accessibility, visual storytelling,
-  and end-to-end quality assurance for production-grade web experiences.
+  Covers anti-generic strategy, Next.js 16 + React 19 + Tailwind v4 CSS-first @theme tech stack,
+  design systems, component architecture, App Router Server Components, Vercel-grade performance,
+  WCAG AAA accessibility, visual storytelling, and end-to-end quality assurance for
+  production-grade web experiences.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, SearchWeb, FetchURL
 license: MIT
 version: 1.0.0

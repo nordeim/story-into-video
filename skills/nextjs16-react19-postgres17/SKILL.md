@@ -1,6 +1,6 @@
 ---
 name: nextjs16-react19-postgres17
-description: "Complete engineering reference for a Next.js 16 + React 19 + PostgreSQL 17 full-stack news aggregation platform. Covers Drizzle ORM, BullMQ job queues, Auth.js v5, 5-layer architecture, 3-layer source provenance, RSS ingestion pipeline, AI summarization, WCAG AAA accessibility, Tailwind v4 theming, and content availability guards. Use when building or debugging production full-stack Next.js apps with auth, job queues, and database patterns."
+description: Full-stack Next.js 16 + React 19 + PostgreSQL 17 reference app with Drizzle ORM, BullMQ job queues (Redis), Auth.js v5, Vercel AI SDK (Anthropic + OpenAI), RSS/Atom ingestion, web push notifications. 5-layer architecture (proxy → app → features → domain → lib), App Router Server Components, async params, Suspense boundaries, PPR/cacheComponents, TypeScript strict + erasableSyntaxOnly, pnpm, Zod validation, Vitest + Playwright E2E + testcontainers. Editorial design system with CSS Subgrid, WCAG AAA accessibility, 3-layer AI provenance (JSON-LD + HTTP header + meta tag), Docker standalone output. Use for production full-stack SaaS with auth, job queues, AI pipelines, RSS/content ingestion, web push, admin panels, and database patterns."
 version: 3.0.0
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: react19-ts6-vite8-tailwindv4-mvp
 description: >
-  Use when building a new MVP or production web application using modern React, TypeScript strict mode, Vite 8 (Rolldown), Tailwind CSS v4, and file-based routing. Covers the complete lifecycle from `npm init` to shipping tested, type-safe, production-grade code.
+  MVP/production React 19 + TypeScript 6 strict + Vite 8 (Rolldown) + Tailwind CSS v4 CSS-first @theme. File-based routing, pnpm, Vitest + Playwright E2E. Covers complete lifecycle from scaffold to shipping tested, type-safe, WCAG AAA, production-grade code. Use when building new greenfield web apps with modern React + Vite + Tailwind v4.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, SearchWeb, FetchURL
 license: MIT
 version: 3.0.0

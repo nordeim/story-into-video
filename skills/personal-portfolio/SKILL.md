@@ -1,11 +1,12 @@
 ---
 name: personal-portfolio
 description: >
-  Build a Tactile Brutalist + High-End Editorial personal portfolio SPA using
-  React 19, TypeScript 6 strict, Vite 6, and Tailwind CSS v4. Covers the complete
-  lifecycle from project scaffold to shipping a type-safe, WCAG AAA-compliant,
-  component-driven digital installation with kinetic typography, hash-based routing,
-  import.meta.glob content ingestion, and dual-theme (night/day) design system.
+  Tactile Brutalist + High-End Editorial personal portfolio SPA with React 19,
+  TypeScript 6 strict, Vite 6, Tailwind CSS v4 CSS-first @theme, pnpm.
+  Covers complete lifecycle from scaffold to shipping: kinetic typography, hash-based
+  routing, import.meta.glob content ingestion, dual-theme (night/day) design system,
+  WCAG AAA accessibility, component-driven digital installation. Use when building
+  a distinctive, anti-generic portfolio or personal site with React + Vite + Tailwind v4.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 license: MIT
 version: 3.0.0

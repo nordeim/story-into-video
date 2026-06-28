@@ -1,6 +1,6 @@
 ---
 name: nextjs16-tailwind4
-description: Comprehensive skill for building luxury-grade Next.js applications with Tailwind CSS v4, Radix UI (shadcn), and Framer Motion. Covers CSS-first theming, avant-garde UI design, code review, security audits, performance optimisation, and advanced debugging for high‑end web experiences.
+description: Luxury-grade Next.js 16 + React 19 + TypeScript strict with Tailwind CSS v4 CSS-first @theme, Radix UI (shadcn), and Framer Motion. Covers App Router, Server Components, avant-garde anti-generic UI design, OWASP 2025 security audits, Core Web Vitals performance optimization, WCAG AAA accessibility, mobile navigation debugging, and code review for high-end production web experiences.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, SearchWeb, FetchURL or similar tools available to you
 ---
 

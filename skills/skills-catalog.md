@@ -1,6 +1,6 @@
 # Skills Catalog
 
-> **136 skills** organized into 10 categories. Each entry shows the skill name and a concise description of what it does and when to use it. Skills marked with `*` are external (outside `/home/pete/.pi/agent/skills/`).
+> **138 skills** organized into 10 categories. Each entry shows the skill name and a concise description of what it does and when to use it. Skills marked with `*` are external (outside `/home/pete/.pi/agent/skills/`).
 
 ---
 
@@ -11,16 +11,16 @@
 | **frontend-development** | React/TypeScript guidelines: Suspense, lazy loading, features directory, MUI v7, TanStack Router, performance patterns. Use when building pages, components, or routing. |
 | **frontend-ui-engineering** | Production-quality UI build patterns. Use when the output must look/feel hand-crafted rather than AI-generated. |
 | **frontend-design** | Design thinking for web UI — color, typography, layout, component design. Teaches principles, not fixed values. |
-| **react19-ts6-vite8-tailwindv4-mvp** | Full MVP scaffold: React 19, TS strict, Vite 8 (Rolldown), Tailwind v4, file-based routing. Use for new greenfield web apps. |
-| **nextjs16-tailwind4** | Luxury-grade Next.js 16 + Tailwind v4 + Radix UI (shadcn) + Framer Motion. CSS-first theming, avant-garde design, security audits, performance tuning. |
-| **nextjs-react-expert** | Vercel Engineering-grade React/Next.js performance optimization. Eliminate waterfalls, reduce bundle size, server/client-side optimizations. |
-| **super-frontend-design** | Master skill combining top 10 frontend skills. Anti-generic strategy, design systems, WCAG AAA, Vercel-grade performance, end-to-end QA. |
+| **react19-ts6-vite8-tailwindv4-mvp** | MVP/production React 19 + TypeScript 6 strict + Vite 8 (Rolldown) + Tailwind CSS v4 CSS-first @theme. File-based routing, pnpm, Vitest + Playwright E2E. Complete lifecycle from scaffold to shipping tested, type-safe, WCAG AAA, production-grade code. Use for new greenfield web apps with React + Vite + Tailwind v4. |
+| **nextjs16-tailwind4** | Luxury-grade Next.js 16 + React 19 + TypeScript strict with Tailwind CSS v4 CSS-first @theme, Radix UI (shadcn), Framer Motion. App Router, Server Components, avant-garde anti-generic UI, OWASP 2025 security audits, Core Web Vitals performance, WCAG AAA accessibility, mobile nav debugging. |
+| **nextjs-react-expert** | React 19 + Next.js 16 performance optimization from Vercel Engineering. 57 rules: eliminate waterfalls, reduce bundle size, server/client-side optimizations. Covers App Router, Server Components, RSC streaming, Turbopack, React Compiler, Core Web Vitals (LCP/INP/CLS). Use when profiling or optimizing production React/Next.js apps. |
+| **super-frontend-design** | Master skill combining top 10 frontend skills. Anti-generic strategy, Next.js 16 + React 19 + Tailwind v4 CSS-first @theme, App Router Server Components, design systems, Vercel-grade performance, WCAG AAA, end-to-end QA. |
 | **tailwind-patterns** | Tailwind CSS v4 patterns: CSS-first `@theme` config, container queries, design tokens, modern utility patterns. |
 | **ui-styling** | shadcn/ui + Tailwind CSS + canvas-based visual design. Use for design systems, responsive layouts, dark mode, accessible components. |
 | **ui-ux-pro-max** | UI/UX design intelligence: layout generation, design tokens, component specs, accessibility, turning UX recs into code. |
 | **scaffold-ui** | Generates anti-generic React components with brutalist Tailwind styling and strict DOM hygiene (no rounded/shadow/gradient). |
-| **personal-portfolio** | Tactile Brutalist + Editorial portfolio SPA: React 19, TS 6 strict, Vite 6, Tailwind v4, kinetic typography, dual-theme. |
-| **brutalist-portfolio-nextjs** | Complete Next.js 16 brutalist portfolio reference: architecture, design system, 16 components, 8+ remediation phases, 52 lessons learned. Use for brutalist/avant-garde portfolio builds, WCAG AAA accessibility, Tailwind v4 CSS-first theming, custom hooks, anti-pattern debugging. |
+| **personal-portfolio** | Tactile Brutalist + Editorial portfolio SPA: React 19, TypeScript 6 strict, Vite 6, Tailwind CSS v4 CSS-first @theme, pnpm. Kinetic typography, hash-based routing, import.meta.glob, dual-theme (night/day), WCAG AAA. Use for distinctive anti-generic portfolio sites. |
+| **brutalist-portfolio-nextjs** | Complete Next.js 16 + React 19 + TypeScript strict brutalist portfolio reference. App Router, Server Components, 16 components, Tailwind v4 CSS-first @theme, 8+ remediation phases, 52 lessons learned. WCAG AAA, custom hooks, anti-pattern debugging, mobile nav debugging. Use for brutalist/avant-garde portfolio builds. |
 | **luxeverse-architect** | Cinematic, production-grade anti-generic web platform architecture and execution framework. |
 | **avant-garde-design-v4** | Elite web design for distinctive interfaces. Luxury/premium brand experiences, landing pages, Tailwind v3→v4 migration. |
 
@@ -46,9 +46,10 @@
 
 | Skill | Description |
 |-------|-------------|
-| **fullstack-dev** | Next.js 16 + TypeScript + Tailwind v4 + shadcn/ui + Prisma ORM. API routes, WebSocket, DB schemas, full project scaffolding. |
-| **nextjs16-react19-postgres17** | Complete engineering reference for Next.js 16 + React 19 + PostgreSQL 17 full-stack apps. Drizzle ORM, BullMQ job queues, Auth.js v5, 5-layer architecture, 3-layer source provenance, RSS ingestion, AI summarization, WCAG AAA, Tailwind v4. Use for production full-stack patterns. |
-| **web-frameworks** | Next.js (App Router, RSC, PPR, SSR, SSG, ISR) + Turborepo (monorepo) + RemixIcon (3100+ SVG icons). |
+| **fullstack-dev** | Full-stack Next.js 16 + React 19 + TypeScript strict with Tailwind CSS v4, shadcn/ui, Prisma ORM. App Router, Server Components, API routes, WebSocket/Socket.io, database schemas, full project scaffolding. |
+| **nextjs16-react19-postgres17** | Full-stack Next.js 16 + React 19 + PostgreSQL 17 reference: Drizzle ORM, BullMQ job queues (Redis), Auth.js v5, Vercel AI SDK (Anthropic + OpenAI), RSS/Atom ingestion, web push notifications. 5-layer architecture (proxy → app → features → domain → lib), App Router Server Components, async params, Suspense boundaries, PPR/cacheComponents, TypeScript strict + erasableSyntaxOnly, pnpm, Zod, Vitest + Playwright E2E + testcontainers. Editorial design system with CSS Subgrid, WCAG AAA, 3-layer AI provenance (JSON-LD + HTTP header + meta), Docker standalone output. Use for production SaaS with auth, job queues, AI pipelines, RSS ingestion, web push, admin panels. |
+| **nextjs16-react19-next-auth5-drizzle-orm** | Full-stack Next.js 16 SaaS: React 19, Tailwind v4 CSS-first @theme, Auth.js v5, Drizzle ORM/Postgres (Neon), Inngest job queue, OpenAI + Replicate + ElevenLabs AI pipeline, Stripe billing, Cloudflare R2 storage, SSE streaming. 5-layer architecture (proxy → app → features → domain → lib), App Router Server Components, TypeScript strict, pnpm, Vitest + Playwright E2E, GitHub Actions CI. Luxury-dark cinematic design system with 13 CSS keyframes, WCAG AAA. Use for production SaaS with auth, AI pipeline, job queues, and full-stack TypeScript. |
+| **web-frameworks** | Next.js 16 + React 19 (App Router, Server Components, RSC, PPR, cacheComponents, async params, SSR, SSG, ISR, standalone output) + Turborepo (monorepo, task pipelines, remote caching) + RemixIcon (3100+ SVG icons). |
 | **api-and-interface-design** | Stable API and interface design. REST/GraphQL endpoints, type contracts, module boundaries. |
 | **api-patterns** | API design decision-making: REST vs GraphQL vs tRPC, response formats, versioning, pagination. |
 | **python-patterns** | Python development principles: framework selection, async patterns, type hints, project structure. Teaches thinking, not copying. |
@@ -133,6 +134,7 @@
 | **loop-builder** | Design unattended agent "loops": scheduled, self-verifying workflows for recurring tasks. |
 | **task-review** | After complex tasks, evaluate whether to save the path as a reusable skill. |
 | **distill-codebase-skill** | Reference template for distilling codebase knowledge into a reusable SKILL.md. Use after major updates, security remediation, or architectural overhauls to capture lessons learned, anti-patterns, debugging guides, and best practices for future agents. |
+| **project-architecture-document-md** | Create a comprehensive Project Architecture Document (PAD) for any codebase. Covers executive summary, tech stack with version pinning, Architecture Decision Records (ADRs), system topology diagrams, layer models, annotated directory structures, critical code patterns with invariants, database schemas, security architecture, testing strategy, build/deployment, developer handbook, and known issues. Produces a single source-of-truth markdown document for onboarding, debugging, and replication. |
 | **idea-refine** | Iterative idea refinement through divergent and convergent thinking. |
 | **context-engineering** | Optimize agent context setup for new sessions, task switching, or degrading output quality. |
 | **context-anchor** | Recover from context compaction by scanning memory files and surfacing where you left off. |
@@ -218,15 +220,15 @@
 |---|----------|-------|
 | 1 | Frontend Development & UI Engineering | 15 |
 | 2 | Design Artifacts & Visual Creation | 9 |
-| 3 | Full-Stack & Backend Development | 9 |
+| 3 | Full-Stack & Backend Development | 10 |
 | 4 | AI / ML / Multimodal SDK Skills | 8 |
 | 5 | Testing, QA & Performance | 14 |
 | 6 | Code Quality, Security & Architecture | 13 |
-| 7 | Planning, Workflow & Project Management | 19 |
+| 7 | Planning, Workflow & Project Management | 20 |
 | 8 | Documentation & Content Creation | 14 |
 | 9 | Career, Learning & Personal Development | 14 |
 | 10 | DevOps, Infrastructure & External Integrations | 21 |
-| | **Total** | **136** |
+| | **Total** | **138** |
 
 ---
 
