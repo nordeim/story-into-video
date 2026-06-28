@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   users,
   accounts,
@@ -133,6 +135,45 @@ describe('Drizzle schema — structural validation', () => {
       expect(usageEvents.type).toBeDefined();
       expect(usageEvents.cost).toBeDefined();
       expect(usageEvents.timestamp).toBeDefined();
+    });
+
+    // C5: Idempotency — Inngest retries must not double-debit credits.
+    // The idempotencyKey column + UNIQUE index enforce this at the DB level.
+    it('usageEvents table has idempotencyKey column for deduplication (C5)', () => {
+      expect(usageEvents.idempotencyKey).toBeDefined();
+    });
+
+    it('usageEvents schema source declares a UNIQUE index on idempotencyKey (C5)', () => {
+      const schemaSource = readFileSync(
+        resolve(__dirname, '../../lib/db/schema/billing.ts'),
+        'utf-8',
+      );
+      expect(schemaSource).toMatch(/idempotencyKey/);
+      expect(schemaSource).toMatch(/uniqueIndex/);
+      expect(schemaSource).toMatch(/idempotency_key/i);
+    });
+  });
+
+  // C5/M1: UNIQUE constraints on media tables prevent duplicate rows from
+  // Inngest retries. Without these, appendVideo/appendVoiceover can create
+  // duplicate rows, and getProject()'s .limit(1) picks one arbitrarily.
+  describe('media tables — UNIQUE constraints (C5/M1)', () => {
+    it('videos schema source declares a UNIQUE index on projectId', () => {
+      const schemaSource = readFileSync(
+        resolve(__dirname, '../../lib/db/schema/media.ts'),
+        'utf-8',
+      );
+      expect(schemaSource).toMatch(/uniqueIndex/);
+      expect(schemaSource).toMatch(/videos_project_id/);
+    });
+
+    it('voiceovers schema source declares a UNIQUE index on projectId', () => {
+      const schemaSource = readFileSync(
+        resolve(__dirname, '../../lib/db/schema/media.ts'),
+        'utf-8',
+      );
+      expect(schemaSource).toMatch(/uniqueIndex/);
+      expect(schemaSource).toMatch(/voiceovers_project_id/);
     });
   });
 });

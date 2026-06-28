@@ -29,7 +29,15 @@ export function CreateWizard() {
   const router = useRouter();
   const [story, setStory] = useState('');
   const [style, setStyle] = useState<
-    'ghibli' | 'oil-painting' | 'anime' | 'realistic' | 'cyberpunk' | 'watercolor' | 'comic'
+    | 'ghibli'
+    | 'medieval'
+    | 'oil-painting'
+    | 'anime'
+    | 'japanese-animation'
+    | 'realistic'
+    | 'cyberpunk'
+    | 'watercolor'
+    | 'comic'
   >('anime');
   const [activeRatio, setActiveRatio] = useState<AspectRatio>(ASPECT_RATIOS[0]!);
   const [submitting, setSubmitting] = useState(false);

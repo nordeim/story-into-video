@@ -10,11 +10,12 @@ import { useEffect, useState } from 'react';
  * Closes the EventSource on unmount or when status reaches a terminal state.
  *
  * T6 (remediation): Reconnect with exponential backoff when the stream drops.
- * Vercel caps SSE at 300s (Hobby) or 900s (Pro). The pipeline runs 5-15min,
- * so a single SSE connection may not survive a full generation. On error,
- * the hook waits (1s → 2s → 4s) and reopens the EventSource, up to
- * MAX_RECONNECT_ATTEMPTS (3). After max attempts, the connectionState
- * becomes 'error' and the UI shows a "Reconnect failed" message.
+ * M5 fix: Vercel Fluid Compute caps SSE at 300s (Hobby) or 800s (Pro/Enterprise
+ * GA; 1800s in beta). The pipeline runs 5-15min, so a single SSE connection
+ * may not survive a full generation. On error, the hook waits (1s → 2s → 4s)
+ * and reopens the EventSource, up to MAX_RECONNECT_ATTEMPTS (3). After max
+ * attempts, the connectionState becomes 'error' and the UI shows a
+ * "Reconnect failed" message.
  *
  * Reconnect is also cancelled if the user unmounts the component or if
  * the stream reaches a terminal status (completed/failed).

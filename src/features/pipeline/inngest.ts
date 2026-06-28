@@ -97,6 +97,24 @@ export const pipelineFunction = inngest.createFunction(
       await updateProjectProgress(projectId, 'generating_characters', 'Generating characters…', 25);
       for (let i = 0; i < analysis.characters.length; i++) {
         const char = analysis.characters[i]!;
+
+        // C6: Debit character_generation credits BEFORE calling Replicate.
+        // Idempotency key is deterministic per (project, character name) —
+        // Inngest retries won't double-charge even if the step partially succeeded.
+        // If the key was already processed, debitCredits returns { idempotent: true }
+        // and we skip the generation call too (the character already exists).
+        const charDebit = await debitCredits(
+          project.userId,
+          CREDIT_COSTS.character_generation,
+          'character_generation',
+          `${projectId}:character:${char.name}`,
+          projectId,
+        );
+        if (charDebit.idempotent) {
+          // This character was already generated in a previous attempt — skip.
+          continue;
+        }
+
         const result = await generateCharacter({
           name: char.name,
           description: char.description,
@@ -113,7 +131,9 @@ export const pipelineFunction = inngest.createFunction(
             projectId,
             `Character image flagged by moderation: ${imageModeration.categories.join(', ')}`,
           );
-          throw new Error(`Character image moderation blocked: ${imageModeration.categories.join(', ')}`);
+          throw new Error(
+            `Character image moderation blocked: ${imageModeration.categories.join(', ')}`,
+          );
         }
 
         await appendCharacter(projectId, char.name, char.description, result.imageUrl);
@@ -126,6 +146,21 @@ export const pipelineFunction = inngest.createFunction(
       const characters = await getProjectCharacters(projectId);
       for (let i = 0; i < analysis.scenes.length; i++) {
         const scene = analysis.scenes[i]!;
+
+        // C6: Debit scene_generation credits BEFORE calling Replicate.
+        // Idempotency key is deterministic per (project, scene order).
+        const sceneDebit = await debitCredits(
+          project.userId,
+          CREDIT_COSTS.scene_generation,
+          'scene_generation',
+          `${projectId}:scene:${scene.order}`,
+          projectId,
+        );
+        if (sceneDebit.idempotent) {
+          // This scene was already generated in a previous attempt — skip.
+          continue;
+        }
+
         const sceneCharacters = characters.filter((c) => scene.characters.includes(c.name));
         const result = await generateScene({
           description: scene.description,
@@ -147,7 +182,9 @@ export const pipelineFunction = inngest.createFunction(
             projectId,
             `Scene image flagged by moderation: ${imageModeration.categories.join(', ')}`,
           );
-          throw new Error(`Scene image moderation blocked: ${imageModeration.categories.join(', ')}`);
+          throw new Error(
+            `Scene image moderation blocked: ${imageModeration.categories.join(', ')}`,
+          );
         }
 
         await appendScene(
@@ -162,12 +199,7 @@ export const pipelineFunction = inngest.createFunction(
 
     // Step 4: Voiceover synthesis (ElevenLabs TTS, chunked)
     await step.run('synthesize-voiceover', async () => {
-      await updateProjectProgress(
-        projectId,
-        'synthesizing_voice',
-        'Synthesizing voiceover…',
-        65,
-      );
+      await updateProjectProgress(projectId, 'synthesizing_voice', 'Synthesizing voiceover…', 65);
 
       const narrationText = buildNarrationText(analysis);
       const voiceResult = await synthesizeVoice({
@@ -189,18 +221,19 @@ export const pipelineFunction = inngest.createFunction(
         narrationText,
       );
 
-      // Debit voiceover credits
-      await debitCredits(project.userId, CREDIT_COSTS.voiceover, 'voiceover', projectId);
+      // Debit voiceover credits — idempotent via ON CONFLICT (C5)
+      await debitCredits(
+        project.userId,
+        CREDIT_COSTS.voiceover,
+        'voiceover',
+        `${projectId}:voiceover`,
+        projectId,
+      );
     });
 
     // Step 5: Subtitle alignment (Whisper ASR → SRT)
     await step.run('align-subtitles', async () => {
-      await updateProjectProgress(
-        projectId,
-        'aligning_subtitles',
-        'Aligning subtitles…',
-        80,
-      );
+      await updateProjectProgress(projectId, 'aligning_subtitles', 'Aligning subtitles…', 80);
 
       // Fetch the voiceover we just created
       const voiceover = await getProjectVoiceover(projectId);
@@ -213,8 +246,9 @@ export const pipelineFunction = inngest.createFunction(
       const audioResponse = await fetch(audioDownloadUrl);
       const audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
 
-      // Run Whisper ASR
-      const subtitleResult = await alignSubtitles(audioBuffer);
+      // Run Whisper ASR (M4: default language 'en' for now — future: detect
+      // from the story analysis or accept user input)
+      const subtitleResult = await alignSubtitles({ audioBuffer });
 
       // Upload the SRT to R2
       const subtitleKey = buildObjectKey(projectId, 'subtitles.srt');
@@ -229,23 +263,19 @@ export const pipelineFunction = inngest.createFunction(
       await appendVideo(projectId, null, subtitleKey, null, '720p');
       await updateVideoSubtitle(projectId, subtitleKey);
 
-      // Debit subtitle alignment credits
+      // Debit subtitle alignment credits — idempotent via ON CONFLICT (C5)
       await debitCredits(
         project.userId,
         CREDIT_COSTS.subtitle_alignment,
         'subtitle_alignment',
+        `${projectId}:subtitle_alignment`,
         projectId,
       );
     });
 
     // Step 6: Video assembly (FFmpeg → MP4)
     await step.run('assemble-video', async () => {
-      await updateProjectProgress(
-        projectId,
-        'assembling_video',
-        'Assembling your video…',
-        90,
-      );
+      await updateProjectProgress(projectId, 'assembling_video', 'Assembling your video…', 90);
 
       // Gather inputs for FFmpeg
       const scenes = await getProjectScenes(projectId);
@@ -284,23 +314,19 @@ export const pipelineFunction = inngest.createFunction(
       // Update the video row (created in Step 5) with the actual video key + duration
       await updateVideo(projectId, videoKey, assembleResult.duration);
 
-      // Debit video assembly credits
+      // Debit video assembly credits — idempotent via ON CONFLICT (C5)
       await debitCredits(
         project.userId,
         CREDIT_COSTS.video_assembly,
         'video_assembly',
+        `${projectId}:video_assembly`,
         projectId,
       );
     });
 
     // Final step: mark project as completed
     await step.run('complete', async () => {
-      await updateProjectProgress(
-        projectId,
-        'completed',
-        'Your video is ready!',
-        100,
-      );
+      await updateProjectProgress(projectId, 'completed', 'Your video is ready!', 100);
     });
 
     return { success: true, projectId };

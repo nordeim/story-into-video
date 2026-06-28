@@ -46,6 +46,34 @@ describe('S2-06: Credit metering foundation', () => {
     expect(source).toMatch(/db\.transaction/);
   });
 
+  // C5/H10: debitCredits must be idempotent + use a row-level lock.
+  // The .for('update') lock prevents concurrent double-spend on the same
+  // connection. The idempotencyKey + ON CONFLICT DO NOTHING prevents
+  // double-debit on Inngest retries (which may run on different connections).
+  it('debitCredits signature includes idempotencyKey parameter (C5)', () => {
+    const source = readFileSync(QUERIES_PATH, 'utf-8');
+    expect(source).toMatch(/idempotencyKey/);
+    expect(source).toMatch(/idempotencyKey:\s*string/);
+  });
+
+  it('debitCredits uses ON CONFLICT DO NOTHING for idempotency (C5)', () => {
+    const source = readFileSync(QUERIES_PATH, 'utf-8');
+    expect(source).toMatch(/onConflictDoNothing/);
+    expect(source).toMatch(/usageEvents\.idempotencyKey/);
+  });
+
+  it('debitCredits uses .for("update") row-level lock (H10)', () => {
+    const source = readFileSync(QUERIES_PATH, 'utf-8');
+    expect(source).toMatch(/for\(['"]update['"]\)/);
+  });
+
+  it('debitCredits returns idempotent flag when duplicate detected (C5)', () => {
+    const source = readFileSync(QUERIES_PATH, 'utf-8');
+    // The function should return a result object with an `idempotent` flag
+    // so callers can distinguish "new debit" from "duplicate detected".
+    expect(source).toMatch(/idempotent/);
+  });
+
   it('queries.ts defines InsufficientCreditsError', () => {
     const source = readFileSync(QUERIES_PATH, 'utf-8');
     expect(source).toMatch(/class InsufficientCreditsError/);

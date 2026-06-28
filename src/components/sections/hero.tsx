@@ -106,19 +106,20 @@ export function Hero() {
               placeholder="Paste your story here, or write a short idea..."
               className="min-h-[78px] w-full resize-none bg-transparent text-base text-white focus:outline-none"
               rows={3}
-              maxLength={500}
+              maxLength={5000}
             />
 
             {/* Character counter — GeistMono to match ratio-toggle type system.
-                Amber warning state at ≥450 chars (90% of the 500-char cap). */}
+                M2 fix: maxLength + counter now match the server-side Zod schema
+                (min(100).max(5000)). Amber warning at ≥4500 chars (90% of 5000). */}
             <div className="mt-2 flex justify-end">
               <span
                 className={cn(
                   'font-mono text-[10px] tabular-nums',
-                  story.length >= 450 ? 'text-amber-400' : 'text-zinc-600',
+                  story.length >= 4500 ? 'text-amber-400' : 'text-zinc-600',
                 )}
               >
-                {story.length} / 500
+                {story.length} / 5000
               </span>
             </div>
 

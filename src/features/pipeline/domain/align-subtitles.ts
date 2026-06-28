@@ -20,6 +20,12 @@ export interface SubtitleCue {
   text: string;
 }
 
+export interface AlignSubtitlesInput {
+  audioBuffer: Buffer;
+  /** Optional language hint (ISO 639-1, e.g. 'en', 'ja', 'es'). Defaults to 'en'. */
+  language?: string;
+}
+
 export interface AlignSubtitlesOutput {
   cues: SubtitleCue[];
   srt: string;
@@ -27,11 +33,19 @@ export interface AlignSubtitlesOutput {
 
 const MAX_WORDS_PER_CUE = 7;
 
-export async function alignSubtitles(audioBuffer: Buffer): Promise<AlignSubtitlesOutput> {
+/**
+ * M4 fix: The Whisper API call now accepts an optional `language` param.
+ * Without it, Whisper auto-detects — accuracy drops significantly for
+ * non-English audio (especially non-Latin scripts). The caller (Inngest
+ * Step 5) passes the language hint, defaulting to 'en' for backward compat.
+ */
+export async function alignSubtitles(input: AlignSubtitlesInput): Promise<AlignSubtitlesOutput> {
+  const language = input.language ?? 'en';
   // Whisper API accepts audio file uploads
   const transcription = await openai.audio.transcriptions.create({
-    file: new File([new Uint8Array(audioBuffer)], 'voiceover.mp3', { type: 'audio/mp3' }),
+    file: new File([new Uint8Array(input.audioBuffer)], 'voiceover.mp3', { type: 'audio/mp3' }),
     model: 'whisper-1',
+    language,
     response_format: 'verbose_json',
     timestamp_granularities: ['word'],
   });

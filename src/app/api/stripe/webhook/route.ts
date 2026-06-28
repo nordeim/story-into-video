@@ -41,14 +41,37 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Idempotency check — log the event, skip if already processed
-  const existing = await db
-    .select()
-    .from(usageEvents)
-    .where(eq(usageEvents.metadata, event.id))
-    .limit(1);
+  // H7 fix: Idempotency via ON CONFLICT (idempotency_key) DO NOTHING.
+  // The previous code used a TOCTOU-vulnerable SELECT-then-INSERT pattern on
+  // the metadata column (no UNIQUE index). Two concurrent webhooks for the
+  // same event.id would both pass the SELECT and both INSERT.
+  //
+  // The fix: attempt the INSERT first with onConflictDoNothing. If it returns
+  // no rows, this event was already processed — return early. Otherwise,
+  // process the event. The idempotencyKey column + UNIQUE index (added in
+  // Task 1.1) make this race-condition-proof at the DB level.
+  //
+  // We use event.id as the idempotencyKey — Stripe guarantees these are unique.
+  const [inserted] = await db
+    .insert(usageEvents)
+    .values({
+      // H7: userId is now nullable — webhook events don't map to a user
+      // until the checkout.session.completed handler runs. The system user
+      // UUID was a hack that violated the foreign key constraint.
+      userId: null,
+      type: 'stripe_webhook',
+      cost: 0,
+      idempotencyKey: event.id,
+      metadata: event.id,
+    })
+    .onConflictDoNothing({
+      target: usageEvents.idempotencyKey,
+    })
+    .returning({ id: usageEvents.id });
 
-  if (existing.length > 0) {
+  if (!inserted) {
+    // Duplicate event.id — already processed. Return success without
+    // re-running the side effects (subscription updates, etc.).
     return NextResponse.json({ received: true, duplicate: true });
   }
 
@@ -116,14 +139,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         // Unhandled event type — log but don't error
         break;
     }
-
-    // Log the webhook event for idempotency + audit
-    await db.insert(usageEvents).values({
-      userId: '00000000-0000-0000-0000-000000000000', // system user for webhook logs
-      type: 'stripe_webhook',
-      cost: 0,
-      metadata: event.id,
-    });
 
     return NextResponse.json({ received: true });
   } catch (err) {

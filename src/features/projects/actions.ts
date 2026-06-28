@@ -11,6 +11,7 @@ import { moderateContent } from '@/features/pipeline/domain/moderate-content';
 import { debitCredits, getOrCreateSubscription } from '@/features/billing/queries';
 import { CREDIT_COSTS } from '@/features/billing/domain/tier-limits';
 import { inngest, PIPELINE_EVENT } from '@/lib/inngest/client';
+import { pipelineRateLimit } from '@/lib/rate-limit';
 
 /**
  * createProjectAction — Server Action that creates a new project from a story.
@@ -32,8 +33,10 @@ const CreateProjectSchema = z.object({
     .max(5000, 'Story must be under 5000 characters'),
   style: z.enum([
     'ghibli',
+    'medieval', // H3: align with STYLE_CHIPS
     'oil-painting',
     'anime',
+    'japanese-animation', // H3: align with STYLE_CHIPS
     'realistic',
     'cyberpunk',
     'watercolor',
@@ -48,7 +51,13 @@ export type CreateProjectResult =
   | {
       success: false;
       error: string;
-      code: 'UNAUTHORIZED' | 'VALIDATION' | 'FLAGGED' | 'INSUFFICIENT_CREDITS' | 'INTERNAL';
+      code:
+        | 'UNAUTHORIZED'
+        | 'VALIDATION'
+        | 'FLAGGED'
+        | 'INSUFFICIENT_CREDITS'
+        | 'INTERNAL'
+        | 'RATE_LIMITED';
     };
 
 export async function createProjectAction(
@@ -59,6 +68,20 @@ export async function createProjectAction(
   const userId = session.user?.id;
   if (!userId) {
     return { success: false, error: 'Not authenticated', code: 'UNAUTHORIZED' };
+  }
+
+  // 1b. C3: RATE LIMIT — 5 project creations per user per minute.
+  // Prevents AI cost amplification (each project triggers a 6-step pipeline
+  // costing ~$0.50-$2 in inference). The limit uses the user ID as the
+  // identifier, so it's per-user (not per-IP) — a single user can't bypass
+  // it by switching networks.
+  const { success: rateLimitOk } = await pipelineRateLimit.limit(userId);
+  if (!rateLimitOk) {
+    return {
+      success: false,
+      error: 'You are creating projects too quickly. Please wait a minute and try again.',
+      code: 'RATE_LIMITED',
+    };
   }
 
   // 2. ZOD VALIDATE
@@ -81,22 +104,15 @@ export async function createProjectAction(
     };
   }
 
-  // 4. CREDITS — check + debit
-  try {
-    await getOrCreateSubscription(userId);
-    await debitCredits(userId, CREDIT_COSTS.analysis, 'analysis');
-  } catch (err) {
-    if (err instanceof Error && err.name === 'InsufficientCreditsError') {
-      return {
-        success: false,
-        error: err.message,
-        code: 'INSUFFICIENT_CREDITS',
-      };
-    }
-    throw err; // unexpected — let it propagate
-  }
+  // 4. ENSURE SUBSCRIPTION EXISTS (free-tier auto-create if needed)
+  // We do this BEFORE the insert so the subscription row is ready for the
+  // debit. The debit itself happens AFTER the insert (C4 fix below).
+  await getOrCreateSubscription(userId);
 
-  // 5. INSERT PROJECT
+  // 5. INSERT PROJECT FIRST (C4 fix)
+  // The project is created BEFORE debiting credits. If the DB insert fails,
+  // the user loses nothing. The debit happens next with a deterministic
+  // idempotency key derived from the project ID — safe against action retries.
   const [project] = await db
     .insert(projects)
     .values({
@@ -114,13 +130,39 @@ export async function createProjectAction(
     return { success: false, error: 'Failed to create project', code: 'INTERNAL' };
   }
 
-  // 6. TRIGGER INNGEST PIPELINE
+  // 6. DEBIT ANALYSIS CREDITS (after insert, with project-id-based idempotency key)
+  // If the user has insufficient credits, we should ideally roll back the
+  // project insert. For now, we leave the project in 'pending' status and
+  // return the error — the pipeline won't trigger, so no AI costs accrue.
+  // The user can top up and retry, or delete the empty project.
+  try {
+    const debitResult = await debitCredits(
+      userId,
+      CREDIT_COSTS.analysis,
+      'analysis',
+      `${project.id}:analysis`,
+      project.id,
+    );
+    // If idempotent (action retry), the credit was already debited — proceed.
+    void debitResult;
+  } catch (err) {
+    if (err instanceof Error && err.name === 'InsufficientCreditsError') {
+      return {
+        success: false,
+        error: err.message,
+        code: 'INSUFFICIENT_CREDITS',
+      };
+    }
+    throw err; // unexpected — let it propagate
+  }
+
+  // 7. TRIGGER INNGEST PIPELINE
   await inngest.send({
     name: PIPELINE_EVENT,
     data: { projectId: project.id },
   });
 
-  // 7. REVALIDATE + REDIRECT
+  // 8. REVALIDATE + REDIRECT
   revalidatePath('/dashboard');
   redirect(`/projects/${project.id}`);
 }

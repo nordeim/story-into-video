@@ -62,4 +62,20 @@ describe('S1-06: Auth pages', () => {
     expect(source).toMatch(/type=['"]email['"]/);
     expect(source).toMatch(/type=['"]password['"]/);
   });
+
+  // C1 fix: AuthForm sign-up mode must call signUpAction (not just signIn)
+  it('C1: AuthForm imports signUpAction from @/features/auth/actions', () => {
+    const authFormPath = resolve(__dirname, '../../components/app/auth-form.tsx');
+    const source = readFileSync(authFormPath, 'utf-8');
+    expect(source).toMatch(/import.*signUpAction.*from.*@\/features\/auth\/actions/);
+  });
+
+  it('C1: AuthForm calls signUpAction when isSignUp is true', () => {
+    const authFormPath = resolve(__dirname, '../../components/app/auth-form.tsx');
+    const source = readFileSync(authFormPath, 'utf-8');
+    // The handleSubmit function should branch on isSignUp and call signUpAction
+    expect(source).toMatch(/signUpAction/);
+    // The call should be conditional on isSignUp
+    expect(source).toMatch(/isSignUp[\s\S]*?signUpAction|signUpAction[\s\S]*?isSignUp/);
+  });
 });

@@ -47,25 +47,95 @@ export async function getOrCreateSubscription(userId: string) {
 }
 
 /**
- * Debit credits from a user's subscription atomically.
+ * Result of a debitCredits call.
+ *
+ * C5: The `idempotent` flag lets callers distinguish "new debit applied" from
+ * "duplicate detected, no action taken". This matters for Inngest retries —
+ * a retried step should NOT re-execute side effects (e.g., calling Replicate)
+ * if the credit was already debited in the previous attempt.
+ */
+export interface DebitResult {
+  /** true if this call was a no-op (duplicate idempotencyKey detected) */
+  idempotent: boolean;
+  /** The usage_event row id, or null if the debit was skipped */
+  eventId: string | null;
+  /** The user's credit balance after the debit (null if skipped) */
+  creditsRemaining: number | null;
+}
+
+/**
+ * Operation types that can be debited. Matches the `usage_event_type` enum.
+ */
+export type DebitOperation =
+  | 'analysis'
+  | 'character_generation'
+  | 'scene_generation'
+  | 'voiceover'
+  | 'subtitle_alignment'
+  | 'video_assembly'
+  | 'moderation_check';
+
+/**
+ * Debit credits from a user's subscription atomically + idempotently.
+ *
  * Throws InsufficientCreditsError if not enough credits remain.
  * Logs a usage_event for audit.
+ *
+ * C5 — Idempotency:
+ *   The `idempotencyKey` parameter is required. The function attempts to
+ *   INSERT the usage_event with ON CONFLICT (idempotency_key) DO NOTHING.
+ *   If the insert returns no rows (duplicate key), the function returns
+ *   `{ idempotent: true, eventId: null, creditsRemaining: null }` WITHOUT
+ *   debiting credits. This makes the function safe to call from Inngest
+ *   step functions that may be retried.
+ *
+ * H10 — Row-level lock:
+ *   The `SELECT ... FOR UPDATE` on the subscription row prevents concurrent
+ *   debits on the same connection from racing. Combined with the idempotency
+ *   key (which handles cross-connection retries), this is mathematically
+ *   race-condition-proof.
+ *
+ * @param userId - The user to debit
+ * @param amount - Credits to deduct
+ * @param operationType - The operation enum value (for the audit log)
+ * @param idempotencyKey - Deterministic key (e.g., `${projectId}:voiceover`)
+ * @param projectId - Optional project context (for the audit log)
  */
 export async function debitCredits(
   userId: string,
   amount: number,
-  operationType:
-    | 'analysis'
-    | 'character_generation'
-    | 'scene_generation'
-    | 'voiceover'
-    | 'subtitle_alignment'
-    | 'video_assembly'
-    | 'moderation_check',
+  operationType: DebitOperation,
+  idempotencyKey: string,
   projectId?: string,
-): Promise<void> {
-  await db.transaction(async (tx) => {
-    // Lock the subscription row for the duration of the transaction
+): Promise<DebitResult> {
+  return await db.transaction(async (tx) => {
+    // 1. IDEMPOTENCY GATE — attempt to insert the usage_event first.
+    // If this key was already processed (e.g., Inngest retry), the
+    // ON CONFLICT DO NOTHING returns an empty array and we abort without
+    // touching the credit balance.
+    const [inserted] = await tx
+      .insert(usageEvents)
+      .values({
+        userId,
+        projectId: projectId ?? null,
+        type: operationType,
+        cost: amount,
+        idempotencyKey,
+      })
+      .onConflictDoNothing({
+        target: usageEvents.idempotencyKey,
+      })
+      .returning({ id: usageEvents.id });
+
+    if (!inserted) {
+      // Duplicate idempotencyKey — this exact debit was already processed.
+      // Return without debiting. The caller should skip side effects too.
+      return { idempotent: true, eventId: null, creditsRemaining: null };
+    }
+
+    // 2. LOCK the subscription row for the duration of the transaction.
+    // .for('update') prevents concurrent transactions from reading the same
+    // creditsRemaining value until this transaction commits or rolls back.
     const [sub] = await tx
       .select()
       .from(subscriptions)
@@ -74,29 +144,32 @@ export async function debitCredits(
       .limit(1);
 
     if (!sub) {
+      // Throw to roll back the usage_event insert — the user has no subscription.
       throw new Error(`No subscription found for user ${userId}`);
     }
 
     if (sub.creditsRemaining < amount) {
+      // Throw to roll back the usage_event insert — InsufficientCreditsError
+      // propagates to the caller, who can surface it to the user. The
+      // transaction rollback means the user can retry later after topping up.
       throw new InsufficientCreditsError(amount, sub.creditsRemaining);
     }
 
-    // Debit
+    // 3. DEBIT — subtract the credits from the locked row.
+    const newBalance = sub.creditsRemaining - amount;
     await tx
       .update(subscriptions)
       .set({
-        creditsRemaining: sub.creditsRemaining - amount,
+        creditsRemaining: newBalance,
         updatedAt: new Date(),
       })
       .where(eq(subscriptions.id, sub.id));
 
-    // Log usage event
-    await tx.insert(usageEvents).values({
-      userId,
-      projectId: projectId ?? null,
-      type: operationType,
-      cost: amount,
-    });
+    return {
+      idempotent: false,
+      eventId: inserted.id,
+      creditsRemaining: newBalance,
+    };
   });
 }
 

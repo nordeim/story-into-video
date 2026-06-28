@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { extractSubscriptionPeriodEnd } from '@/features/billing/domain/extract-period-end';
 
@@ -112,5 +114,42 @@ describe('extractSubscriptionPeriodEnd — Stripe Basil API migration', () => {
 
   it('handles completely empty subscription object', () => {
     expect(extractSubscriptionPeriodEnd({})).toBeNull();
+  });
+});
+
+// H7 fix: Stripe webhook idempotency via ON CONFLICT (not TOCTOU SELECT-then-INSERT)
+describe('H7: Stripe webhook idempotency source-level guarantees', () => {
+  const WEBHOOK_PATH = resolve(__dirname, '../../app/api/stripe/webhook/route.ts');
+
+  it('webhook uses onConflictDoNothing for idempotency (not SELECT-then-INSERT)', () => {
+    const source = readFileSync(WEBHOOK_PATH, 'utf-8');
+    expect(source).toMatch(/onConflictDoNothing/);
+    expect(source).toMatch(/usageEvents\.idempotencyKey/);
+  });
+
+  it('webhook uses event.id as the idempotencyKey', () => {
+    const source = readFileSync(WEBHOOK_PATH, 'utf-8');
+    expect(source).toMatch(/idempotencyKey:\s*event\.id/);
+  });
+
+  it('H7: webhook does NOT use the hardcoded system user UUID', () => {
+    const source = readFileSync(WEBHOOK_PATH, 'utf-8');
+    // The old code had userId: '00000000-0000-0000-0000-000000000000'
+    // which violated the FK constraint. The new code uses userId: null.
+    expect(source).not.toMatch(/00000000-0000-0000-0000-000000000000/);
+    expect(source).toMatch(/userId:\s*null/);
+  });
+
+  it('H7: webhook does NOT use the old TOCTOU SELECT pattern', () => {
+    const source = readFileSync(WEBHOOK_PATH, 'utf-8');
+    // The old code had: db.select().from(usageEvents).where(eq(usageEvents.metadata, event.id))
+    // This is a TOCTOU race — the new code uses INSERT-first with ON CONFLICT.
+    // Strip comments to avoid false positives on the explanation.
+    const stripped = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    // The SELECT-then-INSERT pattern should NOT be present in executable code.
+    // (We allow it in comments explaining the old behavior, which we stripped.)
+    expect(stripped).not.toMatch(
+      /\.select\(\)\s*\.from\(usageEvents\)\s*\.where\(eq\(usageEvents\.metadata/,
+    );
   });
 });

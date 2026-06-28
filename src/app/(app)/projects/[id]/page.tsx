@@ -5,7 +5,7 @@ import { verifySession } from '@/features/auth/domain/verify-session';
 import { getProject } from '@/features/projects/queries';
 import { env } from '@/lib/env';
 import { ProjectProgressPanel } from '@/components/app/project-progress-panel';
-import { SignedDownloadWrapper } from '@/components/app/signed-download-wrapper';
+import { ProjectDownloadButton } from '@/components/app/project-download-button';
 import { ProjectShareButton } from '@/components/app/project-share-button';
 
 /**
@@ -60,17 +60,19 @@ async function ProjectDetail({ projectId }: { projectId: string }) {
           initialErrorMessage={project.errorMessage}
         />
 
-        {/* Download + Share buttons — render only when the video is ready.
-            The signed URL is generated server-side (safe — env vars exist in
-            Node.js) and passed as a prop to the client component. This avoids
-            importing r2.ts in the browser where env vars are undefined. */}
+        {/* H4 fix: Click-time R2 URL signing.
+            The ProjectDownloadButton receives only projectId + hasVideo (primitives
+            that never expire). It fetches /api/projects/[id]/download on click to
+            get a FRESH signed URL. The signed URL is never baked into the RSC
+            payload, so users who leave the tab open >1h no longer get 403 errors. */}
         {project.status === 'completed' && project.videoKey && (
-          <SignedDownloadWrapper videoKey={project.videoKey}>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <ProjectDownloadButton projectId={project.id} hasVideo={!!project.videoKey} />
             <ProjectShareButton
               url={`${env.NEXT_PUBLIC_APP_URL}/projects/${project.id}`}
               title={project.title}
             />
-          </SignedDownloadWrapper>
+          </div>
         )}
       </div>
     </main>
@@ -78,11 +80,8 @@ async function ProjectDetail({ projectId }: { projectId: string }) {
 }
 
 /**
- * SignedDownloadWrapper is now imported from
- * `@/components/app/signed-download-wrapper` (extracted in T1) so it can be
- * independently tested and reused. It signs the URL server-side and passes
- * it as a prop to ProjectDownloadButton (client), avoiding the env validation
- * crash in the browser.
+ * H4: SignedDownloadWrapper was removed in favor of click-time signing via
+ * the /api/projects/[id]/download API route. The wrapper is no longer needed.
  */
 
 function ProjectDetailSkeleton() {

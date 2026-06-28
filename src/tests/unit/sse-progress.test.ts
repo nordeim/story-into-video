@@ -64,6 +64,23 @@ describe('T9: SSE progress route source-level guarantees', () => {
     const source = readFileSync(routePath, 'utf-8');
     expect(source).toMatch(/completed|failed/);
   });
+
+  // C3: SSE route must rate-limit to 1 concurrent connection per user/project
+  it('C3: route imports sseRateLimit from @/lib/rate-limit', () => {
+    const source = readFileSync(routePath, 'utf-8');
+    expect(source).toMatch(/from ['"]@\/lib\/rate-limit['"]/);
+    expect(source).toMatch(/sseRateLimit/);
+  });
+
+  it('C3: route calls sseRateLimit.limit before opening the stream', () => {
+    const source = readFileSync(routePath, 'utf-8');
+    expect(source).toMatch(/sseRateLimit\.limit/);
+  });
+
+  it('C3: route returns 429 when SSE rate limit is exceeded', () => {
+    const source = readFileSync(routePath, 'utf-8');
+    expect(source).toMatch(/429/);
+  });
 });
 
 // Source-reading tests for the hook
@@ -163,7 +180,7 @@ describe('T9: use-project-progress hook functional behavior', () => {
 });
 
 // T6 (remediation): The hook must reconnect with exponential backoff when
-// the SSE stream drops mid-pipeline (Vercel caps SSE at 300-900s; pipeline
+// the SSE stream drops mid-pipeline (Vercel caps SSE at 300s Hobby / 800s Pro GA; pipeline
 // runs 5-15min). The old impl only set connectionState:'error' and never
 // retried — users saw "Live updates disconnected" indefinitely.
 describe('T6: use-project-progress reconnect behavior', () => {

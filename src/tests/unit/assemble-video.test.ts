@@ -45,6 +45,14 @@ vi.mock('fluent-ffmpeg', () => {
   return { default: ffmpegMock };
 });
 
+// H1: Mock the env module — getFfmpegPath now reads env.FFMPEG_PATH (not process.env)
+const { mockEnv } = vi.hoisted(() => ({
+  mockEnv: { FFMPEG_PATH: '/usr/bin/ffmpeg' },
+}));
+vi.mock('@/lib/env', () => ({
+  env: mockEnv,
+}));
+
 import {
   assembleVideo,
   buildFfmpegCommand,
@@ -155,23 +163,18 @@ describe('T3: assemble-video rewrite', () => {
 });
 
 describe('T1: system ffmpeg path resolution', () => {
-  const originalEnv = process.env.FFMPEG_PATH;
-
+  // H1: getFfmpegPath now reads from the env module (mocked), not process.env
   afterEach(() => {
-    if (originalEnv === undefined) {
-      delete process.env.FFMPEG_PATH;
-    } else {
-      process.env.FFMPEG_PATH = originalEnv;
-    }
+    mockEnv.FFMPEG_PATH = '/usr/bin/ffmpeg';
   });
 
-  it('getFfmpegPath returns FFMPEG_PATH env var when set', () => {
-    process.env.FFMPEG_PATH = '/custom/path/to/ffmpeg';
+  it('getFfmpegPath returns env.FFMPEG_PATH when set', () => {
+    mockEnv.FFMPEG_PATH = '/custom/path/to/ffmpeg';
     expect(getFfmpegPath()).toBe('/custom/path/to/ffmpeg');
   });
 
-  it('getFfmpegPath defaults to /usr/bin/ffmpeg when env var is not set', () => {
-    delete process.env.FFMPEG_PATH;
+  it('getFfmpegPath returns the default when env.FFMPEG_PATH is the default', () => {
+    mockEnv.FFMPEG_PATH = '/usr/bin/ffmpeg';
     expect(getFfmpegPath()).toBe('/usr/bin/ffmpeg');
   });
 });

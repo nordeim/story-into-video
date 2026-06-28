@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, integer, pgEnum, uniqueIndex } from 'drizzle-orm/pg-core';
 import { users } from './auth';
 import { projects } from './projects';
 
@@ -49,16 +49,42 @@ export const usageEventTypeEnum = pgEnum('usage_event_type', [
   'stripe_webhook', // Stripe event received (free — logged for audit)
 ]);
 
-export const usageEvents = pgTable('usage_events', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
-  type: usageEventTypeEnum('type').notNull(),
-  // Credits debited for this operation
-  cost: integer('cost').default(0).notNull(),
-  // Optional metadata (e.g., model used, tokens, latency)
-  metadata: text('metadata'),
-  timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow().notNull(),
-});
+export const usageEvents = pgTable(
+  'usage_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    // H7 fix: userId is now nullable so webhook events can be logged without
+    // a real user (e.g., Stripe webhook events that don't map to a user yet).
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
+    type: usageEventTypeEnum('type').notNull(),
+    // Credits debited for this operation
+    cost: integer('cost').default(0).notNull(),
+    /**
+     * Idempotency key for deduplication (C5).
+     *
+     * Inngest retries failed steps up to 3 times by default. Without an
+     * idempotency guard, a retried step that already debited credits would
+     * debit AGAIN — a double-charge. The UNIQUE index below + ON CONFLICT
+     * DO NOTHING in debitCredits() prevents this at the database level.
+     *
+     * Format: `${projectId}:${stepName}:${entityId?}` (deterministic per step).
+     * For webhook events: the Stripe event ID (e.g. `evt_123abc`).
+     *
+     * Nullable for backward compatibility with existing rows that predate
+     * this column. New rows MUST set it.
+     */
+    idempotencyKey: text('idempotency_key'),
+    // Optional metadata (e.g., model used, tokens, latency)
+    metadata: text('metadata'),
+    timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    // C5: UNIQUE index ensures ON CONFLICT (idempotency_key) DO NOTHING works.
+    // Nulls are allowed (legacy rows); Postgres treats each NULL as distinct,
+    // so legacy rows don't conflict with each other.
+    idempotencyKeyUniqueIdx: uniqueIndex('usage_events_idempotency_key_unique_idx').on(
+      table.idempotencyKey,
+    ),
+  }),
+);

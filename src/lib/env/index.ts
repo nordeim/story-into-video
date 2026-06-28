@@ -132,13 +132,27 @@ const envSchema = z
     // ── Monitoring (Sentry) ──
     SENTRY_DSN: z.string().url(),
 
-    // ── Image Moderation Policy (optional, default: 'true' = fail-open) ──
+    // ── Image Moderation Policy (optional, default depends on NODE_ENV) ──
     // When the Replicate output shape is unknown (no recognized safety field):
-    //   - 'true'  (default): fail-open — flagged=false, moderationSkipped=true
-    //   - 'false':           fail-closed — flagged=true with 'unknown-output-shape'
-    // The enum is case-sensitive to catch typos like "True" or "TRUE" that
-    // would silently fall back to default in a plain process.env read.
-    IMAGE_MODERATION_FAIL_OPEN: z.enum(['true', 'false']).optional().default('true'),
+    //   - 'true'  (dev default): fail-open — flagged=false, moderationSkipped=true
+    //   - 'false' (prod default): fail-closed — flagged=true with 'unknown-output-shape'
+    //
+    // H8 fix: The default is now 'false' (fail-closed) in production to follow
+    // the secure-defaults principle. The previous default 'true' (fail-open)
+    // allowed unmoderated AI images if an operator forgot to set the var.
+    // Dev/test keeps 'true' for convenience (operators can always override).
+    // The enum is case-sensitive to catch typos like "True" or "TRUE".
+    IMAGE_MODERATION_FAIL_OPEN: z
+      .enum(['true', 'false'])
+      .optional()
+      .default(process.env.NODE_ENV === 'production' ? 'false' : 'true'),
+
+    // ── FFmpeg (Video Assembly) ──
+    // H1 fix: FFMPEG_PATH must go through the Zod schema (not process.env.*)
+    // The previous code read process.env.FFMPEG_PATH directly in
+    // assemble-video.ts, bypassing validation. A typo like FFMPEG_PAHT would
+    // silently fall back to /usr/bin/ffmpeg with no warning.
+    FFMPEG_PATH: z.string().optional().default('/usr/bin/ffmpeg'),
 
     // ── App ──
     NEXT_PUBLIC_APP_URL: z.string().url(),
@@ -250,6 +264,7 @@ function parseEnv(): EnvData {
       UPSTASH_REDIS_REST_TOKEN: 'placeholder',
       SENTRY_DSN: 'https://placeholder@sentry.io/1',
       IMAGE_MODERATION_FAIL_OPEN: 'true',
+      FFMPEG_PATH: '/usr/bin/ffmpeg',
       NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
       NODE_ENV: 'development',
     };

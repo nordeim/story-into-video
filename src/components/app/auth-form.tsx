@@ -6,6 +6,7 @@ import { signIn } from 'next-auth/react';
 import { ArrowRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { signUpAction } from '@/features/auth/actions';
 
 interface AuthFormProps {
   mode: 'sign-in' | 'sign-up';
@@ -35,6 +36,34 @@ export function AuthForm({ mode, className }: AuthFormProps) {
     setError(null);
     setLoading(true);
 
+    // C1 fix: sign-up mode calls signUpAction to create the user account,
+    // then signs them in. Sign-in mode calls signIn directly.
+    if (isSignUp) {
+      const signUpResult = await signUpAction({ email, password, name: undefined });
+      if (!signUpResult.success) {
+        setLoading(false);
+        setError(
+          signUpResult.code === 'EMAIL_EXISTS' ? signUpResult.error : 'Could not create account.',
+        );
+        return;
+      }
+      // Account created — now sign in to establish a session
+      const signInResult = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
+      setLoading(false);
+      if (signInResult?.error) {
+        setError('Account created, but auto sign-in failed. Please sign in manually.');
+        return;
+      }
+      router.push('/dashboard');
+      router.refresh();
+      return;
+    }
+
+    // Sign-in mode (original behavior)
     const result = await signIn('credentials', {
       email,
       password,
@@ -44,11 +73,7 @@ export function AuthForm({ mode, className }: AuthFormProps) {
     setLoading(false);
 
     if (result?.error) {
-      setError(
-        isSignUp
-          ? 'Could not create account. Email may already be in use.'
-          : 'Invalid email or password.',
-      );
+      setError('Invalid email or password.');
       return;
     }
 

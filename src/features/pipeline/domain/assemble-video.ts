@@ -1,11 +1,16 @@
 import ffmpeg from 'fluent-ffmpeg';
 import { writeFile, readFile, unlink } from 'fs/promises';
+import { env } from '@/lib/env';
 
 /**
  * Resolve the FFmpeg binary path.
  *
- * Uses the FFMPEG_PATH env var if set, otherwise defaults to /usr/bin/ffmpeg
- * (standard location on Ubuntu/Debian/macOS Homebrew).
+ * H1 fix: Reads from the validated env module (env.FFMPEG_PATH), NOT
+ * process.env.FFMPEG_PATH directly. The previous code violated the project's
+ * central "never process.env.*" rule — a typo like FFMPEG_PAHT would silently
+ * fall back to /usr/bin/ffmpeg with no warning.
+ *
+ * Defaults to /usr/bin/ffmpeg (standard on Ubuntu/Debian/macOS Homebrew).
  *
  * This replaces the old @ffmpeg-installer/ffmpeg package which used dynamic
  * require() calls that Turbopack cannot resolve. System FFmpeg is preferred
@@ -17,7 +22,7 @@ import { writeFile, readFile, unlink } from 'fs/promises';
  * Pattern source: ADR-006 (FFmpeg on server, fall back to Shotstack)
  */
 export function getFfmpegPath(): string {
-  return process.env.FFMPEG_PATH ?? '/usr/bin/ffmpeg';
+  return env.FFMPEG_PATH;
 }
 
 /**

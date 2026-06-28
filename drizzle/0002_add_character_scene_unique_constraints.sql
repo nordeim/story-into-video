@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "characters_project_name_unique_idx" ON "characters" USING btree ("project_id","name");--> statement-breakpoint
+CREATE UNIQUE INDEX "scenes_project_order_unique_idx" ON "scenes" USING btree ("project_id","order");

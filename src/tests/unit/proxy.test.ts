@@ -47,4 +47,21 @@ describe('Proxy — route protection', () => {
     expect(middlewareSource).not.toMatch(/from ['"]@\/lib\/drizzle/);
     expect(middlewareSource).not.toMatch(/drizzle-orm/);
   });
+
+  // H6 fix: proxy must validate the Host header to prevent Host Header Injection
+  // (trustHost: true makes Auth.js trust X-Forwarded-Host — an attacker behind
+  // a misconfigured reverse proxy can inject evil.com to steal magic-link tokens)
+  it('H6: proxy validates the Host header against a whitelist', () => {
+    expect(middlewareSource).toMatch(/host/i);
+    expect(middlewareSource).toMatch(/NEXT_PUBLIC_APP_URL|appUrl|allowedHost/);
+  });
+
+  it('H6: proxy returns 400 (or similar) for unauthorized hosts', () => {
+    expect(middlewareSource).toMatch(/400|Invalid Host|NextResponse.*status.*400/);
+  });
+
+  // H6 cleanup: /projects/:path* should be in the matcher
+  it('H6: proxy matcher includes /projects/:path*', () => {
+    expect(middlewareSource).toMatch(/\/projects\/:path\*/);
+  });
 });

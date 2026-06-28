@@ -18,7 +18,16 @@ export interface CharacterReference {
 
 export interface GenerateSceneInput {
   description: string;
-  style: 'ghibli' | 'oil-painting' | 'anime' | 'realistic' | 'cyberpunk' | 'watercolor' | 'comic';
+  style:
+    | 'ghibli'
+    | 'medieval'
+    | 'oil-painting'
+    | 'anime'
+    | 'japanese-animation'
+    | 'realistic'
+    | 'cyberpunk'
+    | 'watercolor'
+    | 'comic';
   characterReferences: CharacterReference[];
   aspectRatio: 'portrait' | 'landscape';
 }
@@ -32,8 +41,11 @@ export interface GenerateSceneOutput {
 
 const STYLE_PROMPTS: Record<GenerateSceneInput['style'], string> = {
   ghibli: 'in the style of Studio Ghibli animation, soft colors, hand-drawn aesthetic',
+  medieval: 'in medieval art style, illuminated manuscript, Gothic, knights and castles',
   'oil-painting': 'as an oil painting, rich textures, classical art style',
   anime: 'in anime style, vibrant colors, detailed eyes, cel-shaded',
+  'japanese-animation':
+    'in Japanese animation style, similar to Studio Ghibli or Makoto Shinkai, painterly backgrounds',
   realistic: 'photorealistic, cinematic, high detail, professional cinematography',
   cyberpunk: 'cyberpunk style, neon lighting, futuristic, dystopian atmosphere',
   watercolor: 'watercolor painting, soft washes, artistic, dreamy',

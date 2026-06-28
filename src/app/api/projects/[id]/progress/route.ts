@@ -6,6 +6,7 @@ import { getProject } from '@/features/projects/queries';
 import { db } from '@/lib/db';
 import { projects } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { sseRateLimit } from '@/lib/rate-limit';
 
 /**
  * SSE progress stream — pushes project status updates to the client.
@@ -84,6 +85,20 @@ export async function GET(
   const project = await getProject(projectId, session.user.id);
   if (!project) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  // 2b. C3: RATE LIMIT — 1 concurrent SSE connection per user/project.
+  // Prevents a single user from opening 100 SSE streams (each polling the DB
+  // every 2s = 200 queries/sec from one user). The limit uses a composite
+  // key of userId + projectId so a user can watch one project at a time.
+  // The fixed-window TTL is 60s — if the client disconnects without closing
+  // cleanly, the limit auto-expires.
+  const { success: sseRateLimitOk } = await sseRateLimit.limit(`${session.user.id}:${projectId}`);
+  if (!sseRateLimitOk) {
+    return NextResponse.json(
+      { error: 'Too many concurrent connections. Close existing tabs and try again.' },
+      { status: 429 },
+    );
   }
 
   // 3. SSE RESPONSE — custom ReadableStream that polls the DB

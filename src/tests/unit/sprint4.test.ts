@@ -132,7 +132,7 @@ describe('Sprint 4: Voiceover, Subtitles, Billing', () => {
         ],
       } as never);
 
-      const result = await alignSubtitles(Buffer.from('audio'));
+      const result = await alignSubtitles({ audioBuffer: Buffer.from('audio') });
 
       expect(result.cues.length).toBeGreaterThan(0);
       expect(result.cues[0]?.text).toContain('Hello');
@@ -143,7 +143,9 @@ describe('Sprint 4: Voiceover, Subtitles, Billing', () => {
     it('throws when Whisper returns no words', async () => {
       vi.mocked(openai.audio.transcriptions.create).mockResolvedValue({ words: [] } as never);
 
-      await expect(alignSubtitles(Buffer.from('audio'))).rejects.toThrow(/no word/i);
+      await expect(alignSubtitles({ audioBuffer: Buffer.from('audio') })).rejects.toThrow(
+        /no word/i,
+      );
     });
 
     it('groups words into cues of max 7 words', async () => {
@@ -154,7 +156,7 @@ describe('Sprint 4: Voiceover, Subtitles, Billing', () => {
       }));
       vi.mocked(openai.audio.transcriptions.create).mockResolvedValue({ words } as never);
 
-      const result = await alignSubtitles(Buffer.from('audio'));
+      const result = await alignSubtitles({ audioBuffer: Buffer.from('audio') });
       // 15 words / 7 per cue = 3 cues (7 + 7 + 1)
       expect(result.cues).toHaveLength(3);
     });
@@ -184,10 +186,12 @@ describe('Sprint 4: Voiceover, Subtitles, Billing', () => {
       expect(source).toMatch(/invoice\.payment_failed/);
     });
 
-    it('webhook route is idempotent (checks existing event)', () => {
+    it('webhook route is idempotent (uses ON CONFLICT DO NOTHING, H7)', () => {
       const webhookPath = resolve(__dirname, '../../app/api/stripe/webhook/route.ts');
       const source = readFileSync(webhookPath, 'utf-8');
-      expect(source).toMatch(/existing/);
+      // H7: idempotency now via ON CONFLICT (idempotency_key) DO NOTHING,
+      // not the old TOCTOU SELECT-then-INSERT pattern.
+      expect(source).toMatch(/onConflictDoNothing/);
       expect(source).toMatch(/duplicate/);
     });
 

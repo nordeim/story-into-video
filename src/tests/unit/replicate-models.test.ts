@@ -32,4 +32,16 @@ describe('T4: Replicate model IDs are env-configurable', () => {
   it('SDXL_IPADAPTER_MODEL reads from env.REPLICATE_SDXL_IPADAPTER_MODEL (not hardcoded)', () => {
     expect(source).toMatch(/env\.REPLICATE_SDXL_IPADAPTER_MODEL/);
   });
+
+  // C2 fix: When the IP-Adapter model is still the SDXL base placeholder,
+  // the codebase must emit a loud warning so operators know character
+  // consistency won't work. Without this, the core product feature silently
+  // does not function.
+  it('C2: replicate.ts warns when IP-Adapter model is the SDXL base placeholder', () => {
+    expect(source).toMatch(/placeholder|SDXL_BASE_HASH|console\.warn.*IP.?Adapter/i);
+  });
+
+  it('C2: warning is emitted in production context (NODE_ENV check)', () => {
+    expect(source).toMatch(/NODE_ENV.*production|production.*NODE_ENV/i);
+  });
 });

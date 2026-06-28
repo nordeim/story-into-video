@@ -10,12 +10,25 @@ import { characters, scenes, projects, videos, voiceovers } from '@/lib/db/schem
  * Pattern source: skills/nextjs16-react19-postgres17/SKILL.md §5, §7
  */
 
+/**
+ * Result of an idempotent append* call.
+ *
+ * C5: When Inngest retries a step, the append* query may hit the UNIQUE
+ * constraint (e.g., videos.project_id). In that case, `inserted` is false
+ * and `row` is null — the caller should treat this as 'already done' and
+ * skip downstream side effects.
+ */
+export interface AppendResult<T> {
+  inserted: boolean;
+  row: T | null;
+}
+
 export async function appendCharacter(
   projectId: string,
   name: string,
   description: string,
   referenceImageKey: string,
-) {
+): Promise<AppendResult<typeof characters.$inferSelect>> {
   const [character] = await db
     .insert(characters)
     .values({
@@ -24,8 +37,11 @@ export async function appendCharacter(
       description,
       referenceImageKey,
     })
+    .onConflictDoNothing({
+      target: [characters.projectId, characters.name],
+    })
     .returning();
-  return character!;
+  return { inserted: !!character, row: character ?? null };
 }
 
 export async function appendScene(
@@ -34,7 +50,7 @@ export async function appendScene(
   description: string,
   generatedImageKey: string,
   duration: number | null,
-) {
+): Promise<AppendResult<typeof scenes.$inferSelect>> {
   const [scene] = await db
     .insert(scenes)
     .values({
@@ -44,8 +60,11 @@ export async function appendScene(
       generatedImageKey,
       duration,
     })
+    .onConflictDoNothing({
+      target: [scenes.projectId, scenes.order],
+    })
     .returning();
-  return scene!;
+  return { inserted: !!scene, row: scene ?? null };
 }
 
 export type ProjectStatus = (typeof projects.status.enumValues)[number];
@@ -96,7 +115,7 @@ export async function appendVoiceover(
   audioKey: string,
   duration: number | null,
   transcript: string,
-) {
+): Promise<AppendResult<typeof voiceovers.$inferSelect>> {
   const [voiceover] = await db
     .insert(voiceovers)
     .values({
@@ -107,8 +126,11 @@ export async function appendVoiceover(
       duration,
       transcript,
     })
+    .onConflictDoNothing({
+      target: voiceovers.projectId,
+    })
     .returning();
-  return voiceover!;
+  return { inserted: !!voiceover, row: voiceover ?? null };
 }
 
 export async function getProjectVoiceover(projectId: string) {
@@ -128,7 +150,7 @@ export async function appendVideo(
   subtitleKey: string | null,
   duration: number | null,
   resolution: '720p' | '1080p' | '4k',
-) {
+): Promise<AppendResult<typeof videos.$inferSelect>> {
   const [video] = await db
     .insert(videos)
     .values({
@@ -139,15 +161,15 @@ export async function appendVideo(
       resolution,
       status: 'completed',
     })
+    .onConflictDoNothing({
+      target: videos.projectId,
+    })
     .returning();
-  return video!;
+  return { inserted: !!video, row: video ?? null };
 }
 
 export async function updateVideoSubtitle(projectId: string, subtitleKey: string) {
-  await db
-    .update(videos)
-    .set({ subtitleKey })
-    .where(eq(videos.projectId, projectId));
+  await db.update(videos).set({ subtitleKey }).where(eq(videos.projectId, projectId));
 }
 
 /**
@@ -163,17 +185,10 @@ export async function updateVideo(
   videoKey: string,
   duration: number,
 ): Promise<void> {
-  await db
-    .update(videos)
-    .set({ videoKey, duration })
-    .where(eq(videos.projectId, projectId));
+  await db.update(videos).set({ videoKey, duration }).where(eq(videos.projectId, projectId));
 }
 
 export async function getProjectVideo(projectId: string) {
-  const [video] = await db
-    .select()
-    .from(videos)
-    .where(eq(videos.projectId, projectId))
-    .limit(1);
+  const [video] = await db.select().from(videos).where(eq(videos.projectId, projectId)).limit(1);
   return video;
 }

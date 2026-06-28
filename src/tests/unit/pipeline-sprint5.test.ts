@@ -57,9 +57,7 @@ vi.mock('@/features/pipeline/domain/analyze-story', () => ({
     title: 'Test',
     summary: 'A test story summary.',
     characters: [{ name: 'Hero', description: 'A brave warrior' }],
-    scenes: [
-      { order: 1, description: 'Scene 1', characters: ['Hero'], duration_sec: 8 },
-    ],
+    scenes: [{ order: 1, description: 'Scene 1', characters: ['Hero'], duration_sec: 8 }],
   }),
 }));
 
@@ -158,12 +156,12 @@ vi.mock('@/features/pipeline/queries', () => ({
   updateVideoSubtitle: vi.fn().mockResolvedValue(undefined),
   updateProjectProgress: vi.fn().mockResolvedValue(undefined),
   setProjectFailed: vi.fn().mockResolvedValue(undefined),
-  getProjectCharacters: vi.fn().mockResolvedValue([
-    { id: 'c1', name: 'Hero', referenceImageKey: 'p1/char-1.png' },
-  ]),
-  getProjectScenes: vi.fn().mockResolvedValue([
-    { id: 's1', order: 1, generatedImageKey: 'p1/scene-1.png', duration: 8 },
-  ]),
+  getProjectCharacters: vi
+    .fn()
+    .mockResolvedValue([{ id: 'c1', name: 'Hero', referenceImageKey: 'p1/char-1.png' }]),
+  getProjectScenes: vi
+    .fn()
+    .mockResolvedValue([{ id: 's1', order: 1, generatedImageKey: 'p1/scene-1.png', duration: 8 }]),
   getProjectVoiceover: vi.fn().mockResolvedValue({
     id: 'vo1',
     audioKey: 'p1/voiceover.mp3',
@@ -199,7 +197,13 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('@/features/billing/queries', () => ({
-  debitCredits: vi.fn().mockResolvedValue(undefined),
+  // C5/C6: debitCredits now returns DebitResult { idempotent, eventId, creditsRemaining }
+  // Default mock returns { idempotent: false } so the pipeline proceeds normally.
+  debitCredits: vi.fn().mockResolvedValue({
+    idempotent: false,
+    eventId: 'evt-test',
+    creditsRemaining: 100,
+  }),
   getOrCreateSubscription: vi.fn(),
   InsufficientCreditsError: class extends Error {
     constructor(
@@ -283,11 +287,12 @@ describe('T4+T5+T7: Inngest pipeline wires Steps 4-6', () => {
       expect.any(String),
     );
 
-    // voiceover credits debited
+    // voiceover credits debited — idempotent via ON CONFLICT (C5)
     expect(debitCredits).toHaveBeenCalledWith(
       'u1',
       CREDIT_COSTS.voiceover,
       'voiceover',
+      'p1:voiceover',
       'p1',
     );
   });
@@ -306,7 +311,8 @@ describe('T4+T5+T7: Inngest pipeline wires Steps 4-6', () => {
     // Find the SRT call specifically
     const putObjectCalls = vi.mocked(putObject).mock.calls;
     const srtCall = putObjectCalls.find(
-      (call) => call[0] === 'generated' && typeof call[2] !== 'undefined' && call[3] === 'text/plain',
+      (call) =>
+        call[0] === 'generated' && typeof call[2] !== 'undefined' && call[3] === 'text/plain',
     );
     expect(srtCall).toBeDefined();
     expect(srtCall?.[1]).toMatch(/^p1\/subtitles/);
@@ -315,6 +321,7 @@ describe('T4+T5+T7: Inngest pipeline wires Steps 4-6', () => {
       'u1',
       CREDIT_COSTS.subtitle_alignment,
       'subtitle_alignment',
+      'p1:subtitle_alignment',
       'p1',
     );
   });
@@ -353,11 +360,12 @@ describe('T4+T5+T7: Inngest pipeline wires Steps 4-6', () => {
       expect.any(Number),
     );
 
-    // video_assembly credits debited
+    // video_assembly credits debited — idempotent via ON CONFLICT (C5)
     expect(debitCredits).toHaveBeenCalledWith(
       'u1',
       CREDIT_COSTS.video_assembly,
       'video_assembly',
+      'p1:video_assembly',
       'p1',
     );
   });
@@ -375,7 +383,8 @@ describe('T4+T5+T7: Inngest pipeline wires Steps 4-6', () => {
     // (not just for audio + SRT). FFmpeg needs signed URLs, not R2 keys.
     const signedUrlCalls = vi.mocked(getSignedDownloadUrl).mock.calls;
     const sceneImageCall = signedUrlCalls.find(
-      (call) => call[0] === 'generated' && typeof call[1] === 'string' && call[1].includes('scene-1.png'),
+      (call) =>
+        call[0] === 'generated' && typeof call[1] === 'string' && call[1].includes('scene-1.png'),
     );
     expect(sceneImageCall).toBeDefined();
   });
@@ -404,18 +413,12 @@ describe('T4+T5+T7: pipeline source-level guarantees', () => {
   }
 
   it('does not contain the "Sprint 4 will add video" placeholder text', () => {
-    const source = readFileSync(
-      resolve(__dirname, '../../features/pipeline/inngest.ts'),
-      'utf-8',
-    );
+    const source = readFileSync(resolve(__dirname, '../../features/pipeline/inngest.ts'), 'utf-8');
     expect(source).not.toMatch(/Sprint 4 will add video/);
   });
 
   it('imports synthesizeVoice, alignSubtitles, and assembleVideo', () => {
-    const source = readFileSync(
-      resolve(__dirname, '../../features/pipeline/inngest.ts'),
-      'utf-8',
-    );
+    const source = readFileSync(resolve(__dirname, '../../features/pipeline/inngest.ts'), 'utf-8');
     const codeOnly = stripComments(source);
     expect(codeOnly).toMatch(/import.*synthesizeVoice.*from.*synthesize-voice/);
     expect(codeOnly).toMatch(/import.*alignSubtitles.*from.*align-subtitles/);
@@ -423,10 +426,7 @@ describe('T4+T5+T7: pipeline source-level guarantees', () => {
   });
 
   it('does not have a step named "complete-phase-3" in executable code', () => {
-    const source = readFileSync(
-      resolve(__dirname, '../../features/pipeline/inngest.ts'),
-      'utf-8',
-    );
+    const source = readFileSync(resolve(__dirname, '../../features/pipeline/inngest.ts'), 'utf-8');
     const codeOnly = stripComments(source);
     expect(codeOnly).not.toMatch(/complete-phase-3/);
   });

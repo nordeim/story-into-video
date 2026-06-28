@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, integer, pgEnum, uniqueIndex } from 'drizzle-orm/pg-core';
 import { users } from './auth';
 
 /**
@@ -26,8 +26,10 @@ export const projectStatusEnum = pgEnum('project_status', [
 
 export const visualStyleEnum = pgEnum('visual_style', [
   'ghibli',
+  'medieval', // H3: added to align with STYLE_CHIPS marketing marquee
   'oil-painting',
   'anime',
+  'japanese-animation', // H3: added to align with STYLE_CHIPS marketing marquee
   'realistic',
   'cyberpunk',
   'watercolor',
@@ -54,28 +56,48 @@ export const projects = pgTable('projects', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const characters = pgTable('characters', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  projectId: uuid('project_id')
-    .notNull()
-    .references(() => projects.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  description: text('description').notNull(),
-  // R2 object key (not URL) — signed URLs are generated on read
-  referenceImageKey: text('reference_image_key'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+export const characters = pgTable(
+  'characters',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description').notNull(),
+    // R2 object key (not URL) — signed URLs are generated on read
+    referenceImageKey: text('reference_image_key'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    // C5: One character per (project, name) — Inngest retries must not duplicate.
+    projectNameUniqueIdx: uniqueIndex('characters_project_name_unique_idx').on(
+      table.projectId,
+      table.name,
+    ),
+  }),
+);
 
-export const scenes = pgTable('scenes', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  projectId: uuid('project_id')
-    .notNull()
-    .references(() => projects.id, { onDelete: 'cascade' }),
-  order: integer('order').notNull(), // 1-indexed scene sequence
-  description: text('description').notNull(),
-  // R2 object key for the generated scene image
-  generatedImageKey: text('generated_image_key'),
-  // Duration this scene appears in the final video (seconds)
-  duration: integer('duration'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+export const scenes = pgTable(
+  'scenes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    order: integer('order').notNull(), // 1-indexed scene sequence
+    description: text('description').notNull(),
+    // R2 object key for the generated scene image
+    generatedImageKey: text('generated_image_key'),
+    // Duration this scene appears in the final video (seconds)
+    duration: integer('duration'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    // C5: One scene per (project, order) — Inngest retries must not duplicate.
+    projectOrderUniqueIdx: uniqueIndex('scenes_project_order_unique_idx').on(
+      table.projectId,
+      table.order,
+    ),
+  }),
+);

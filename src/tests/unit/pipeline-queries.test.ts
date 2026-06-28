@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 /**
  * T2 — Pipeline queries for voiceovers + videos tables.
@@ -14,6 +16,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const dbInsertChain = (returnValue: unknown) => ({
   values: vi.fn(() => ({
+    onConflictDoNothing: vi.fn(() => ({
+      returning: vi.fn().mockResolvedValue([returnValue]),
+    })),
     returning: vi.fn().mockResolvedValue([returnValue]),
   })),
 });
@@ -77,7 +82,9 @@ describe('T2: Voiceover + Video pipeline queries', () => {
         'Once upon a time...',
       );
 
-      expect(result).toEqual(voiceoverRow);
+      // C5: append* now returns AppendResult { inserted, row }
+      expect(result.inserted).toBe(true);
+      expect(result.row).toEqual(voiceoverRow);
       expect(db.insert).toHaveBeenCalled();
     });
   });
@@ -126,7 +133,9 @@ describe('T2: Voiceover + Video pipeline queries', () => {
         '1080p',
       );
 
-      expect(result).toEqual(videoRow);
+      // C5: append* now returns AppendResult { inserted, row }
+      expect(result.inserted).toBe(true);
+      expect(result.row).toEqual(videoRow);
     });
   });
 
@@ -156,6 +165,33 @@ describe('T2: Voiceover + Video pipeline queries', () => {
           duration: 90,
         }),
       );
+    });
+  });
+
+  // C5: Pipeline queries must be idempotent so Inngest retries don't create
+  // duplicate rows. The UNIQUE indexes on videos.projectId + voiceovers.projectId
+  // (added in Task 1.3) make ON CONFLICT DO NOTHING possible.
+  describe('C5: Idempotent append* queries (ON CONFLICT DO NOTHING)', () => {
+    const QUERIES_PATH = resolve(__dirname, '../../features/pipeline/queries.ts');
+
+    it('appendVideo uses onConflictDoNothing on projectId', () => {
+      const source = readFileSync(QUERIES_PATH, 'utf-8');
+      expect(source).toMatch(/appendVideo[\s\S]*?onConflictDoNothing/);
+    });
+
+    it('appendVoiceover uses onConflictDoNothing on projectId', () => {
+      const source = readFileSync(QUERIES_PATH, 'utf-8');
+      expect(source).toMatch(/appendVoiceover[\s\S]*?onConflictDoNothing/);
+    });
+
+    it('appendCharacter uses onConflictDoNothing (on projectId + name)', () => {
+      const source = readFileSync(QUERIES_PATH, 'utf-8');
+      expect(source).toMatch(/appendCharacter[\s\S]*?onConflictDoNothing/);
+    });
+
+    it('appendScene uses onConflictDoNothing (on projectId + order)', () => {
+      const source = readFileSync(QUERIES_PATH, 'utf-8');
+      expect(source).toMatch(/appendScene[\s\S]*?onConflictDoNothing/);
     });
   });
 });

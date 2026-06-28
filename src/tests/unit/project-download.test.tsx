@@ -59,68 +59,56 @@ describe('T10: download/share source-level guarantees', () => {
     expect(source).toMatch(/^['"]use client['"]/m);
   });
 
-  // T1 (remediation): SignedDownloadWrapper is extracted to its own file so
-  // the app/components directory count matches documentation and the wrapper
-  // is independently testable + reusable.
-  it('SignedDownloadWrapper is extracted to its own file (not inline in page.tsx)', () => {
-    const path = resolve(__dirname, '../../components/app/signed-download-wrapper.tsx');
-    expect(() => readFileSync(path, 'utf-8')).not.toThrow();
-  });
-
-  it('SignedDownloadWrapper is a Server Component (no "use client" directive)', () => {
-    const path = resolve(__dirname, '../../components/app/signed-download-wrapper.tsx');
-    const source = readFileSync(path, 'utf-8');
-    const codeOnly = stripComments(source);
-    expect(codeOnly).not.toMatch(/^['"]use client['"]/m);
-  });
-
-  it('SignedDownloadWrapper imports getSignedDownloadUrl from @/lib/storage/r2', () => {
-    const path = resolve(__dirname, '../../components/app/signed-download-wrapper.tsx');
-    const source = readFileSync(path, 'utf-8');
-    expect(source).toMatch(/from ['"]@\/lib\/storage\/r2['"]/);
-    expect(source).toMatch(/getSignedDownloadUrl/);
-  });
-
-  it('SignedDownloadWrapper exports a named function (composition over inline)', () => {
-    const path = resolve(__dirname, '../../components/app/signed-download-wrapper.tsx');
-    const source = readFileSync(path, 'utf-8');
-    expect(source).toMatch(/export (async )?function SignedDownloadWrapper/);
-  });
-
-  it('project detail page imports SignedDownloadWrapper (no inline definition)', () => {
+  // H4 fix: SignedDownloadWrapper was REMOVED in favor of click-time signing
+  // via /api/projects/[id]/download. The wrapper signed at SSR time, baking
+  // a 1h-expiry URL into the RSC payload. Users with stale tabs got 403.
+  it('H4: project detail page does NOT import SignedDownloadWrapper (removed)', () => {
     const pageSource = readFileSync(
       resolve(__dirname, '../../app/(app)/projects/[id]/page.tsx'),
       'utf-8',
     );
     const codeOnly = stripComments(pageSource);
-    expect(codeOnly).toMatch(/from ['"]@\/components\/app\/signed-download-wrapper['"]/);
-    // The inline definition must be removed — only the import should remain
+    expect(codeOnly).not.toMatch(/from ['"]@\/components\/app\/signed-download-wrapper['"]/);
     expect(codeOnly).not.toMatch(/async function SignedDownloadWrapper/);
+  });
+
+  it('H4: project detail page imports ProjectDownloadButton (click-time signing)', () => {
+    const pageSource = readFileSync(
+      resolve(__dirname, '../../app/(app)/projects/[id]/page.tsx'),
+      'utf-8',
+    );
+    const codeOnly = stripComments(pageSource);
+    expect(codeOnly).toMatch(/from ['"]@\/components\/app\/project-download-button['"]/);
+  });
+
+  it('H4: download API route exists at app/api/projects/[id]/download/route.ts', () => {
+    const routePath = resolve(__dirname, '../../app/api/projects/[id]/download/route.ts');
+    expect(() => readFileSync(routePath, 'utf-8')).not.toThrow();
   });
 });
 
 // ── Functional tests for the buttons ────────────────────────────────────────
-// T1 (REMEDIATION): ProjectDownloadButton now receives the signed URL as a prop
-// from the Server Component. It no longer imports r2.ts or fetches client-side.
-// This eliminates the env validation crash in the browser.
+// H4 fix: ProjectDownloadButton now receives projectId (not downloadUrl) and
+// fetches a fresh signed URL at click time via /api/projects/[id]/download.
+// This eliminates the 1h-expiry trap where stale tabs got 403 errors.
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
-describe('T10: ProjectDownloadButton functional behavior (post-T1 fix)', () => {
-  it('renders a download link using the pre-signed URL passed as a prop', async () => {
-    const { ProjectDownloadButton } = await import(
-      '@/components/app/project-download-button'
-    );
+describe('H4: ProjectDownloadButton functional behavior (click-time signing)', () => {
+  it('renders a download button (not a link) that triggers fetch on click', async () => {
+    const { ProjectDownloadButton } = await import('@/components/app/project-download-button');
 
-    render(
-      <ProjectDownloadButton
-        videoKey="proj-1/final.mp4"
-        downloadUrl="https://r2.example.com/signed-download"
-      />,
-    );
+    render(<ProjectDownloadButton projectId="proj-1" hasVideo={true} />);
 
-    const link = screen.getByRole('link', { name: /download/i });
-    expect(link).toHaveAttribute('href', 'https://r2.example.com/signed-download');
-    expect(link).toHaveAttribute('download');
+    // Should be a button (not an <a> link) — it fetches on click
+    const button = screen.getByRole('button', { name: /download/i });
+    expect(button).toBeInTheDocument();
+  });
+
+  it('returns null when hasVideo is false (empty state)', async () => {
+    const { ProjectDownloadButton } = await import('@/components/app/project-download-button');
+
+    const { container } = render(<ProjectDownloadButton projectId="proj-1" hasVideo={false} />);
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('does NOT import r2.ts at module level (no client-side env dependency)', () => {

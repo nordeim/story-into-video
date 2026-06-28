@@ -283,12 +283,13 @@ describe('env module — Zod validation', () => {
       expect(env.IMAGE_MODERATION_FAIL_OPEN).toBe('false');
     });
 
-    it('defaults to "true" when IMAGE_MODERATION_FAIL_OPEN is not set', async () => {
-      // Explicitly delete to ensure it's unset
+    // H8 fix: default is now 'false' (fail-closed) in production for security.
+    // The previous default 'true' (fail-open) violated the secure-defaults principle.
+    it('H8: defaults to "false" (fail-closed) when IMAGE_MODERATION_FAIL_OPEN is not set (production)', async () => {
       delete process.env.IMAGE_MODERATION_FAIL_OPEN;
-      Object.assign(process.env, VALID_ENV);
+      Object.assign(process.env, VALID_ENV); // VALID_ENV has NODE_ENV='production'
       const { env } = await import('@/lib/env');
-      expect(env.IMAGE_MODERATION_FAIL_OPEN).toBe('true');
+      expect(env.IMAGE_MODERATION_FAIL_OPEN).toBe('false');
     });
 
     it('rejects IMAGE_MODERATION_FAIL_OPEN with invalid value (e.g., "maybe")', async () => {
@@ -310,6 +311,27 @@ describe('env module — Zod validation', () => {
       // This ensures moderate-image.ts can read env.IMAGE_MODERATION_FAIL_OPEN.
       expect(env).toHaveProperty('IMAGE_MODERATION_FAIL_OPEN');
       expect(typeof env.IMAGE_MODERATION_FAIL_OPEN).toBe('string');
+    });
+
+    // H1 fix: FFMPEG_PATH must be in the Zod schema (not read via process.env.*)
+    it('H1: FFMPEG_PATH is exposed on the typed env object', async () => {
+      Object.assign(process.env, VALID_ENV);
+      const { env } = await import('@/lib/env');
+      expect(env).toHaveProperty('FFMPEG_PATH');
+      expect(typeof env.FFMPEG_PATH).toBe('string');
+    });
+
+    it('H1: FFMPEG_PATH defaults to /usr/bin/ffmpeg when unset', async () => {
+      delete process.env.FFMPEG_PATH;
+      Object.assign(process.env, VALID_ENV);
+      const { env } = await import('@/lib/env');
+      expect(env.FFMPEG_PATH).toBe('/usr/bin/ffmpeg');
+    });
+
+    it('H1: FFMPEG_PATH respects the env var when set', async () => {
+      Object.assign(process.env, { ...VALID_ENV, FFMPEG_PATH: '/custom/ffmpeg' });
+      const { env } = await import('@/lib/env');
+      expect(env.FFMPEG_PATH).toBe('/custom/ffmpeg');
     });
   });
 });

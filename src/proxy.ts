@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { auth } from '@/lib/auth';
+import { env } from '@/lib/env';
 
 /**
  * Proxy — Layer 0 of the 5-layer architecture.
@@ -25,16 +26,40 @@ import { auth } from '@/lib/auth';
  * CRITICAL: The matcher must ONLY list protected routes. If a catch-all
  * pattern is included, it shadows the specific route matchers and the
  * proxy never runs on the protected paths.
+ *
+ * H6 fix: Host header validation. trustHost: true (in auth config) makes
+ * Auth.js trust the incoming Host / X-Forwarded-Host header. Without edge
+ * validation, an attacker behind a misconfigured reverse proxy can inject
+ * evil.com to steal magic-link tokens (Host Header Injection). We validate
+ * the Host header against a whitelist BEFORE Auth.js runs.
  */
 export default auth(async (req) => {
   const { nextUrl } = req;
+
+  // ── H6: HOST HEADER VALIDATION ──────────────────────────────────────────
+  // Reject any request whose Host header doesn't match the canonical domain,
+  // localhost (dev), or Vercel preview deployments. This prevents Host Header
+  // Injection where trustHost: true would let Auth.js generate magic links
+  // for attacker-controlled domains.
+  const host = req.headers.get('host') || '';
+  const appUrl = new URL(env.NEXT_PUBLIC_APP_URL);
+  const isAllowedHost =
+    host === appUrl.host ||
+    host.startsWith('localhost') ||
+    host.startsWith('127.0.0.1') ||
+    host.endsWith('.vercel.app');
+
+  if (!isAllowedHost) {
+    console.warn(`[proxy] Blocked request with unauthorized Host header: ${host}`);
+    return new NextResponse('Invalid Host header', { status: 400 });
+  }
+
+  // ── ROUTE PROTECTION ────────────────────────────────────────────────────
   const isAuthenticated = !!req.auth;
 
-  // Define protected path prefixes
-  const protectedPaths = ['/dashboard', '/create', '/settings', '/billing'];
-  const isProtectedPath = protectedPaths.some((p) =>
-    nextUrl.pathname.startsWith(p),
-  );
+  // Define protected path prefixes — includes /projects (H6 cleanup)
+  const protectedPaths = ['/dashboard', '/create', '/settings', '/billing', '/projects'];
+  const isProtectedPath = protectedPaths.some((p) => nextUrl.pathname.startsWith(p));
 
   if (isProtectedPath && !isAuthenticated) {
     const signInUrl = new URL('/sign-in', nextUrl.origin);
@@ -48,10 +73,13 @@ export default auth(async (req) => {
 export const config = {
   // Only run middleware on auth-protected routes.
   // Static assets, marketing pages, and API routes are NOT listed here.
+  // H6: /projects/:path* added — was missing, so /projects/[id] relied on
+  // SSR-time verifySession() instead of edge-level protection.
   matcher: [
     '/dashboard/:path*',
     '/create/:path*',
     '/settings/:path*',
     '/billing/:path*',
+    '/projects/:path*',
   ],
 };

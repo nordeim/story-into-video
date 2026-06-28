@@ -8,6 +8,34 @@
       "when": 1782535605920,
       "tag": "0000_parched_wind_dancer",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782623541055,
+      "tag": "0001_add_idempotency_and_unique_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782624008474,
+      "tag": "0002_add_character_scene_unique_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782626042680,
+      "tag": "0003_make_usage_events_user_id_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782626785391,
+      "tag": "0004_add_medieval_japanese_animation_styles",
+      "breakpoints": true
     }
   ]
 }

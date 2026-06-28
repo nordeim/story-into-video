@@ -13,7 +13,16 @@ import { replicate, SDXL_MODEL } from '@/lib/ai/replicate';
 export interface GenerateCharacterInput {
   name: string;
   description: string;
-  style: 'ghibli' | 'oil-painting' | 'anime' | 'realistic' | 'cyberpunk' | 'watercolor' | 'comic';
+  style:
+    | 'ghibli'
+    | 'medieval'
+    | 'oil-painting'
+    | 'anime'
+    | 'japanese-animation'
+    | 'realistic'
+    | 'cyberpunk'
+    | 'watercolor'
+    | 'comic';
 }
 
 export interface GenerateCharacterOutput {
@@ -25,8 +34,11 @@ export interface GenerateCharacterOutput {
 
 const STYLE_PROMPTS: Record<GenerateCharacterInput['style'], string> = {
   ghibli: 'in the style of Studio Ghibli animation, soft colors, hand-drawn aesthetic',
+  medieval: 'in medieval art style, illuminated manuscript, Gothic, knights and castles',
   'oil-painting': 'as an oil painting, rich textures, classical art style',
   anime: 'in anime style, vibrant colors, detailed eyes, cel-shaded',
+  'japanese-animation':
+    'in Japanese animation style, similar to Studio Ghibli or Makoto Shinkai, painterly backgrounds',
   realistic: 'photorealistic, high detail, professional portrait photography',
   cyberpunk: 'cyberpunk style, neon lighting, futuristic, dystopian',
   watercolor: 'watercolor painting, soft washes, artistic, dreamy',
