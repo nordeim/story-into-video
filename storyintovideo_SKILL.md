@@ -1484,7 +1484,7 @@ Before claiming completion, verify ALL of the following:
 ```bash
 pnpm lint         # zero warnings, zero errors
 pnpm typecheck    # zero errors (strict + noUncheckedIndexedAccess)
-pnpm test         # 288 tests pass across 43 files
+pnpm test         # 377 tests pass across 43 files
 pnpm test:e2e     # 48 E2E tests pass (requires Playwright browsers: pnpm exec playwright install)
 pnpm format:check # all files use Prettier code style
 pnpm build        # zero errors, all 14 routes compile
@@ -1549,8 +1549,8 @@ pnpm build        # zero errors, all 14 routes compile
 
 ### Operational (Before First Deploy)
 
-- [ ] All 29 env vars set in `.env.local` from `.env.example`
-- [ ] `pnpm drizzle-kit generate && pnpm drizzle-kit migrate` run against real Neon
+- [ ] All 30 env vars set in `.env.local` from `.env.example`
+- [ ] `pnpm drizzle:generate && pnpm drizzle:migrate` run against real Neon
 - [ ] Stripe products configured (4 tiers: Free/Creator/Pro/Studio)
 - [ ] `REPLICATE_SDXL_IPADAPTER_MODEL` set to a real `lucataco/sdxl-ipadapter:<sha>` hash
 - [ ] `FFMPEG_PATH` set (default `/usr/bin/ffmpeg`)
@@ -2383,8 +2383,8 @@ story-into-video/
 │   │   │   ├── accordion.tsx         # Radix Accordion + grid-rows
 │   │   │   ├── sheet.tsx             # Radix Dialog (mobile nav)
 │   │   │   └── dropdown-menu.tsx     # Radix DropdownMenu (language)
-│   │   └── app/                      # App components (8 files)
-│   │       ├── auth-form.tsx         # 'use client' — Google + credentials
+│   │   └── app/                      # App components (7 files)
+│   │       ├── auth-form.tsx         # 'use client' — Google + credentials (C1: sign-up mode)
 │   │       ├── create-wizard.tsx     # 'use client' — story input + style + ratio
 │   │       ├── empty-state.tsx       # Reusable empty-state
 │   │       ├── providers.tsx         # 'use client' — SessionProvider
@@ -2479,7 +2479,7 @@ story-into-video/
 ├── pnpm-workspace.yaml               # allowBuilds (pnpm 10.26+)
 ├── vitest.config.ts
 ├── playwright.config.ts
-└── .env.example                      # 29 env vars documented
+└── .env.example                      # 30 env vars documented
 ```
 
 ---
@@ -2529,9 +2529,9 @@ story-into-video/
 
 ### Enums (8)
 1. `project_status`: draft, pending, analyzing, generating_characters, generating_scenes, synthesizing_voice, aligning_subtitles, assembling_video, completed, failed
-2. `visual_style`: ghibli, oil-painting, anime, realistic, cyberpunk, watercolor, comic
+2. `visual_style`: ghibli, medieval, oil-painting, anime, japanese-animation, realistic, cyberpunk, watercolor, comic
 3. `aspect_ratio`: portrait, landscape
-4. `video_status`: pending, processing, ready, failed
+4. `video_status`: pending, rendering, completed, failed
 5. `video_resolution`: 720p, 1080p, 4k
 6. `plan`: free, creator, pro, studio
 7. `subscription_status`: active, trialing, past_due, canceled, incomplete, incomplete_expired, unpaid
