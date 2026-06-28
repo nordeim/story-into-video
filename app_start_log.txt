@@ -1,0 +1,252 @@
+$ pnpm drizzle:migrate
+$ dotenv -e .env.local -- drizzle-kit migrate
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/home/project/story-into-video-prod/drizzle.config.ts'
+Using 'postgres' driver for database querying
+[⣷] applying migrations...{
+  severity_local: 'NOTICE',
+  severity: 'NOTICE',
+  code: '42P06',
+  message: 'schema "drizzle" already exists, skipping',
+  file: 'schemacmds.c',
+  line: '132',
+  routine: 'CreateSchemaCommand'
+}
+{
+  severity_local: 'NOTICE',
+  severity: 'NOTICE',
+  code: '42P07',
+  message: 'relation "__drizzle_migrations" already exists, skipping',
+  file: 'parse_utilcmd.c',
+  line: '207',
+  routine: 'transformCreateStmt'
+}
+[✓] migrations applied successfully!(venv) pete@pop-os:/home/project/story-into-video-prod
+
+$ pnpm typecheck
+$ tsc --noEmit
+
+$ pnpm lint
+$ eslint .
+
+$ pnpm test
+$ vitest run
+
+ RUN  v4.1.9 /home/project/story-into-video-prod
+
+ ✓ src/tests/unit/project-download.test.tsx (15 tests) 479ms
+     ✓ renders a download link using the pre-signed URL passed as a prop  379ms
+ ✓ src/tests/unit/hero-ratio-toggle.test.tsx (3 tests) 583ms
+     ✓ starts with 9:16 active and 16:9 inactive  368ms
+ ✓ src/tests/unit/hero-chip-populate.test.tsx (5 tests) 765ms
+     ✓ populates textarea with Time travel seed when chip clicked  413ms
+ ✓ src/tests/unit/sse-progress.test.ts (15 tests) 219ms
+ ✓ src/tests/unit/hero-character-counter.test.tsx (4 tests) 476ms
+ ✓ src/tests/unit/env.test.ts (29 tests) 365ms
+ ✓ src/tests/unit/assemble-video.test.ts (11 tests) 26ms
+stderr | src/tests/unit/layout-hydration.test.tsx > RootLayout — hydration resilience > renders skip-to-content link targeting #main
+In HTML, <html> cannot be a child of <div>.
+This will cause a hydration error.
+
+stderr | src/tests/unit/layout-hydration.test.tsx > RootLayout — hydration resilience > renders skip-to-content link targeting #main
+ClientFetchError: Failed to parse URL from /api/auth/session. Read more at https://errors.authjs.dev#autherror
+    at fetchData (file:///home/project/story-into-video-prod/node_modules/.pnpm/next-auth@5.0.0-beta.31_next@16.2.9_@babel+core@7.29.7_@opentelemetry+api@1.9.1_@playwr_bf594a3766cfdfefed88f79d55c02b0a/node_modules/next-auth/lib/client.js:39:22)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at getSession (file:///home/project/story-into-video-prod/node_modules/.pnpm/next-auth@5.0.0-beta.31_next@16.2.9_@babel+core@7.29.7_@opentelemetry+api@1.9.1_@playwr_bf594a3766cfdfefed88f79d55c02b0a/node_modules/next-auth/react.js:103:21)
+    at Object.__NEXTAUTH._getSession (file:///home/project/story-into-video-prod/node_modules/.pnpm/next-auth@5.0.0-beta.31_next@16.2.9_@babel+core@7.29.7_@opentelemetry+api@1.9.1_@playwr_bf594a3766cfdfefed88f79d55c02b0a/node_modules/next-auth/react.js:251:43) {
+  type: 'AuthError',
+  kind: 'error'
+}
+
+stderr | src/tests/unit/layout-hydration.test.tsx > RootLayout — hydration resilience > renders skip-to-content link targeting #main
+An update to SessionProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SessionProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | src/tests/unit/layout-hydration.test.tsx > RootLayout — hydration resilience > renders JSON-LD structured data script
+ClientFetchError: Failed to parse URL from /api/auth/session. Read more at https://errors.authjs.dev#autherror
+    at fetchData (file:///home/project/story-into-video-prod/node_modules/.pnpm/next-auth@5.0.0-beta.31_next@16.2.9_@babel+core@7.29.7_@opentelemetry+api@1.9.1_@playwr_bf594a3766cfdfefed88f79d55c02b0a/node_modules/next-auth/lib/client.js:39:22)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at getSession (file:///home/project/story-into-video-prod/node_modules/.pnpm/next-auth@5.0.0-beta.31_next@16.2.9_@babel+core@7.29.7_@opentelemetry+api@1.9.1_@playwr_bf594a3766cfdfefed88f79d55c02b0a/node_modules/next-auth/react.js:103:21)
+    at Object.__NEXTAUTH._getSession (file:///home/project/story-into-video-prod/node_modules/.pnpm/next-auth@5.0.0-beta.31_next@16.2.9_@babel+core@7.29.7_@opentelemetry+api@1.9.1_@playwr_bf594a3766cfdfefed88f79d55c02b0a/node_modules/next-auth/react.js:251:43) {
+  type: 'AuthError',
+  kind: 'error'
+}
+
+stderr | src/tests/unit/layout-hydration.test.tsx > RootLayout — hydration resilience > renders JSON-LD structured data script
+An update to SessionProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SessionProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | src/tests/unit/layout-hydration.test.tsx > RootLayout — hydration resilience > renders children inside body
+ClientFetchError: Failed to parse URL from /api/auth/session. Read more at https://errors.authjs.dev#autherror
+    at fetchData (file:///home/project/story-into-video-prod/node_modules/.pnpm/next-auth@5.0.0-beta.31_next@16.2.9_@babel+core@7.29.7_@opentelemetry+api@1.9.1_@playwr_bf594a3766cfdfefed88f79d55c02b0a/node_modules/next-auth/lib/client.js:39:22)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at getSession (file:///home/project/story-into-video-prod/node_modules/.pnpm/next-auth@5.0.0-beta.31_next@16.2.9_@babel+core@7.29.7_@opentelemetry+api@1.9.1_@playwr_bf594a3766cfdfefed88f79d55c02b0a/node_modules/next-auth/react.js:103:21)
+    at Object.__NEXTAUTH._getSession (file:///home/project/story-into-video-prod/node_modules/.pnpm/next-auth@5.0.0-beta.31_next@16.2.9_@babel+core@7.29.7_@opentelemetry+api@1.9.1_@playwr_bf594a3766cfdfefed88f79d55c02b0a/node_modules/next-auth/react.js:251:43) {
+  type: 'AuthError',
+  kind: 'error'
+}
+
+stderr | src/tests/unit/layout-hydration.test.tsx > RootLayout — hydration resilience > renders children inside body
+An update to SessionProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SessionProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ src/tests/unit/layout-hydration.test.tsx (5 tests) 116ms
+ ✓ src/tests/unit/use-reveal.test.tsx (7 tests) 118ms
+ ✓ src/tests/unit/pipeline-sprint3.test.ts (10 tests) 19ms
+ ✓ src/tests/unit/sprint4.test.ts (12 tests) 32ms
+ ✓ src/tests/unit/create-project-action.test.ts (8 tests) 24ms
+ ✓ src/tests/unit/cn.test.ts (8 tests) 20ms
+ ✓ src/tests/unit/pipeline-sprint5.test.ts (9 tests) 28ms
+ ✓ src/tests/unit/analyze-story.test.ts (7 tests) 28ms
+ ✓ src/tests/unit/schema.test.ts (10 tests) 22ms
+stderr | src/tests/unit/moderate-image.test.ts > T11: moderateImage domain function > returns flagged:false for unknown output shapes (fail-open default)
+[moderate-image] Moderation skipped: unknown output shape for https://r2.example.com/scene-3.png. Fail-open policy is active (IMAGE_MODERATION_FAIL_OPEN=true). Set IMAGE_MODERATION_FAIL_OPEN=false to fail-closed.
+
+stderr | src/tests/unit/moderate-image.test.ts > T11: moderateImage domain function > accepts a string output (some Replicate models return a single URL string)
+[moderate-image] Moderation skipped: unknown output shape for https://r2.example.com/scene-4.png. Fail-open policy is active (IMAGE_MODERATION_FAIL_OPEN=true). Set IMAGE_MODERATION_FAIL_OPEN=false to fail-closed.
+
+stderr | src/tests/unit/moderate-image.test.ts > T5: moderateImage env-configurable fail-open policy > returns flagged:true for unknown shapes when IMAGE_MODERATION_FAIL_OPEN=false
+[moderate-image] Moderation FAIL-CLOSED: unknown output shape for https://r2.example.com/scene-5.png. Flagging as 'unknown-output-shape'. Set IMAGE_MODERATION_FAIL_OPEN=true to allow.
+
+stderr | src/tests/unit/moderate-image.test.ts > T5: moderateImage env-configurable fail-open policy > returns flagged:false for unknown shapes when IMAGE_MODERATION_FAIL_OPEN=true (default)
+[moderate-image] Moderation skipped: unknown output shape for https://r2.example.com/scene-7.png. Fail-open policy is active (IMAGE_MODERATION_FAIL_OPEN=true). Set IMAGE_MODERATION_FAIL_OPEN=false to fail-closed.
+
+ ✓ src/tests/unit/moderate-image.test.ts (8 tests) 59ms
+ ✓ src/tests/unit/stripe-webhook.test.ts (8 tests) 8ms
+ ✓ src/tests/unit/r2-putobject.test.ts (6 tests) 41ms
+ ✓ src/tests/unit/use-scrolled.test.ts (7 tests) 83ms
+ ✓ src/tests/unit/use-reduced-motion.test.ts (4 tests) 51ms
+ ✓ src/tests/unit/create-wizard.test.ts (9 tests) 10ms
+ ✓ src/tests/unit/credit-metering.test.ts (8 tests) 10ms
+ ✓ src/tests/unit/pipeline-queries.test.ts (6 tests) 19ms
+ ✓ src/tests/unit/verify-session.test.ts (4 tests) 16ms
+ ✓ src/tests/unit/legal-pages.test.ts (10 tests) 18ms
+ ✓ src/tests/unit/dashboard.test.ts (8 tests) 11ms
+ ✓ src/tests/unit/auth-pages.test.ts (9 tests) 13ms
+ ✓ src/tests/unit/cta-routes.test.ts (11 tests) 15ms
+ ✓ src/tests/unit/auth-config.test.ts (10 tests) 10ms
+ ✓ src/tests/unit/proxy.test.ts (5 tests) 14ms
+ ✓ src/tests/unit/style-chips.test.ts (5 tests) 13ms
+ ✓ src/tests/unit/hero-headline.test.tsx (5 tests) 429ms
+     ✓ renders the H1 with three distinct text nodes (Turn / Story Into Video / with AI Magic)  308ms
+ ✓ src/tests/unit/replicate-models.test.ts (3 tests) 8ms
+ ✓ src/tests/unit/routing.test.ts (2 tests) 7ms
+ ✓ src/tests/unit/metadata.test.ts (2 tests) 6ms
+
+ Test Files  36 passed (36)
+      Tests  288 passed (288)
+   Start at  09:40:07
+   Duration  21.24s (transform 1.33s, setup 3.55s, import 6.90s, tests 4.16s, environment 39.22s)
+
+$ pnpm build
+$ next build
+▲ Next.js 16.2.9 (Turbopack)
+- Environments: .env.local, .env
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 13.6s
+✓ Finished TypeScript in 11.7s    
+✓ Collecting page data using 3 workers in 1049ms    
+✓ Generating static pages using 3 workers (11/11) in 673ms
+✓ Finalizing page optimization in 16ms    
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/health
+├ ƒ /api/inngest
+├ ƒ /api/projects/[id]/progress
+├ ƒ /api/stripe/webhook
+├ ○ /billing
+├ ƒ /create
+├ ƒ /dashboard
+├ ○ /icon
+├ ○ /privacy
+├ ƒ /projects/[id]
+├ ○ /sign-in
+├ ○ /sign-up
+└ ○ /terms
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+$ pnpm dev
+$ next dev --turbopack
+▲ Next.js 16.2.9 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.2.132:3000
+- Environments: .env.local, .env
+✓ Ready in 474ms
+
+○ Compiling / ...
+ GET / 200 in 5.2s (next.js: 4.5s, application-code: 788ms)
+ GET /icon?6e03113122ba4ea8 200 in 2.1s (next.js: 1824ms, application-code: 272ms)
+○ Compiling /api/auth/[...nextauth] ...
+ GET /api/auth/session 200 in 4.5s (next.js: 4.5s, application-code: 40ms)
+ GET /api/auth/session 200 in 77ms (next.js: 65ms, application-code: 12ms)
+✓ Compiled in 105ms
+✓ Compiled in 115ms
+✓ Compiled in 93ms
+ GET / 200 in 320ms (next.js: 5ms, application-code: 315ms)
+ GET /icon?6e03113122ba4ea8 200 in 40ms (next.js: 8ms, application-code: 31ms)
+ GET /api/auth/session 200 in 88ms (next.js: 65ms, application-code: 23ms)
+ GET /api/auth/session 200 in 19ms (next.js: 3ms, application-code: 15ms)
+
