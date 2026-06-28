@@ -185,7 +185,7 @@ pnpm dev                        # Start dev server (Turbopack, port 3000)
 | `pnpm build` | Production build (hybrid: static + dynamic) | Before deploy |
 | `pnpm lint` | ESLint (flat config, zero warnings) | Before commit |
 | `pnpm typecheck` | `tsc --noEmit` (zero errors) | Before commit |
-| `pnpm test` | Vitest unit tests (288 tests, jsdom) | Before commit |
+| `pnpm test` | Vitest unit tests (377 tests, jsdom) | Before commit |
 | `pnpm test:e2e` | Playwright E2E tests (48 tests, Chromium) | Before deploy |
 | `pnpm format` | Prettier auto-fix | — |
 | `pnpm format:check` | Prettier verify | CI |
@@ -207,10 +207,10 @@ All four must pass with zero warnings/errors before any commit. **husky + lint-s
 
 | Type | Framework | Location | Count |
 |---|---|---|---|
-| Unit | Vitest + jsdom | `src/tests/unit/**/*.test.{ts,tsx}` | 288 (36 files) |
+| Unit | Vitest + jsdom | `src/tests/unit/**/*.test.{ts,tsx}` | 377 (43 files) |
 | E2E | Playwright (Chromium) | `src/tests/e2e/**/*.spec.ts` | 48 (9 files) |
 
-### Unit Test Coverage (36 files, 288 tests)
+### Unit Test Coverage (43 files, 377 tests)
 
 **Marketing layer (inherited from clone):**
 - `cn.test.ts` (8), `use-scrolled.test.ts` (7), `use-reveal.test.tsx` (7), `use-reduced-motion.test.ts` (4)
@@ -326,11 +326,11 @@ src/
 │       ├── empty-state.tsx              # Reusable empty-state primitive
 │       ├── providers.tsx                # 'use client' — SessionProvider wrapper
 │       ├── project-progress-panel.tsx   # 'use client' — SSE subscriber + progress bar
-│       ├── signed-download-wrapper.tsx  # Server Component — signs R2 URL, passes as prop
-│       ├── project-download-button.tsx  # 'use client' — receives `downloadUrl` prop (NO r2.ts import)
+│       ├── signed-download-wrapper.tsx  # DELETED (H4: replaced by click-time /api/projects/[id]/download route)
+│       ├── project-download-button.tsx  # 'use client' — H4 fix: fetches /api/projects/[id]/download at click time (NO r2.ts import, NO downloadUrl prop)
 │       └── project-share-button.tsx     # 'use client' — Web Share API + clipboard fallback
 ├── features/                     # Layer 2 + 3: Feature modules with domain isolation
-│   ├── auth/domain/verify-session.ts   # The DAL auth function (throws NEXT_REDIRECT)
+│   ├── auth/{actions,domain/verify-session}.ts  # signUpAction (C1 fix) + DAL auth function
 │   ├── projects/
 │   │   ├── queries.ts            # getUserProjects, getProject (owner-checked, LEFT JOIN videos)
 │   │   └── actions.ts            # 'use server' — createProjectAction (triggers Inngest)
@@ -369,13 +369,14 @@ src/
 │   │   ├── client.ts             # Inngest client + PIPELINE_EVENT constant
 │   │   └── functions.ts          # Function registrations
 │   ├── storage/r2.ts             # S3-compatible R2 client + signed URLs + putObject(Buffer)
+│   ├── rate-limit.ts             # Upstash Ratelimit clients (C3: auth, pipeline, SSE)
 │   ├── stripe/client.ts          # Stripe SDK + PRICE_IDS
 │   ├── data/                     # Static marketing data constants (10 files)
 │   ├── hooks/                    # Custom React hooks (4 files: use-scrolled, use-reveal, use-reduced-motion, use-project-progress)
 │   ├── fonts.ts                  # Font configuration
 │   └── utils.ts                  # cn() utility
 ├── tests/
-│   ├── unit/                     # Vitest unit tests (36 files, 288 tests)
+│   ├── unit/                     # Vitest unit tests (43 files, 377 tests)
 │   ├── e2e/                      # Playwright E2E tests (9 files, 48 tests)
 │   └── setup.ts                  # Test setup (jest-dom + test env vars)
 ├── types/
@@ -401,9 +402,10 @@ src/
 | `/api/auth/[...nextauth]` | ƒ Dynamic | Auth.js catch-all (Google OAuth, credentials) |
 | `/api/inngest` | ƒ Dynamic | Inngest webhook (6-step pipeline) |
 | `/api/stripe/webhook` | ƒ Dynamic | Stripe webhook (signature-verified, idempotent) |
-| `/api/projects/[id]/progress` | ƒ Dynamic | SSE progress stream (auth + owner-checked, 2s polling) |
-| `/api/health` | ƒ Dynamic | Health check endpoint (returns `{ status: 'ok' }`) |
-| Proxy | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing` (renamed from `middleware.ts` in Next.js 16) |
+| `/api/projects/[id]/progress` | ƒ Dynamic | SSE progress stream (auth + owner-checked, 2s polling, **rate-limited C3**) |
+| `/api/projects/[id]/download` | ƒ Dynamic | **H4 fix: Click-time R2 URL signing** (fresh signed URL per request) |
+| `/api/health` | ƒ Dynamic | **H9 fix: Health check** (DB `SELECT 1` + FFmpeg `accessSync`, returns 503 if unhealthy) |
+| Proxy | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing`, **`/projects`** + **H6: Host header validation** |
 
 ### Database Schema (11 tables + 8 enums)
 
@@ -452,11 +454,13 @@ These are NOT from the `shadcn` CLI (it timed out). They follow canonical new-yo
 
 ### Auth.js v5 Patterns (CRITICAL)
 
-- **`verifySession()`** — DAL function in `src/features/auth/domain/verify-session.ts`. Returns session or throws `NEXT_REDIRECT` (via `redirect('/sign-in')`). **Never wrap in try/catch** — it catches the redirect and silently swallows it.
+- **`verifySession()`** — DAL function in `src/features/auth/domain/verify-session.ts`. Returns session or throws `NEXT_REDIRECT` (via `redirect('/sign-in')`). **Never wrap in try/catch** — it catches the redirect and silently swallows it. Accepts optional `{ redirectTo?: string }` to customize the callback URL.
+- **`signUpAction()`** — C1 fix: Server Action in `src/features/auth/actions.ts`. Creates a new user account (bcrypt cost 12, user insert, free-tier subscription). Returns `{ success: true, userId }` or `{ success: false, code: 'VALIDATION'|'EMAIL_EXISTS'|'INTERNAL'|'RATE_LIMITED' }`. Rate-limited via `authRateLimit` (10/15min/IP). `AuthForm` calls this in sign-up mode, then auto-signs-in via `signIn('credentials')`.
 - **API routes use `auth()` directly** — returns null → 401 JSON. Do NOT use `verifySession()` in API routes (it redirects — wrong for JSON).
 - **Server Actions start with `verifySession()`** — before any other logic.
 - **Middleware uses `auth` as default export** — Auth.js v5's `auth` function from `NextAuth()` is used directly as middleware. It checks cookie presence; actual session validity is verified by `verifySession()` in Server Components/Actions.
 - **`AUTH_SECRET` read from `env` module** — never `process.env.AUTH_SECRET` directly.
+- **H6: Proxy host header validation** — `proxy.ts` validates the Host header against a whitelist (canonical domain + localhost + `.vercel.app`) before Auth.js runs. Prevents Host Header Injection when `trustHost: true` is enabled.
 
 ### Drizzle ORM Patterns
 
@@ -608,7 +612,7 @@ Final: Mark project status='completed', progressPercent=100
 ### Marketing Layer (inherited)
 1. **`suppressHydrationWarning` on `<body>`** — Browser extensions inject attributes before React hydrates. `<html>` alone is insufficient.
 2. **Workflow is `'use client'`** — Uses `useState` for video loading choreography. Don't assume server components for "mostly static" sections.
-3. **Test counts drift from plans** — MEP planned 6+3, actual is now 288 unit + 48 E2E. Always verify against `pnpm test` output.
+3. **Test counts drift from plans** — MEP planned 6+3, actual is now 377 unit + 48 E2E. Always verify against `pnpm test` output.
 4. **File structure evolves** — `components/primitives/`, `lib/hooks/`, `lib/data/` were created during build. Update docs as you build.
 5. **Playwright needs separate install** — `pnpm install` doesn't install browser binaries.
 
@@ -665,9 +669,12 @@ Final: Mark project status='completed', progressPercent=100
 
 ### High (degrades UX)
 7. **No visual regression testing** — pixel-perfect verification against the live marketing site is manual.
-8. **No rate limiting** — the blueprint specifies Upstash Ratelimit on auth (10/15min), AI (5/min), export (10/hour). Not yet implemented. Env vars (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`) are already in the Zod schema.
+8. ~~**No rate limiting**~~ → **FIXED (C3)** — Upstash Ratelimit on auth (10/15min/IP), pipeline (5/min/user), SSE (1/user/project). New deps: `@upstash/ratelimit`, `@upstash/redis`.
 9. **No monitoring** — Sentry, Vercel Analytics, Axiom are not yet integrated. Env var `SENTRY_DSN` is in the schema.
 10. **E2E tests not in CI** — the GitHub Actions workflow (T8) runs unit tests only. Adding Playwright E2E requires a Postgres service container + browser binaries + seeded data.
+11. **H2 — Brand color violations** — 75+ `amber-*` + 29+ `bg-zinc-950` violations remain across 22+ files. CI guard test (`brand-tokens.test.ts`) measures the baseline. Full replacement deferred to a design sprint.
+12. **H5 — FFmpeg `/tmp` OOM risk** — `assemble-video.ts` writes to `/tmp` + reads into Buffer. For large 4K videos, this can OOM. Stream-to-R2 via `@aws-sdk/lib-storage` deferred (dep installed but refactor not done).
+13. **M3 — Character image R2 upload** — `referenceImageKey` stores Replicate CDN URLs, not R2 keys. Uploading to R2 requires pipeline Step 2 refactor.
 
 ### Medium (polish + compliance)
 11. **PostCSS vulnerability** — `postcss <8.5.10` has a moderate vuln (transitive via `next`). Not exploitable. Will resolve when Next.js updates its lockfile.
@@ -710,20 +717,21 @@ Final: Mark project status='completed', progressPercent=100
 ## Recommendations
 
 ### Immediate (before any deploy)
-1. **Provision all external services** — Neon, Google OAuth, OpenAI, Replicate, ElevenLabs, R2 (3 buckets), Stripe, Inngest, Resend, Upstash, Sentry.
-2. **Run `pnpm drizzle-kit generate && pnpm drizzle-kit migrate`** — create the database schema.
+1. **Provision all external services** — Neon, Google OAuth, OpenAI, Replicate, ElevenLabs, R2 (3 buckets), Stripe, Inngest, Resend, **Upstash** (required for rate limiting), Sentry.
+2. **Run `pnpm drizzle:generate && pnpm drizzle:migrate`** — create the database schema. **⚠️ 4 new migrations (0001-0004) from the remediation sprint. Migration 0001 requires pre-cleanup of duplicate video/voiceover rows.**
 3. **Configure Stripe products** — create 4 tiers (Free/Creator/Pro/Studio), update `PRICE_IDS`.
-4. **Set `REPLICATE_SDXL_IPADAPTER_MODEL` env var** — the default is the SDXL base placeholder. Without a real `lucataco/sdxl-ipadapter:<sha>` hash, scene generation won't apply character consistency. (T4)
-5. **Set `AUTH_URL` to the production URL** — e.g., `https://storyintovideo.jesspete.shop`. The `trustHost: true` config (T2) makes Auth.js use the request's Host header as a fallback, but AUTH_URL is still used for email magic links. The env module emits a `console.warn` if it differs from `NEXT_PUBLIC_APP_URL`.
-6. **Test the AI pipeline end-to-end** — sign up, paste a story, verify characters/scenes/video generate. This is the highest-risk validation. Steps 4-6 are wired but untested with real API keys.
+4. **Set `REPLICATE_SDXL_IPADAPTER_MODEL` env var** — the default is the SDXL base placeholder. Without a real `lucataco/sdxl-ipadapter:<sha>` hash, scene generation won't apply character consistency. **C2 fix: `replicate.ts` now emits a `console.warn` in production when the placeholder is detected.** (T4)
+5. **Set `AUTH_URL` to the production URL** — the `trustHost: true` config (T2) makes Auth.js use the request's Host header as a fallback. The env module emits a `console.warn` if it differs from `NEXT_PUBLIC_APP_URL`.
+6. **Test the AI pipeline end-to-end** — sign up (C1 fix: now works via `signUpAction`), paste a story, verify characters/scenes/video generate. This is the highest-risk validation.
 7. **Run `pnpm install` to activate husky** — the `prepare` script sets up `.husky/pre-commit`. Verify the hook fires on your first commit.
 
 ### Short-term (first sprint post-launch)
-8. **Add rate limiting** — Upstash Ratelimit on auth, AI, export endpoints. Env vars already in schema.
+8. ~~**Add rate limiting**~~ → **DONE (C3)** — Upstash Ratelimit on auth, pipeline, SSE. Env vars in schema; `src/lib/rate-limit.ts` implemented.
 9. **Implement `/pricing`, `/blog`, `/contact`** pages.
 10. **Add cookie consent banner** — required for GDPR/CCPA. The Privacy Policy page exists; the banner is the missing piece.
 11. **Add data export endpoint** — `GET /api/user/export` returns user data as JSON (GDPR right to portability).
-12. **Set `IMAGE_MODERATION_FAIL_OPEN=false` for production** — fail-closed is the recommended setting once the model output shape is known and stable. (T5)
+12. **H2 — Brand color full replacement** — replace 75+ `amber-*` + 29+ `bg-zinc-950` with brand tokens (`bg-primary`, `bg-background`). CI guard test measures progress.
+13. **H5 — FFmpeg stream-to-R2** — refactor `assemble-video.ts` to pipe FFmpeg output directly to R2 via `@aws-sdk/lib-storage` `Upload` class. Eliminates `/tmp` OOM risk. Dep installed.
 
 ### Medium-term (scale + compliance)
 13. **Add E2E tests to CI** — extend `.github/workflows/ci.yml` with a Playwright job. Requires a Postgres service container + browser binaries + seeded data.
@@ -835,7 +843,7 @@ You are successful when:
 
 - `pnpm lint` exits with 0 warnings
 - `pnpm typecheck` exits with 0 errors
-- `pnpm test` passes all 288 unit tests
+- `pnpm test` passes all 377 unit tests
 - `pnpm test:e2e` passes all 48 E2E tests (requires Playwright browsers installed)
 - `pnpm build` exits with 0 errors
 - Lighthouse scores ≥95 across Performance, Accessibility, Best Practices, SEO (marketing page)

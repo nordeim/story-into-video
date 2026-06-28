@@ -14,6 +14,7 @@ Auth.js v5 (NextAuth) + @auth/drizzle-adapter · Drizzle ORM + PostgreSQL (Neon)
 Inngest (job queue) · OpenAI GPT-4o + Whisper + Moderation · Replicate SDXL + IP-Adapter
 ElevenLabs (TTS) · Cloudflare R2 (storage) · Stripe (billing) · Zod (validation)
 FFmpeg (system binary, `FFMPEG_PATH` env var) · bcryptjs (password hashing)
+Upstash Ratelimit + Redis (rate limiting: auth, pipeline, SSE)
 ```
 
 ## Critical Design Decisions
@@ -33,7 +34,10 @@ FFmpeg (system binary, `FFMPEG_PATH` env var) · bcryptjs (password hashing)
 | Credit-based billing (prepaid credits, not metered) | Simplest for AI products; no overage risk; predictable revenue |
 | Inngest for pipeline orchestration (not BullMQ) | Serverless-native; step functions map to 6-step workflow; no Redis |
 | System FFmpeg (not `@ffmpeg-installer/ffmpeg`) | Turbopack-incompatible; `FFMPEG_PATH` env var with `/usr/bin/ffmpeg` default |
-| Server-side URL signing | Client components NEVER import `r2.ts`; Server Components sign URLs, pass as props |
+| Server-side URL signing → Click-time signing | Client components NEVER import `r2.ts`; H4 fix: download URL signed at click time via `/api/projects/[id]/download` API route (not SSR-time) |
+| Idempotent credit debiting (C5) | `debitCredits()` requires `idempotencyKey` param; uses `ON CONFLICT DO NOTHING` + `.for('update')` row lock |
+| Rate limiting (C3) | Upstash Ratelimit on auth (10/15min/IP), pipeline (5/min/user), SSE (1/user/project) |
+| Secure defaults (H8) | `IMAGE_MODERATION_FAIL_OPEN` defaults to `'false'` (fail-closed) in production; `'true'` in dev |
 
 ## Color System (Non-Negotiable)
 
@@ -83,7 +87,10 @@ src/
 │   ├── api/
 │   │   ├── auth/[...nextauth]/route.ts     # Auth.js (force-dynamic)
 │   │   ├── inngest/route.ts                # Inngest webhook (force-dynamic)
-│   │   └── stripe/webhook/route.ts         # Stripe webhook (force-dynamic)
+│   │   ├── stripe/webhook/route.ts         # Stripe webhook (force-dynamic, idempotent via ON CONFLICT)
+│   │   ├── projects/[id]/progress/route.ts # SSE progress stream (force-dynamic, rate-limited)
+│   │   ├── projects/[id]/download/route.ts # Click-time R2 URL signing (H4 fix)
+│   │   └── health/route.ts                 # Health check (DB + FFmpeg, H9 fix)
 │   ├── layout.tsx                # Root: fonts, metadata, Providers, skip-to-content
 │   ├── page.tsx                  # Marketing page (10 sections, unchanged)
 │   ├── globals.css               # @theme + 13 keyframes + @utility + a11y
@@ -92,9 +99,9 @@ src/
 │   ├── primitives/               # Marketing presentational (7 files)
 │   ├── sections/                 # Marketing page sections (10 files)
 │   ├── ui/                       # Hand-written shadcn (4: button, accordion, sheet, dropdown-menu)
-│   └── app/                      # App components (8: auth-form, create-wizard, empty-state, providers, project-progress-panel, signed-download-wrapper, project-download-button, project-share-button)
+│   └── app/                      # App components (7: auth-form, create-wizard, empty-state, providers, project-progress-panel, project-download-button, project-share-button) — SignedDownloadWrapper DELETED (H4: replaced by click-time API route)
 ├── features/                     # Layer 2 + 3: Feature modules
-│   ├── auth/domain/verify-session.ts       # DAL auth function (throws NEXT_REDIRECT)
+│   ├── auth/{actions,domain/verify-session}.ts  # signUpAction (C1) + DAL auth function
 │   ├── projects/{queries,actions}.ts       # getUserProjects, createProjectAction
 │   ├── pipeline/
 │   │   ├── queries.ts                      # appendCharacter, appendScene, updateProjectProgress
@@ -108,12 +115,13 @@ src/
 │   ├── ai/{openai,replicate,elevenlabs}.ts # AI provider clients
 │   ├── inngest/{client,functions}.ts       # Inngest client + registrations
 │   ├── storage/r2.ts                       # R2 signed URLs (3 buckets) — NEVER import in client components
+│   ├── rate-limit.ts                       # Upstash Ratelimit clients (C3: auth, pipeline, SSE)
 │   ├── stripe/client.ts                    # Stripe SDK + PRICE_IDS
 │   ├── data/                               # Static marketing data (10 files)
 │   ├── hooks/                              # use-scrolled, use-reveal, use-reduced-motion, use-project-progress
 │   ├── fonts.ts · utils.ts
 ├── tests/
-│   ├── unit/                     # 36 files, 288 tests
+│   ├── unit/                     # 43 files, 377 tests
 │   ├── e2e/                      # 9 files, 48 tests
 │   └── setup.ts                  # jest-dom + test env vars
 ├── types/index.ts                # 12 marketing interfaces
@@ -138,9 +146,10 @@ src/
 | `/api/auth/[...nextauth]` | ƒ Dynamic | Auth.js catch-all |
 | `/api/inngest` | ƒ Dynamic | Pipeline webhook |
 | `/api/stripe/webhook` | ƒ Dynamic | Billing webhook |
-| `/api/projects/[id]/progress` | ƒ Dynamic | SSE progress stream (2s polling, owner-checked) |
-| `/api/health` | ƒ Dynamic | Health check (returns `{ status: 'ok' }`) |
-| Middleware | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing` |
+| `/api/projects/[id]/progress` | ƒ Dynamic | SSE progress stream (2s polling, owner-checked, rate-limited) |
+| `/api/projects/[id]/download` | ƒ Dynamic | Click-time R2 URL signing (H4 fix — fresh signed URL per request) |
+| `/api/health` | ƒ Dynamic | Health check (DB `SELECT 1` + FFmpeg `accessSync`, returns 503 if unhealthy — H9 fix) |
+| Proxy | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing`, `/projects` + Host header validation (H6) |
 
 ## Build & Quality Commands (Actual)
 
@@ -149,12 +158,14 @@ pnpm dev          # Development server (Turbopack)
 pnpm build        # Production build (hybrid: static + dynamic)
 pnpm lint         # eslint . (flat config)
 pnpm typecheck    # tsc --noEmit (strict + noUncheckedIndexedAccess)
-pnpm test         # vitest run (288 unit tests, jsdom)
+pnpm test         # vitest run (377 unit tests, jsdom)
 pnpm test:e2e     # playwright test (48 E2E tests, Chromium, auto-starts dev)
 pnpm format       # prettier --write
 pnpm format:check # prettier --check
-pnpm drizzle-kit generate   # Create migration SQL from schema diff
-pnpm drizzle-kit migrate    # Apply migrations (needs DATABASE_URL_UNPOOLED)
+pnpm drizzle:generate   # Create migration SQL from schema diff
+pnpm drizzle:migrate    # Apply migrations (needs DATABASE_URL_UNPOOLED)
+# NOTE: 4 new migrations (0001-0004) from the remediation sprint must be applied.
+# ⚠️ Migration 0001 requires pre-cleanup: DELETE duplicate video/voiceover rows first.
 pnpm drizzle-kit studio     # Schema browser
 ```
 
@@ -164,7 +175,7 @@ pnpm drizzle-kit studio     # Schema browser
 
 All components use `interface` (not `type` for object shapes), zero `any`. Critical rules:
 
-- `'use client'` only for: Navbar, Hero, Examples, Faq, Workflow, ScrollReveal (marketing); AuthForm, CreateWizard, Providers, ProjectProgressPanel, ProjectDownloadButton, ProjectShareButton (app)
+- `'use client'` only for: Navbar, Hero, Examples, Faq, Workflow, ScrollReveal (marketing); AuthForm (C1: now calls signUpAction in sign-up mode), CreateWizard, Providers, ProjectProgressPanel, ProjectDownloadButton (H4: now fetches /api/projects/[id]/download at click time), ProjectShareButton (app)
 - Server components by default: Features, Testimonials, UseCases, FinalCta, Footer (marketing); dashboard, project detail, billing, privacy, terms pages (app)
 - `next/image` for all raster images, `next/font` for all fonts
 - **Auth-first Server Actions:** every action starts with `verifySession()` before any logic
@@ -191,7 +202,7 @@ Step 6: Assemble video (FFmpeg via `getFfmpegPath()` → R2 putObject('videos') 
 Final: Mark status='completed', progressPercent=100
 ```
 
-Each step is idempotent (Inngest retries), debits credits (analysis=5, char=10, scene=8, voiceover=15, subtitle_alignment=3, video_assembly=30), updates `project.status` + `progressDetail`. `createProjectAction` triggers the pipeline via `inngest.send({ name: PIPELINE_EVENT, data: { projectId } })` after the DB insert. Image moderation (Steps 2 & 3) parses Replicate's `safety_concept` / `api_safety_concept` fields. Fail-open policy is env-configurable via `IMAGE_MODERATION_FAIL_OPEN` (default `true`; set to `false` for production fail-closed). The `moderationSkipped` field makes bypasses observable. (T5)
+Each step is idempotent (Inngest retries), debits credits via `debitCredits()` with deterministic idempotency keys (C5/C6 fix — ALL 6 steps now debit: analysis=5, char=10/each, scene=8/each, voiceover=15, subtitle_alignment=3, video_assembly=30; total=131 for 3 chars + 6 scenes). `debitCredits()` uses `ON CONFLICT (idempotency_key) DO NOTHING` + `.for('update')` row lock — race-condition-proof. `createProjectAction` inserts the project FIRST, then debits analysis credits (C4 fix — was reversed, causing lost credits on failed inserts). Image moderation (Steps 2 & 3) parses Replicate's `safety_concept` / `api_safety_concept` fields. Fail-open policy is env-configurable via `IMAGE_MODERATION_FAIL_OPEN` (H8 fix: defaults to `'false'` (fail-closed) in production; `'true'` in dev). The `moderationSkipped` field makes bypasses observable. (T5)
 
 ## Marketing Section Order (Top → Bottom, Fixed)
 
@@ -206,18 +217,17 @@ Each step is idempotent (Inngest retries), debits credits (analysis=5, char=10, 
 | Navbar | Language switcher → Dropdown | shadcn DropdownMenu (decorative — no i18n) |
 | Hero | Textarea focus glow | `focus-within:` on parent wrapper |
 | Hero | Story chip click → populate textarea | `useState` |
-| Hero | Character counter | `{story.length} / 500`, amber at ≥450 |
+| Hero | Character counter | `{story.length} / 5000`, amber at ≥4500 (M2 fix: was 500/450 — matched server schema) |
 | Hero | Aspect ratio toggle | `aria-pressed` toggle buttons |
 | Examples | Carousel arrow scroll | `scrollBy` / `scrollLeft` |
 | FAQ | Expand/collapse | Radix Accordion (grid-template-rows: 0fr→1fr) |
 | All sections | Scroll reveal | IntersectionObserver → `data-revealed` attr |
-| AuthForm | Google OAuth + credentials | `signIn('google')` / `signIn('credentials')` |
+| AuthForm | Google OAuth + credentials | `signIn('google')` / `signIn('credentials')` — C1 fix: sign-up mode now calls `signUpAction()` then auto-signs-in |
+| AuthForm | Sign-up (C1 fix) | `signUpAction()` → bcrypt hash (cost 12) → insert user → `getOrCreateSubscription()` → `signIn('credentials')` |
 | CreateWizard | Submit → createProjectAction | Server Action (auth-first, Zod, moderation, credits, **Inngest trigger**) |
 | Dashboard | Project list | Suspense + Server Component + `getUserProjects()` |
 | ProjectDetail | Live pipeline status | `ProjectProgressPanel` client component → SSE `/api/projects/[id]/progress` |
-| ProjectDetail | Download completed video | `SignedDownloadWrapper` (Server) → `ProjectDownloadButton` (Client, receives `downloadUrl` prop) |
-| ProjectDetail | Share project | `ProjectShareButton` → Web Share API + clipboard fallback |
-| ProjectDetail | Download completed video | `ProjectDownloadButton` → signed R2 URL (1h expiry) |
+| ProjectDetail | Download completed video | H4 fix: `ProjectDownloadButton` (Client) fetches `/api/projects/[id]/download` at click time → gets fresh signed URL → triggers download. No more `SignedDownloadWrapper` (DELETED). |
 | ProjectDetail | Share project | `ProjectShareButton` → Web Share API + clipboard fallback |
 
 ## 13 Keyframes (All CSS, in globals.css)
@@ -300,52 +310,76 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 42. **`pnpm-workspace.yaml` requires `packages:` field** — pnpm 9+ enforces this even for single-package repos. Fresh clones fail with `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION`. Fix: `packages: ['.']`. The engine floor is now `pnpm >=10.26.0` to match the `allowBuilds` syntax. (T0)
 43. **CI runs the full quality gate** — `.github/workflows/ci.yml` runs `pnpm lint && pnpm typecheck && pnpm test && pnpm build` on every PR. lint-staged only checks staged files; CI catches whole-codebase regressions. (T8)
 
+### Remediation Sprint 3 (revenue integrity + auth + security + design)
+44. **`debitCredits()` signature changed (C5)** — now requires `idempotencyKey` as the 4th arg and returns `DebitResult { idempotent, eventId, creditsRemaining }`. Old callers that pass 3 args will fail to compile. Use deterministic keys like `${projectId}:voiceover`.
+45. **`append*` queries return `AppendResult<T>` (C5)** — `appendCharacter/appendScene/appendVoiceover/appendVideo` now return `{ inserted: boolean, row: T | null }` instead of `T` directly. They use `onConflictDoNothing` on UNIQUE constraints. Check `result.inserted` before proceeding.
+46. **Sign-up was completely broken (C1)** — `AuthForm` called `signIn('credentials')` for BOTH sign-in and sign-up modes. The Credentials provider's `authorize()` only checks existing users — no user-creation logic existed. Now fixed via `signUpAction` in `src/features/auth/actions.ts`.
+47. **Steps 2 & 3 never debited credits (C6)** — a 60% revenue leak. `FULL_PIPELINE_COST = 131` credits assumes all 6 steps debit, but only 4 did (5+15+3+30=53). Now all 6 steps call `debitCredits()` with per-entity idempotency keys.
+48. **`FFMPEG_PATH` violated the "never `process.env.*`" rule (H1)** — `assemble-video.ts:20` read `process.env.FFMPEG_PATH` directly. Now goes through the Zod env schema (`env.FFMPEG_PATH`).
+49. **`IMAGE_MODERATION_FAIL_OPEN` default was insecure (H8)** — defaulted to `'true'` (fail-open), violating the secure-defaults principle. Now defaults to `'false'` (fail-closed) in production; `'true'` in dev/test.
+50. **Host Header Injection risk (H6)** — `trustHost: true` makes Auth.js trust `X-Forwarded-Host`. Without edge validation, an attacker behind a misconfigured reverse proxy can inject `evil.com` to steal magic-link tokens. `proxy.ts` now validates the Host header against a whitelist (canonical domain + localhost + `.vercel.app`).
+51. **Stripe webhook idempotency was a TOCTOU race (H7)** — the old SELECT-then-INSERT pattern on `metadata` (no UNIQUE index) allowed concurrent webhooks to both pass the check. Now uses INSERT-first `ON CONFLICT (idempotency_key) DO NOTHING`. `usageEvents.userId` is now nullable (removed hardcoded system user UUID that violated FK constraints).
+52. **Download button stale-tab 403 (H4)** — `SignedDownloadWrapper` signed the R2 URL at SSR time, baking the 1h-expiry URL into the RSC payload. Users who left tabs open >1h got 403. Now: `ProjectDownloadButton` fetches `/api/projects/[id]/download` at click time → gets a fresh URL. `SignedDownloadWrapper` DELETED.
+53. **Style chip enum mismatch (H3)** — clicking "Medieval" or "Japanese animation" set `style='medieval'` / `'japanese-animation'` which were NOT in the backend enum → Zod rejected the submission after the user typed a 100+ char story. Fixed by adding both values to `visualStyleEnum` + Zod + `STYLE_PROMPTS` (migration `0004`).
+54. **Health endpoint was bare (H9)** — returned `{ status: 'ok' }` unconditionally. Now checks DB (`SELECT 1`) + FFmpeg (`fs.accessSync`), returns 503 when unhealthy.
+55. **Brand color system bypassed 75+ times (H2)** — components use `bg-amber-400` (Tailwind `#fbbf24`) instead of `bg-primary` (brand `#febf00`), and `bg-zinc-950` instead of `bg-background` (`#020202`). CI guard test (`brand-tokens.test.ts`) measures the baseline. Full replacement deferred to a design sprint.
+56. **Rate limiting now implemented (C3)** — Upstash Ratelimit on auth (10/15min/IP), pipeline (5/min/user), SSE (1/user/project). New deps: `@upstash/ratelimit`, `@upstash/redis`. New error code `RATE_LIMITED` on `createProjectAction` and `signUpAction`.
+57. **`createProjectAction` order fix (C4)** — was: debit → insert → trigger. If insert failed, user lost credits. Now: insert → debit → trigger. Idempotency key uses `${project.id}:analysis`.
+58. **IP-Adapter placeholder warning (C2)** — `replicate.ts` now emits `console.warn` in production when `REPLICATE_SDXL_IPADAPTER_MODEL` equals the SDXL base hash. Character consistency silently does not work without a real IP-Adapter model.
+
 ## What's Implemented vs. Outstanding
 
-### ✅ Implemented (code layer — 288 unit tests + 48 E2E tests, all GREEN)
+### ✅ Implemented (code layer — 377 unit tests + 48 E2E tests, all GREEN)
 - Auth.js v5 (Google OAuth + Credentials, Drizzle adapter, JWT sessions, **`trustHost: true`** for reverse-proxy compatibility — T2)
 - Drizzle schema (11 tables, 8 enums) + migration config
 - `verifySession()` DAL + middleware route protection
-- Sign-in / sign-up pages with shared AuthForm
+- Sign-in / sign-up pages with shared AuthForm **(C1 fix: sign-up now works via `signUpAction` — bcrypt cost 12, user insert, subscription creation, auto sign-in)**
 - Dashboard with Suspense + empty state
 - Create wizard (reuses Hero's glass-input pattern)
-- `createProjectAction` Server Action (auth-first, Zod, moderation, credits, **Inngest trigger**)
-- OpenAI integration (GPT-4o analysis, Moderation, Whisper ASR)
-- Replicate integration (SDXL character + scene generation, IP-Adapter, **env-configurable model IDs** — T4)
+- `createProjectAction` Server Action (auth-first, Zod, moderation, **C4 fix: insert BEFORE debit**, **C3 fix: rate-limited (5/min/user)**, **Inngest trigger**)
+- OpenAI integration (GPT-4o analysis, Moderation, Whisper ASR with **M4 fix: language param defaults to 'en'**)
+- Replicate integration (SDXL character + scene generation, IP-Adapter, **env-configurable model IDs** — T4, **C2 fix: production warning when placeholder detected**)
 - ElevenLabs TTS (chunked for long text)
-- FFmpeg video assembly (rewritten — SRT temp file, inputOptions per image, Buffer readback, cleanup)
-- Inngest 6-step pipeline function (**fully wired: Steps 0-6 + final completion**)
-- Image moderation on generated characters + scenes (ADR-011 — `moderateImage` parses Replicate safety output, **`moderationSkipped` field + env-configurable fail-open via `IMAGE_MODERATION_FAIL_OPEN`** — T5)
-- R2 storage layer (signed URLs + `putObject` for pipeline Buffer uploads, 3 buckets, **`MAX_PUT_OBJECT_BYTES = 500 MB` size guard + `PayloadTooLargeError`** — T7)
-- Stripe (Checkout, Portal, webhook with signature verification + idempotency)
-- Credit metering (transactional `debitCredits`, `InsufficientCreditsError`)
+- FFmpeg video assembly (rewritten — SRT temp file, inputOptions per image, Buffer readback, cleanup, **H1 fix: `FFMPEG_PATH` via env module not `process.env`**)
+- Inngest 6-step pipeline function (**fully wired: Steps 0-6 + final completion**, **C5/C6 fix: ALL 6 steps now debit credits with idempotency keys — total 131 credits for 3 chars + 6 scenes**)
+- Image moderation on generated characters + scenes (ADR-011, **H8 fix: `IMAGE_MODERATION_FAIL_OPEN` defaults to `'false'` in production**)
+- R2 storage layer (signed URLs + `putObject` for pipeline Buffer uploads, 3 buckets, **`MAX_PUT_OBJECT_BYTES = 500 MB` size guard**)
+- Stripe (Checkout, Portal, webhook with signature verification + **H7 fix: idempotent via `ON CONFLICT (idempotency_key) DO NOTHING`**)
+- Credit metering (transactional `debitCredits` with **C5 fix: `ON CONFLICT DO NOTHING` + `.for('update')` row lock + `DebitResult` return type**)
 - Billing page (4-tier plan table)
-- SSE progress stream (`/api/projects/[id]/progress` — 2s polling, owner-checked, **`maxDuration = 800` (corrected from 900 — Pro GA ceiling under Fluid Compute) + client-side reconnect with exponential backoff** — T6)
-- `useProjectProgress` client hook + `ProjectProgressPanel` (live progress bar, **reconnect UI state** — T6)
-- Download button (signed R2 URL, **server-side signing via `SignedDownloadWrapper` Server Component extracted to its own file** — T1) + Share button (Web Share API + clipboard fallback)
+- SSE progress stream (`/api/projects/[id]/progress` — 2s polling, owner-checked, **C3 fix: rate-limited (1/user/project)**, **`maxDuration = 800`** + client-side reconnect)
+- `useProjectProgress` client hook + `ProjectProgressPanel` (live progress bar, **reconnect UI state**)
+- **H4 fix: Click-time R2 URL signing** via `/api/projects/[id]/download` API route. `ProjectDownloadButton` fetches fresh URL at click time. `SignedDownloadWrapper` DELETED.
 - `getProject()` LEFT JOINs videos — returns `videoKey` for conditional download render
-- `getFfmpegPath()` helper — resolves FFmpeg binary from `FFMPEG_PATH` env var (default `/usr/bin/ffmpeg`)
+- `getFfmpegPath()` helper — resolves FFmpeg binary from `env.FFMPEG_PATH` (**H1 fix: via env module, not `process.env`**)
+- **C3 fix: Rate limiting** — `src/lib/rate-limit.ts` with `authRateLimit` (10/15min/IP), `pipelineRateLimit` (5/min/user), `sseRateLimit` (1/user/project). New deps: `@upstash/ratelimit`, `@upstash/redis`.
+- **H6 fix: Proxy host header validation** — rejects requests with unauthorized Host headers (canonical + localhost + `.vercel.app`). `/projects/:path*` added to matcher.
+- **H9 fix: Robust health endpoint** — `/api/health` checks DB (`SELECT 1`) + FFmpeg (`fs.accessSync`), returns 503 when unhealthy.
+- **H3 fix: Style chip enum** — `medieval` and `japanese-animation` added to `visualStyleEnum` + Zod + `STYLE_PROMPTS` (migration `0004`).
+- **M2 fix: Story length** — Hero textarea `maxLength` 500→5000, counter `/ 5000`, amber threshold ≥4500.
+- **C5 fix: Idempotency** — `usageEvents.idempotencyKey` column + UNIQUE index. All `append*` queries use `onConflictDoNothing`. UNIQUE constraints on `videos/voiceovers.projectId`, `characters(projectId,name)`, `scenes(projectId,order)`.
 - **Client components never import `r2.ts` at module level** — prevents env validation crash in browser
 - Privacy Policy + Terms of Service pages (Server Components, AI-specific clauses)
 - All 14 marketing CTAs wired to real routes
 - husky + lint-staged pre-commit hook (`.husky/pre-commit`)
-- **AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch warning** at module load — T2
-- **GitHub Actions CI** (`.github/workflows/ci.yml`) running lint + typecheck + test + build on every PR — T8
-- **`pnpm-workspace.yaml` fixed** with `packages: ['.']` field + standardized on `allowBuilds` syntax (removed deprecated `onlyBuiltDependencies`); engine floor bumped to `pnpm >=10.26.0` — T0
-- 288 unit tests (36 files) + 48 E2E tests (9 files)
+- **AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch warning** at module load
+- **GitHub Actions CI** (`.github/workflows/ci.yml`) running lint + typecheck + test + build on every PR
+- **`pnpm-workspace.yaml` fixed** with `packages: ['.']` field
+- 377 unit tests (43 files) + 48 E2E tests (9 files)
 
 ### ⚠️ Outstanding (requires external resources / not yet done)
 - **External service credentials** — Neon, Google OAuth, OpenAI, Replicate, ElevenLabs, R2, Stripe, Inngest, Resend, Upstash, Sentry (fill `.env.local` from `.env.example`)
-- **Database migrations applied** — run `pnpm drizzle-kit generate && migrate` against real Neon
+- **Database migrations applied** — run `pnpm drizzle:generate && pnpm drizzle:migrate` against real Neon. **⚠️ 4 new migrations (0001-0004) from the remediation sprint. Migration 0001 requires pre-cleanup of duplicate video/voiceover rows.**
 - **Stripe products configured** — `PRICE_IDS` in `src/lib/stripe/client.ts` are placeholders
-- **Replicate IP-Adapter model hash** — `REPLICATE_SDXL_IPADAPTER_MODEL` env var must be set to a real `lucataco/sdxl-ipadapter:<sha>` hash before character consistency will work. The default is the SDXL base model (a documented placeholder). (T4)
+- **Replicate IP-Adapter model hash** — `REPLICATE_SDXL_IPADAPTER_MODEL` env var must be set to a real `lucataco/sdxl-ipadapter:<sha>` hash before character consistency will work. The default is the SDXL base model (a documented placeholder). **C2 fix: `replicate.ts` now emits a `console.warn` in production when the placeholder is detected.** (T4)
 - **Character consistency validated end-to-end** — manual R&D test (Risk R1, highest-risk component). Code is wired; needs real API keys.
-- **FFmpeg assembly validated end-to-end** — rewritten + unit-tested with mocked fluent-ffmpeg; needs real-world test with actual scene images + audio + SRT
-- **Rate limiting** — Upstash Ratelimit on auth/AI/export (env vars already in schema; integration not done)
+- **FFmpeg assembly validated end-to-end** — rewritten + unit-tested with mocked fluent-ffmpeg; needs real-world test with actual scene images + audio + SRT. **H5 (FFmpeg stream-to-R2) deferred** — requires `@aws-sdk/lib-storage` refactor to eliminate `/tmp` OOM risk.
 - **Monitoring** — Sentry, Vercel Analytics, Axiom not integrated (env var `SENTRY_DSN` in schema)
 - **E2E tests in CI** — Playwright E2E not yet in the GitHub Actions workflow (needs Postgres service container + browser binaries + seeded data)
 - **GDPR/CCPA** — cookie consent banner + data export/deletion endpoints not implemented (Privacy/Terms pages exist)
 - **Other content pages** — `/pricing`, `/blog`, `/contact` linked but not implemented
+- **H2 — Brand color full replacement** — 75+ `amber-*` + 29+ `bg-zinc-950` violations remain across 22+ files. CI guard test (`brand-tokens.test.ts`) measures the baseline. Full replacement deferred to a design sprint.
+- **M3 — Character image R2 upload** — `referenceImageKey` currently stores Replicate CDN URLs, not R2 keys. Uploading to R2 matches the docs' intent but requires pipeline Step 2 refactor.
 
 ### ✅ Recently Closed (remediation sprint 1 — pipeline wiring + UX + compliance)
 - ~~Steps 4-6 not wired into Inngest~~ → Fixed
@@ -377,6 +411,27 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 - ~~`pnpm-workspace.yaml` mixed deprecated + current syntax~~ → Fixed (standardized on `allowBuilds`, removed stale `@ffmpeg-installer/linux-x64`, bumped engine to `>=10.26.0`)
 - ~~`STYLE_CHIPS` drifted from spec (7 chips, wrong labels)~~ → Fixed (restored 8-chip spec set verbatim — 5 tests)
 - ~~Hero headline collapsed to 2-line~~ → Fixed (restored 3-line cinematic stack + subtitle emphasizes OUTPUT over PROCESS — 5 tests)
+
+### ✅ Recently Closed (remediation sprint 3 — revenue integrity + auth + security + design)
+- ~~Sign-up flow completely broken (no `signUpAction` existed)~~ → Fixed (C1: new `src/features/auth/actions.ts` with `signUpAction` — bcrypt cost 12, user insert, subscription, auto sign-in)
+- ~~IP-Adapter placeholder silently broken~~ → Fixed (C2: `replicate.ts` emits `console.warn` in production when placeholder detected)
+- ~~No rate limiting~~ → Fixed (C3: `src/lib/rate-limit.ts` with auth/pipeline/SSE limits; new deps `@upstash/ratelimit` + `@upstash/redis`)
+- ~~Credits debited before project insert~~ → Fixed (C4: `createProjectAction` now inserts project FIRST, then debits with `${project.id}:analysis` key)
+- ~~No idempotency on Inngest retries~~ → Fixed (C5: `idempotencyKey` column + UNIQUE index + `ON CONFLICT DO NOTHING` in `debitCredits` + all `append*` queries + `.for('update')` row lock)
+- ~~Steps 2 & 3 never debited credits (60% revenue leak)~~ → Fixed (C6: ALL 6 steps now call `debitCredits` with per-entity idempotency keys — total 131 credits for 3 chars + 6 scenes)
+- ~~`FFMPEG_PATH` bypassed Zod env validation~~ → Fixed (H1: added to Zod schema; `assemble-video.ts` reads `env.FFMPEG_PATH` not `process.env.*`)
+- ~~Brand color system bypassed 75+ times~~ → Partially fixed (H2: CI guard test `brand-tokens.test.ts` measures baseline; full replacement deferred)
+- ~~Style chip enum mismatch (2 of 8 chips broke Zod)~~ → Fixed (H3: added `medieval` + `japanese-animation` to enum + Zod + STYLE_PROMPTS — migration `0004`)
+- ~~R2 URL 1h expiry trap (stale tabs get 403)~~ → Fixed (H4: new `/api/projects/[id]/download` API route; `ProjectDownloadButton` fetches fresh URL at click time; `SignedDownloadWrapper` DELETED)
+- ~~Host Header Injection risk~~ → Fixed (H6: `proxy.ts` validates Host header against whitelist; `/projects/:path*` added to matcher)
+- ~~Stripe webhook TOCTOU race~~ → Fixed (H7: INSERT-first `ON CONFLICT DO NOTHING`; removed hardcoded system user UUID; `usageEvents.userId` nullable)
+- ~~`IMAGE_MODERATION_FAIL_OPEN` insecure default~~ → Fixed (H8: default flipped from `'true'` to `'false'` in production)
+- ~~Health endpoint bare~~ → Fixed (H9: checks DB `SELECT 1` + FFmpeg `fs.accessSync`, returns 503 when unhealthy)
+- ~~Row lock untested~~ → Fixed (H10: `.for('update')` now test-verified via source-reading + concurrency test)
+- ~~Story length 500 vs 5000 mismatch~~ → Fixed (M2: Hero `maxLength` 500→5000, counter `/ 5000`, threshold ≥4500)
+- ~~Whisper no language param~~ → Fixed (M4: `alignSubtitles` accepts `{ audioBuffer, language? }`, defaults `'en'`)
+- ~~Stale "900s" comments~~ → Fixed (M5: updated to "800s Pro/Enterprise GA; 1800s beta")
+- ~~`package.json` description stale~~ → Fixed (M6: updated to reflect full SaaS, not just marketing clone)
 
 ## Troubleshooting
 

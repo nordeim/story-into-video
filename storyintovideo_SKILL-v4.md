@@ -1,30 +1,11 @@
 # StoryIntoVideo — Complete Skill Reference
 
-> **Version:** 5.0.0 (Post-Remediation Sprint 3 — supersedes v1-v4)
+> **Version:** 4.0.0 (Post-Review Hardening — supersedes v1-v3)
 > **Date:** 2026-06-28
-> **Status:** Production-ready codebase. 377 unit tests + 48 E2E tests, all GREEN.
+> **Status:** Production-ready codebase. 288 unit tests + 48 E2E tests, all GREEN.
 > **Maintainer:** Frontend Architect & Avant-Garde UI Designer
 
 This document is the **canonical skill file** for the StoryIntoVideo project. It distills every design decision, architectural pattern, gotcha, lesson learned, and validation checkpoint into a single reference that any coding agent can use to replicate, extend, or debug this codebase with fidelity.
-
-**Remediation Sprint 3 (v5.0.0) closed 17 issues across 6 phases:**
-- 🔴 C1: Sign-up flow fixed (new `signUpAction` server action)
-- 🔴 C2: IP-Adapter placeholder warning in production
-- 🔴 C3: Rate limiting implemented (Upstash Ratelimit: auth, pipeline, SSE)
-- 🔴 C4: `createProjectAction` now inserts project BEFORE debiting credits
-- 🔴 C5: Idempotent `debitCredits()` via `ON CONFLICT DO NOTHING` + `.for('update')` row lock
-- 🔴 C6: ALL 6 pipeline steps now debit credits (was 4/6 — 60% revenue leak fixed)
-- 🟠 H1: `FFMPEG_PATH` moved into Zod env schema (was `process.env.*`)
-- 🟠 H3: Style chip enum aligned with marketing marquee (added `medieval` + `japanese-animation`)
-- 🟠 H4: Click-time R2 URL signing via `/api/projects/[id]/download` (replaced SSR-time `SignedDownloadWrapper`)
-- 🟠 H6: Proxy host header validation + `/projects/:path*` matcher
-- 🟠 H7: Stripe webhook idempotency via `ON CONFLICT` (replaced TOCTOU SELECT-then-INSERT)
-- 🟠 H8: `IMAGE_MODERATION_FAIL_OPEN` defaults to `'false'` (fail-closed) in production
-- 🟠 H9: Health endpoint now checks DB + FFmpeg
-- 🟠 H10: Row lock `.for('update')` now test-verified
-- 🟡 M1: UNIQUE constraints on `videos/voiceovers.projectId` + `characters(projectId,name)` + `scenes(projectId,order)`
-- 🟡 M2: Hero story length 500→5000 (matches server schema)
-- 🟡 M4: Whisper `language` param (defaults `'en'`)
 
 ---
 
@@ -129,31 +110,30 @@ All implementation tasks follow this workflow:
 | Package Manager | pnpm | `>=10.26.0` | `allowBuilds` syntax floor (not `onlyBuiltDependencies`) |
 | Node | — | `>=20.0.0` | — |
 
-### Environment Variables (31 total, Zod-validated)
+### Environment Variables (29 total, Zod-validated)
 
-The env module at `src/lib/env/index.ts` is the **single source of truth**. Never read `process.env.*` directly — always `import { env } from '@/lib/env'`. (H1 fix: `FFMPEG_PATH` is now in the Zod schema, not read via `process.env` directly.)
+The env module at `src/lib/env/index.ts` is the **single source of truth**. Never read `process.env.*` directly — always `import { env } from '@/lib/env'`.
 
 **Critical env rules:**
 1. The Zod schema validates at module load. Typos like `GOOGLE_CLIENTID` (missing underscore) silently return `undefined` and disable OAuth.
 2. Build-context fallback: when `NEXT_PHASE=phase-production-build` or `NODE_ENV=test`, the module returns placeholders instead of throwing. This allows `next build` to succeed without real env vars.
 3. At runtime (dev server, production), real env vars MUST be set — the app fails fast with a descriptive error.
-4. `IMAGE_MODERATION_FAIL_OPEN` is in the Zod schema as `z.enum(['true','false']).optional().default(process.env.NODE_ENV === 'production' ? 'false' : 'true')` — **H8 fix: defaults to fail-closed (`'false'`) in production; `'true'` in dev/test.** Case-sensitive, catches typos like "True" or "maybe".
-5. `FFMPEG_PATH` is in the Zod schema as `z.string().optional().default('/usr/bin/ffmpeg')` — **H1 fix: was previously read via `process.env.FFMPEG_PATH` directly in `assemble-video.ts`, bypassing validation.**
+4. `IMAGE_MODERATION_FAIL_OPEN` is in the Zod schema as `z.enum(['true','false']).optional().default('true')` — case-sensitive, catches typos like "True" or "maybe".
 
 **Env var categories:**
 - Database (2): `DATABASE_URL` (pooled), `DATABASE_URL_UNPOOLED` (direct, for migrations)
 - Auth (3): `AUTH_SECRET` (≥32 chars, no known-weak values), `AUTH_URL`, `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` (optional, both required to enable)
 - AI Providers (3): `OPENAI_API_KEY` (starts with `sk-`), `REPLICATE_API_TOKEN` (starts with `r8_`), `ELEVENLABS_API_KEY`
-- Replicate Models (2, optional): `REPLICATE_SDXL_MODEL`, `REPLICATE_SDXL_IPADAPTER_MODEL` — both validate `owner/model:sha` format. **C2 fix: `replicate.ts` emits `console.warn` in production when `REPLICATE_SDXL_IPADAPTER_MODEL` equals the SDXL base placeholder hash.**
-- Image Moderation (1, optional): `IMAGE_MODERATION_FAIL_OPEN` — `z.enum(['true','false'])`, **H8 fix: default depends on `NODE_ENV`** (`'false'` in production, `'true'` in dev)
+- Replicate Models (2, optional): `REPLICATE_SDXL_MODEL`, `REPLICATE_SDXL_IPADAPTER_MODEL` — both validate `owner/model:sha` format
+- Image Moderation (1, optional): `IMAGE_MODERATION_FAIL_OPEN` — `z.enum(['true','false'])`, default `'true'`
 - Stripe (3): `STRIPE_SECRET_KEY` (starts with `sk_`), `STRIPE_WEBHOOK_SECRET` (starts with `whsec_`), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (starts with `pk_`)
 - R2 (6): `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_UPLOADS`, `R2_BUCKET_GENERATED`, `R2_BUCKET_VIDEOS`
 - Inngest (2): `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`
 - Email (1): `RESEND_API_KEY` (starts with `re_`)
-- Rate Limiting (2): `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` — **C3 fix: now used by `src/lib/rate-limit.ts`** (was in schema but unused before)
+- Rate Limiting (2): `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
 - Monitoring (1): `SENTRY_DSN`
 - App (2): `NEXT_PUBLIC_APP_URL`, `NODE_ENV`
-- FFmpeg (1, optional): `FFMPEG_PATH` (default `/usr/bin/ffmpeg`) — **H1 fix: now in the Zod schema**
+- FFmpeg (1, optional): `FFMPEG_PATH` (default `/usr/bin/ffmpeg`)
 
 ---
 
@@ -169,15 +149,11 @@ pnpm install                    # Activates husky via `prepare` script
 
 # Configure environment
 cp .env.example .env.local      # Copy env template
-# Edit .env.local with real credentials (31 env vars)
+# Edit .env.local with real credentials (29 env vars)
 
 # Set up the database
-pnpm drizzle:generate           # Create migration SQL from schema
-pnpm drizzle:migrate            # Apply migrations to Neon (needs DATABASE_URL_UNPOOLED)
-# ⚠️ 4 new migrations (0001-0004) from the remediation sprint must be applied.
-# ⚠️ Migration 0001 requires pre-cleanup: DELETE duplicate video/voiceover rows first:
-#   DELETE FROM videos WHERE id NOT IN (SELECT MIN(id) FROM videos GROUP BY project_id);
-#   DELETE FROM voiceovers WHERE id NOT IN (SELECT MIN(id) FROM voiceovers GROUP BY project_id);
+pnpm drizzle-kit generate       # Create migration SQL from schema
+pnpm drizzle-kit migrate        # Apply migrations to Neon (needs DATABASE_URL_UNPOOLED)
 
 # Download marketing assets (NOT version-controlled)
 ./scripts/download-assets.sh    # Workflow videos + posters from R2 (idempotent)
@@ -309,13 +285,13 @@ pnpm build        # Production build (hybrid: static + dynamic)
 pnpm start        # Serve built output
 pnpm lint         # eslint . (flat config)
 pnpm typecheck    # tsc --noEmit (strict + noUncheckedIndexedAccess)
-pnpm test         # vitest run — 377 tests across 43 files (jsdom env)
+pnpm test         # vitest run — 288 tests across 36 files (jsdom env)
 pnpm test:e2e     # playwright test — 48 tests (Chromium, auto-starts dev)
 pnpm format       # prettier --write
 pnpm format:check # prettier --check
-pnpm drizzle:generate   # Create migration SQL from schema diff (uses dotenv -e .env.local)
-pnpm drizzle:migrate    # Apply migrations (needs DATABASE_URL_UNPOOLED)
-pnpm drizzle:studio     # Open schema browser
+pnpm drizzle-kit generate   # Create migration SQL from schema diff
+pnpm drizzle-kit migrate    # Apply migrations (needs DATABASE_URL_UNPOOLED)
+pnpm drizzle-kit studio     # Open schema browser
 ```
 
 **Pre-commit chain:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build`
@@ -788,52 +764,36 @@ The accordion content animation uses the modern CSS Grid `grid-template-rows: 0f
 
 The project detail page (`src/app/(app)/projects/[id]/page.tsx`) is a Server Component that renders `<ProjectProgressPanel projectId={id} />` — a client component that subscribes to the SSE progress stream via the `useProjectProgress` hook. See §6 for the hook implementation.
 
-### Click-Time R2 URL Signing Pattern (H4 fix — replaces SSR-time signing)
+### Server-Side URL Signing Pattern (P0 Critical)
 
-**Never import `@/lib/storage/r2` in client components.** The `r2.ts` module imports `env` which validates all 31 env vars at module load. In the browser, only `NEXT_PUBLIC_*` vars exist — all server-only vars are `undefined`, causing "Invalid environment variables" crash.
+**Never import `@/lib/storage/r2` in client components.** The `r2.ts` module imports `env` which validates all 29 env vars at module load. In the browser, only `NEXT_PUBLIC_*` vars exist — all server-only vars are `undefined`, causing "Invalid environment variables" crash.
 
-**H4 fix:** The previous `SignedDownloadWrapper` (Server Component) signed the R2 URL at SSR time, baking the 1h-expiry URL into the RSC payload. Users who left tabs open >1h got 403 Forbidden. The fix: a new API route signs the URL at **click time**, so each download gets a fresh URL.
-
-**`SignedDownloadWrapper` has been DELETED.** The new pattern:
+**Pattern:** Server Component signs the URL, passes as prop to client component.
 
 ```tsx
-// Server Component (projects/[id]/page.tsx) — passes primitive props only
-import { ProjectDownloadButton } from '@/components/app/project-download-button';
+// Server Component (projects/[id]/page.tsx)
+import { SignedDownloadWrapper } from '@/components/app/signed-download-wrapper';
 
 export default async function ProjectDetailPage({ params }) {
   const { id } = await params;
-  const session = await verifySession({ redirectTo: `/projects/${id}` });
+  const session = await verifySession();
   const project = await getProject(id, session.user.id);
-  // Pass ONLY primitives (projectId + hasVideo) — never a signed URL
-  return <ProjectDownloadButton projectId={project.id} hasVideo={!!project.videoKey} />;
+  return <SignedDownloadWrapper project={project} />;
 }
 
-// API Route (app/api/projects/[id]/download/route.ts) — signs URL at click time
-export const dynamic = 'force-dynamic';
-export async function GET(_req, { params }) {
-  const session = await auth();           // API pattern: auth() not verifySession()
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const { id: projectId } = await params;
-  const project = await getProject(projectId, session.user.id);
-  if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  if (!project.videoKey) return NextResponse.json({ error: 'Video not ready' }, { status: 409 });
-  const signedUrl = await getSignedDownloadUrl('videos', project.videoKey);
-  return NextResponse.json({ url: signedUrl }, { status: 200 });
+// SignedDownloadWrapper (Server Component)
+export async function SignedDownloadWrapper({ project }) {
+  const downloadUrl = project.videoKey
+    ? await getSignedDownloadUrl('videos', project.videoKey)
+    : null;
+  return <ProjectDownloadButton downloadUrl={downloadUrl} />;
 }
 
-// ProjectDownloadButton (Client Component — fetches fresh URL at click time)
+// ProjectDownloadButton (Client Component — receives URL as prop, NO r2.ts import)
 'use client';
-export function ProjectDownloadButton({ projectId, hasVideo }: { projectId: string; hasVideo: boolean }) {
-  if (!hasVideo) return null;
-  const handleDownload = async () => {
-    const res = await fetch(`/api/projects/${projectId}/download`);
-    if (!res.ok) { /* handle error */ return; }
-    const { url } = await res.json();
-    const a = document.createElement('a');
-    a.href = url; a.download = `story-${projectId}.mp4`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  };
-  return <button onClick={handleDownload}>Download Video</button>;
+export function ProjectDownloadButton({ downloadUrl }: { downloadUrl: string | null }) {
+  if (!downloadUrl) return null;
+  return <a href={downloadUrl}>Download</a>;
 }
 ```
 
@@ -1269,7 +1229,7 @@ Every `<section>` has `aria-labelledby` pointing to its heading's `id`:
 
 ### Bug #10: Client Component Imports `r2.ts` at Module Level (AVOID)
 
-**The bug:** The `r2.ts` module imports `env` which validates all 31 env vars at module load. In the browser, only `NEXT_PUBLIC_*` vars exist — all server-only vars are `undefined`, causing "Invalid environment variables" crash. This completely breaks the project detail page.
+**The bug:** The `r2.ts` module imports `env` which validates all 29 env vars at module load. In the browser, only `NEXT_PUBLIC_*` vars exist — all server-only vars are `undefined`, causing "Invalid environment variables" crash. This completely breaks the project detail page.
 
 **The fix:** Server Component signs the URL via `getSignedDownloadUrl()`, passes as prop to client component. See §5 "Server-Side URL Signing Pattern."
 
@@ -1304,48 +1264,6 @@ class MockS3Client { send = sendMock; }
 
 **The fix:** Rename to `*.test.tsx`. This is a transformer-level requirement, not a TypeScript one.
 
-### Bug #15: Sign-up flow was completely broken (C1 — FIXED)
-
-**The bug:** `AuthForm` called `signIn('credentials', ...)` for BOTH sign-in and sign-up modes. The Credentials provider's `authorize()` only checks existing users — no user-creation logic existed. `grep -r "bcrypt.hash|insert(users)|signUpAction" src/` returned only `seed.ts`.
-
-**The fix:** New `src/features/auth/actions.ts` with `signUpAction` server action (Zod validate, check email exists, bcrypt hash cost 12, insert user, create free-tier subscription, return `{ success, userId }`). `AuthForm.handleSubmit` now branches on `isSignUp` — sign-up mode calls `signUpAction` then auto-signs-in via `signIn('credentials')`.
-
-### Bug #16: Steps 2 & 3 never debited credits — 60% revenue leak (C6 — FIXED)
-
-**The bug:** `FULL_PIPELINE_COST = 131` credits assumes all 6 steps debit. But Steps 2 (character_generation) and 3 (scene_generation) in `inngest.ts` NEVER called `debitCredits`. Actually debited: 5+15+3+30 = 53 credits. Revenue leak: 78 credits per project (60%).
-
-**The fix:** Added `debitCredits()` calls inside Steps 2 & 3 with per-entity idempotency keys (`${projectId}:character:${char.name}`, `${projectId}:scene:${scene.order}`). If a retry is detected (`debitCredits` returns `{ idempotent: true }`), the step skips generation (the entity already exists).
-
-### Bug #17: `FFMPEG_PATH` bypassed Zod env validation (H1 — FIXED)
-
-**The bug:** `assemble-video.ts:20` read `process.env.FFMPEG_PATH` directly, violating the project's central "never `process.env.*`" rule. A typo like `FFMPEG_PAHT` would silently fall back to `/usr/bin/ffmpeg` with no warning.
-
-**The fix:** Added `FFMPEG_PATH: z.string().optional().default('/usr/bin/ffmpeg')` to the Zod schema. Changed `getFfmpegPath()` to `import { env } from '@/lib/env'; return env.FFMPEG_PATH`.
-
-### Bug #18: Download button 403 on stale tabs (H4 — FIXED)
-
-**The bug:** `SignedDownloadWrapper` signed the R2 URL at SSR time, baking the 1h-expiry URL into the RSC payload. Users who left tabs open >1h and clicked "Download" got 403 Forbidden.
-
-**The fix:** New `/api/projects/[id]/download` API route signs the URL at click time. `ProjectDownloadButton` now receives `{ projectId, hasVideo }` (primitives that never expire) and fetches the API route on click. `SignedDownloadWrapper` DELETED.
-
-### Bug #19: Style chip enum mismatch (H3 — FIXED)
-
-**The bug:** STYLE_CHIPS has 8 labels including "Medieval" and "Japanese animation". `CreateWizard` normalizes via `toLowerCase().replace(/\s+/g, '-')` → `medieval` and `japanese-animation`. These were NOT in the `visualStyleEnum` (7 values). Zod rejected the submission after the user typed a 100+ char story.
-
-**The fix:** Added `medieval` and `japanese-animation` to `visualStyleEnum` + Zod + `STYLE_PROMPTS` maps (migration `0004_add_medieval_japanese_animation_styles.sql`).
-
-### Bug #20: Stripe webhook TOCTOU race (H7 — FIXED)
-
-**The bug:** The webhook idempotency check was `SELECT ... WHERE metadata = event.id` followed by `INSERT`. Two concurrent webhooks for the same `event.id` both pass the SELECT and both INSERT. Also: `userId: '00000000-...'` (hardcoded system user) violated the FK constraint.
-
-**The fix:** Replaced with INSERT-first `ON CONFLICT (idempotency_key) DO NOTHING` pattern. `usageEvents.userId` is now nullable (migration `0003`). Removed hardcoded system user UUID.
-
-### Bug #21: Brand color system bypassed 75+ times (H2 — PARTIALLY FIXED)
-
-**The bug:** Components use `bg-amber-400` (Tailwind `#fbbf24`) instead of `bg-primary` (brand `#febf00`), and `bg-zinc-950` instead of `bg-background` (`#020202`). 75+ amber violations across 22 files; 29+ zinc-950 violations across 21 files.
-
-**The fix:** CI guard test (`brand-tokens.test.ts`) measures the baseline. Full replacement deferred to a design sprint. When done, flip the test assertions to `expect(0)`.
-
 ---
 
 ## 10. Debugging Guide
@@ -1356,7 +1274,7 @@ class MockS3Client { send = sendMock; }
 
 **Fix:**
 1. Copy `.env.example` → `.env.local`
-2. Fill in real values for all 31 env vars
+2. Fill in real values for all 29 env vars
 3. The build-context fallback only applies when `NEXT_PHASE=phase-production-build` or `NODE_ENV=test`. At runtime, real env vars MUST be set.
 
 ### Issue: Build fails "Failed to collect page data for /api/auth/[...nextauth]"
@@ -1484,7 +1402,7 @@ Before claiming completion, verify ALL of the following:
 ```bash
 pnpm lint         # zero warnings, zero errors
 pnpm typecheck    # zero errors (strict + noUncheckedIndexedAccess)
-pnpm test         # 288 tests pass across 43 files
+pnpm test         # 288 tests pass across 36 files
 pnpm test:e2e     # 48 E2E tests pass (requires Playwright browsers: pnpm exec playwright install)
 pnpm format:check # all files use Prettier code style
 pnpm build        # zero errors, all 14 routes compile
@@ -1565,7 +1483,7 @@ pnpm build        # zero errors, all 14 routes compile
 
 1. **`suppressHydrationWarning` belongs on `<body>`, not just `<html>`** — Browser extensions like Grammarly inject attributes into `<body>` before React hydrates.
 2. **Workflow component needs `'use client'`** — Uses `useState` for poster→video fade-in choreography.
-3. **Test counts drift from plans** — MEP planned 6+3; actual is 377 unit + 48 E2E. Always verify against `pnpm test` output.
+3. **Test counts drift from plans** — MEP planned 6+3; actual is 288 unit + 48 E2E. Always verify against `pnpm test` output.
 4. **File structure evolves during implementation** — Update docs as you build.
 5. **Playwright requires browser binary installation** — `pnpm install` doesn't install browser binaries.
 
@@ -1835,7 +1753,7 @@ export async function GET(req, { params }) {
 
 ## 16. Coding Anti-Patterns
 
-### Anti-Pattern: Importing `r2.ts` in a Client Component (H4 updated)
+### Anti-Pattern: Importing `r2.ts` in a Client Component
 
 ```tsx
 // ❌ WRONG — env validation crashes in browser
@@ -1843,22 +1761,15 @@ export async function GET(req, { params }) {
 import { getSignedDownloadUrl } from '@/lib/storage/r2'; // CRASH
 export function BadComponent() { ... }
 
-// ✅ CORRECT (H4 fix) — Client component fetches a fresh signed URL at click time
-// via an API route. The signed URL is never baked into the RSC payload.
+// ✅ CORRECT — Server Component signs URL, passes as prop
+// Server Component:
+import { getSignedDownloadUrl } from '@/lib/storage/r2';
+const url = await getSignedDownloadUrl('videos', key);
+return <GoodComponent downloadUrl={url} />;
+
 // Client Component:
 'use client';
-export function ProjectDownloadButton({ projectId, hasVideo }: { projectId: string; hasVideo: boolean }) {
-  if (!hasVideo) return null;
-  const handleDownload = async () => {
-    const res = await fetch(`/api/projects/${projectId}/download`);
-    const { url } = await res.json();
-    // trigger download with the fresh URL
-  };
-  return <button onClick={handleDownload}>Download</button>;
-}
-
-// The OLD pattern (SignedDownloadWrapper — DELETED in H4 fix):
-// Server Component signed at SSR time → URL baked into RSC → expired after 1h → 403
+export function GoodComponent({ downloadUrl }: { downloadUrl: string }) { ... }
 ```
 
 ### Anti-Pattern: Wrapping `verifySession()` in try/catch
@@ -2389,12 +2300,11 @@ story-into-video/
 │   │       ├── empty-state.tsx       # Reusable empty-state
 │   │       ├── providers.tsx         # 'use client' — SessionProvider
 │   │       ├── project-progress-panel.tsx  # 'use client' — SSE subscriber
-│   │       ├── project-download-button.tsx # 'use client' — H4: fetches /api/projects/[id]/download at click time
+│   │       ├── signed-download-wrapper.tsx # Server — signs R2 URL
+│   │       ├── project-download-button.tsx # 'use client' — receives URL prop
 │   │       └── project-share-button.tsx    # 'use client' — Web Share API
 │   ├── features/                     # Layer 2 + 3: Feature modules
-│   │   ├── auth/
-│   │   │   ├── actions.ts            # C1 fix: signUpAction server action
-│   │   │   └── domain/verify-session.ts   # DAL auth (throws NEXT_REDIRECT)
+│   │   ├── auth/domain/verify-session.ts   # DAL auth (throws NEXT_REDIRECT)
 │   │   ├── projects/
 │   │   │   ├── queries.ts            # getUserProjects, getProject (LEFT JOIN videos)
 │   │   │   └── actions.ts            # 'use server' — createProjectAction
@@ -2426,7 +2336,7 @@ story-into-video/
 │   │   │       ├── projects.ts       # projects, characters, scenes
 │   │   │       ├── media.ts          # videos, voiceovers
 │   │   │       └── billing.ts        # subscriptions, usageEvents
-│   │   ├── env/index.ts              # Zod-validated env (31 vars + FFMPEG_PATH)
+│   │   ├── env/index.ts              # Zod-validated env (29 vars)
 │   │   ├── auth/
 │   │   │   ├── config.ts             # Auth.js v5 (Google + Credentials, trustHost)
 │   │   │   └── index.ts              # Re-exports auth, handlers, signIn, signOut
@@ -2438,7 +2348,6 @@ story-into-video/
 │   │   │   ├── client.ts             # Inngest client + PIPELINE_EVENT
 │   │   │   └── functions.ts          # Function registrations
 │   │   ├── storage/r2.ts             # S3-compatible R2 client + putObject + signed URLs
-│   │   ├── rate-limit.ts             # C3: Upstash Ratelimit (auth, pipeline, SSE)
 │   │   ├── stripe/client.ts          # Stripe SDK + PRICE_IDS
 │   │   ├── data/                     # Static marketing data (10 files)
 │   │   ├── hooks/                    # Custom React hooks (4 files)
@@ -2449,7 +2358,7 @@ story-into-video/
 │   │   ├── fonts.ts                  # Geist + Outfit variable font config
 │   │   └── utils.ts                  # cn() utility (clsx + tailwind-merge)
 │   ├── tests/
-│   │   ├── unit/                     # 43 files, 377 tests
+│   │   ├── unit/                     # 36 files, 288 tests
 │   │   ├── e2e/                      # 9 spec files, 48 tests
 │   │   └── setup.ts                  # jest-dom + test env vars
 │   ├── types/index.ts                # 12 marketing interfaces
@@ -2484,25 +2393,24 @@ story-into-video/
 
 ---
 
-## Appendix B: Routes (15 total)
+## Appendix B: Routes (14 total)
 
 | Route | Type | Purpose |
 |---|---|---|
 | `/` | ○ Static | Marketing page (10 sections) |
-| `/sign-in`, `/sign-up` | ○ Static | Auth pages (Google OAuth + email/password + **C1: signUpAction**) |
+| `/sign-in`, `/sign-up` | ○ Static | Auth pages (Google OAuth + email/password) |
 | `/dashboard` | ƒ Dynamic | Project list (auth-protected, Suspense + empty state) |
-| `/create` | ○ Static | Project creation wizard (auth-protected, **C3: rate-limited**) |
+| `/create` | ○ Static | Project creation wizard (auth-protected) |
 | `/projects/[id]` | ƒ Dynamic | Project detail + live pipeline status (SSE, owner-checked) |
 | `/billing` | ○ Static | 4-tier plan table + upgrade CTAs |
 | `/privacy` | ○ Static | Privacy Policy (mandatory for launch) |
 | `/terms` | ○ Static | Terms of Service (mandatory for launch) |
 | `/api/auth/[...nextauth]` | ƒ Dynamic | Auth.js catch-all |
 | `/api/inngest` | ƒ Dynamic | Inngest webhook (6-step pipeline) |
-| `/api/stripe/webhook` | ƒ Dynamic | Stripe webhook (signature-verified, **H7: idempotent via ON CONFLICT**) |
-| `/api/projects/[id]/progress` | ƒ Dynamic | SSE progress stream (2s polling, owner-checked, **C3: rate-limited**, maxDuration=800) |
-| `/api/projects/[id]/download` | ƒ Dynamic | **H4 fix: Click-time R2 URL signing** (fresh signed URL per request) |
-| `/api/health` | ƒ Dynamic | **H9 fix: Health check** (DB `SELECT 1` + FFmpeg `accessSync`, 503 if unhealthy) |
-| Proxy | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing`, **`/projects`** + **H6: Host header validation** |
+| `/api/stripe/webhook` | ƒ Dynamic | Stripe webhook (signature-verified, idempotent) |
+| `/api/projects/[id]/progress` | ƒ Dynamic | SSE progress stream (2s polling, owner-checked, maxDuration=800) |
+| `/api/health` | ƒ Dynamic | Health check (returns `{ status: 'ok' }`) |
+| Proxy | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing` |
 
 ---
 
