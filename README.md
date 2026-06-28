@@ -16,7 +16,7 @@ The marketing page is preserved verbatim from the clone; the production app laye
 | Layer | Technology | Notes |
 |---|---|---|
 | Framework | Next.js 16 | App Router, hybrid rendering (static marketing + dynamic app) |
-| UI | React 19 | Strict TypeScript, zero `any` |
+| UI | React 19.2.3+ | Strict TypeScript, zero `any`. Pinned above CVE-2025-55182 (React2Shell RCE) — never downgrade below 19.2.3. |
 | Styling | Tailwind CSS v4 | CSS-first `@theme` block (no `tailwind.config.js`) |
 | Components | shadcn/ui (Radix) | 4 hand-written primitives + 8 app components |
 | Fonts | Geist Sans + Geist Mono + Outfit 820 | Self-hosted via `next/font` (no CDN) |
@@ -38,7 +38,7 @@ The marketing page is preserved verbatim from the clone; the production app laye
 ### Prerequisites
 
 - Node.js ≥ 20
-- pnpm ≥ 9
+- pnpm ≥ 10.26 (`allowBuilds` syntax floor in `pnpm-workspace.yaml`)
 - A Neon PostgreSQL database (or any Postgres instance)
 - External service accounts (see `.env.example` for the full list)
 
@@ -73,7 +73,7 @@ pnpm typecheck
 # Lint — must pass with zero warnings
 pnpm lint
 
-# Unit tests (Vitest) — 259 tests across 33 files
+# Unit tests (Vitest) — 288 tests across 36 files
 pnpm test
 
 # E2E tests (Playwright) — 48 tests, auto-starts dev server
@@ -92,7 +92,7 @@ pnpm build        # Production build (hybrid: static + dynamic)
 pnpm start        # Serve built output
 pnpm lint         # ESLint (flat config, next/core-web-vitals + typescript-eslint)
 pnpm typecheck    # tsc --noEmit (strict mode, noUncheckedIndexedAccess)
-pnpm test         # Vitest unit tests (jsdom env) — 259 tests across 33 files
+pnpm test         # Vitest unit tests (jsdom env) — 288 tests across 36 files
 pnpm test:e2e     # Playwright E2E tests (Chromium)
 pnpm format       # Prettier --write (auto-fix)
 pnpm format:check # Prettier --check (verify only)
@@ -304,7 +304,7 @@ src/
 │   │   ├── queries.ts                      # Pipeline state updates
 │   │   ├── inngest.ts                      # 6-step pipeline function
 │   │   └── domain/                         # Pure functions (6 files)
-│   └── billing/{queries,actions,domain/}.ts
+│   └── billing/{queries,actions,domain/}.ts  # domain/ has tier-limits.ts + extract-period-end.ts
 ├── lib/                          # Layer 4: Infrastructure
 │   ├── db/{index,schema/*}.ts              # Drizzle client + 11 tables
 │   ├── env/index.ts                        # Zod-validated env
@@ -317,7 +317,7 @@ src/
 │   ├── hooks/                              # 4 hooks (use-scrolled, use-reveal, use-reduced-motion, use-project-progress)
 │   ├── fonts.ts · utils.ts
 ├── tests/
-│   ├── unit/                     # 33 files, 259 tests
+│   ├── unit/                     # 36 files, 288 tests
 │   ├── e2e/                      # 9 files, 48 tests
 │   └── setup.ts                  # jest-dom + test env vars
 ├── types/index.ts                # 12 marketing interfaces
@@ -389,7 +389,7 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 
 ### Unit Tests (Vitest)
 
-259 tests across 33 files, all GREEN:
+288 tests across 36 files, all GREEN:
 
 **Marketing layer (inherited from clone):**
 
@@ -410,7 +410,7 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 | Test file | Tests | What it covers |
 |---|---|---|
 | `routing.test.ts` | 2 | `force-static` removal verified |
-| `env.test.ts` | 19 | Zod env validation (fail-fast, weak-secret rejection, build-context fallback, AUTH_URL host-mismatch warning, OPENAI_API_KEY prefix variants, REPLICATE_SDXL_*_MODEL format validation) |
+| `env.test.ts` | 25 | Zod env validation (fail-fast, weak-secret rejection, build-context fallback, AUTH_URL host-mismatch warning, OPENAI_API_KEY prefix variants, REPLICATE_SDXL_*_MODEL format validation, **DATABASE_URL `.url().refine()` composition** (Zod v4), **IMAGE_MODERATION_FAIL_OPEN enum validation**) |
 | `schema.test.ts` | 10 | Drizzle schema structural validation (all 11 tables + columns) |
 | `auth-config.test.ts` | 10 | Auth.js v5 config (providers, adapter, JWT, AUTH_SECRET from env, `trustHost: true`) |
 | `verify-session.test.ts` | 4 | `verifySession()` DAL (returns session or throws NEXT_REDIRECT) |
@@ -435,7 +435,7 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 | `pipeline-sprint5.test.ts` | 8 | Steps 4-6 wiring: voiceover, subtitles, video assembly, credit debits, completion |
 | `sse-progress.test.ts` | 15 | SSE route source guarantees + `useProjectProgress` hook with mocked EventSource + reconnect with exponential backoff (T6) |
 | `project-download.test.tsx` | 15 | `getProject` LEFT JOIN videos, `ProjectDownloadButton` with server-side `downloadUrl` prop (no `r2.ts` import in client), `SignedDownloadWrapper` extracted to its own file (T1), `ProjectShareButton` clipboard fallback, source-level guarantees |
-| `moderate-image.test.ts` | 7 | `moderateImage` parses Replicate safety output, `moderationSkipped` field, env-configurable fail-open policy via `IMAGE_MODERATION_FAIL_OPEN` (T5) |
+| `moderate-image.test.ts` | 8 | `moderateImage` parses Replicate safety output, `moderationSkipped` field, env-configurable fail-open policy via `IMAGE_MODERATION_FAIL_OPEN` (read from validated `env` module, not `process.env` directly) (T5) |
 | `legal-pages.test.ts` | 10 | `/privacy` + `/terms` source guarantees (server components, required sections) |
 
 **Remediation Sprint 2 (post-review hardening):**
@@ -443,6 +443,14 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 | Test file | Tests | What it covers |
 |---|---|---|
 | `replicate-models.test.ts` | 3 | Source-level guarantees that `SDXL_MODEL` and `SDXL_IPADAPTER_MODEL` are read from `env` (not hardcoded) (T4) |
+
+**Post-review hardening (design_critique.md remediation):**
+
+| Test file | Tests | What it covers |
+|---|---|---|
+| `stripe-webhook.test.ts` | 8 | `extractSubscriptionPeriodEnd()` pure helper: Basil API `items.data[0].current_period_end` shape, pre-Basil top-level fallback, missing/null handling |
+| `style-chips.test.ts` | 5 | 8-chip spec fidelity: exact labels (Ghibli, Medieval, Oil Painting, Anime, Japanese animation, Realistic, Cyberpunk, Watercolor), uniqueness, regression guards against drifted labels |
+| `hero-headline.test.tsx` | 5 | 3-line cinematic H1 stack (2 `<br>` tags), Outfit weight 820 inline style, subtitle emphasizes OUTPUT ("finished video") over PROCESS ("subtitles, all generated") |
 
 ### E2E Tests (Playwright)
 
@@ -481,7 +489,7 @@ The engineering blueprint is `PRODUCTION_READINESS_PLAN.md` (11 ADRs, 27 TDD tas
 2. **Lazy env validation with build-context fallback** — the Zod schema returns placeholder values when `NEXT_PHASE=phase-production-build` or `NODE_ENV=test`, allowing `next build` to succeed without real env vars. At runtime, fails fast on missing/invalid vars. This wasn't in the blueprint; it was discovered necessary because the auth route handler imports DrizzleAdapter which accesses `env.DATABASE_URL` at module load.
 3. **Eager Drizzle client with deferred connection** — `postgres()` doesn't connect until first query, so `src/lib/db/index.ts` exports a real (non-Proxy) Drizzle client that DrizzleAdapter accepts. The blueprint suggested a lazy Proxy; that was rejected by DrizzleAdapter's structure validation.
 4. **Auth route as `force-dynamic`** — prevents prerender failure (DrizzleAdapter needs env vars at module load).
-5. **Stripe webhook dual camelCase/snake_case support** — `subscription.currentPeriodEnd ?? subscription.current_period_end` for SDK v22+ compatibility.
+5. **Stripe "Basil" API (2025-03-31) `current_period_end` migration** — the field was removed from the top-level Subscription object and moved to `subscription.items.data[0].current_period_end`. The Stripe Node SDK has always used snake_case (no camelCase conversion). The webhook handler uses the `extractSubscriptionPeriodEnd()` pure helper (`src/features/billing/domain/extract-period-end.ts`) which checks the Basil shape first, then falls back to the pre-Basil top-level field.
 6. **Inngest v4 `createFunction` signature** — trigger is in the config object (`triggers: [{ event: '...' }]`), not a second argument. The blueprint's pseudocode used the v3 signature.
 
 ### Deviations from Blueprint (Remediation Sprint)
@@ -495,9 +503,22 @@ The remediation sprint closed 9 of the blueprint's outstanding gaps. The followi
 5. **`putObject` for pipeline uploads** — the blueprint only specified `getSignedUploadUrl` (presigned URLs). `putObject` was added for Inngest pipeline steps that already have the Buffer in memory (TTS audio, FFmpeg output) — direct S3 PUT is faster than round-tripping through a presigned URL.
 6. **husky `prepare` script with `|| true`** — prevents `pnpm install` from failing on first install (when husky isn't yet installed). This is a common pattern; the `|| true` is intentional.
 
+### Deviations from Blueprint (Post-Review Hardening — design_critique.md remediation)
+
+A meticulous code review (documented in `design_critique.md`) identified 5 inaccuracies in the docs that had propagated into the codebase. All were fixed via TDD (RED → GREEN → REFACTOR), adding 29 new tests:
+
+1. **Stripe webhook `extractSubscriptionPeriodEnd()` pure helper** — the previous code had a fictional `currentPeriodEnd ?? current_period_end` fallback defending against a non-existent Stripe SDK v22 camelCase conversion. The REAL breaking change is the Stripe "Basil" API (2025-03-31) which moved `current_period_end` from the top-level Subscription object to `subscription.items.data[0].current_period_end`. The new helper (`src/features/billing/domain/extract-period-end.ts`) checks the Basil shape first, then falls back to the pre-Basil top-level field. 8 new tests.
+2. **SSE `maxDuration` corrected from 900 → 800** — the previous value of 900 exceeded the Vercel Pro/Enterprise GA ceiling under Fluid Compute (now default on all plans), causing silent fallback to the platform default. 800 is the correct GA ceiling; 1800s is available in beta only. The client-side reconnect handles Hobby's 300s cap. 1 test updated.
+3. **React pinned at `^19.2.3`** — the previous `^19.2.0` allowed versions 19.2.0–19.2.2 which are vulnerable to CVE-2025-55182 ("React2Shell", CVSS 10.0 RCE). For Next.js apps the runtime fix comes via `next@16.0.10+`, but the direct React pins are raised to document the security floor.
+4. **Zod v4 `DATABASE_URL` validation** — replaced the bare `.refine()` with `startsWith()` (a Zod v3 workaround) with `.url().refine()` composition. Zod v4's `.url()` uses `new URL()` which accepts any scheme — so `.url()` validates URL format AND `.refine()` restricts the protocol to `postgres:`/`postgresql:`. This catches MORE typos than the old approach (e.g., `postgresql://not a url with spaces` is now correctly rejected). 4 new tests.
+5. **`IMAGE_MODERATION_FAIL_OPEN` moved into the Zod env schema** — was previously read via `process.env.IMAGE_MODERATION_FAIL_OPEN` directly in `moderate-image.ts`, bypassing validation. Typos like `IMAGE_MOD_FAIL_OPEN` would silently fall back to the default. Now validated as `z.enum(['true','false']).optional().default('true')` — case-sensitive, catches "True"/"maybe" at module load. 6 new env tests + 1 new moderate-image test.
+6. **`pnpm-workspace.yaml` syntax standardized** — removed the stale `@ffmpeg-installer/linux-x64` entry (package was removed from deps), removed the redundant `onlyBuiltDependencies` array (deprecated in pnpm 11), kept `protobufjs` (still a transitive dep with postinstall). Engine floor bumped from `pnpm >=9.0.0` → `>=10.26.0` to match the `allowBuilds` syntax.
+7. **`STYLE_CHIPS` restored to spec** — the hero marquee had drifted to 7 chips with different labels (added "Comic" + "Futuristic neon"; dropped "Medieval" + "Japanese animation"). Restored the spec-mandated 8-chip set verbatim from `deviation_report_v3.md` §1.6. 5 new tests.
+8. **Hero headline restored to 3-line cinematic stack** — the H1 had collapsed to 2 lines ("Turn Story Into Video / with AI Magic"), losing the poster-quality title card. Restored the 3-line stack: "Turn" / "Story Into Video" / "with AI Magic". Subtitle copy changed from PROCESS ("subtitles, all generated in minutes") to OUTPUT ("a finished video in minutes") — the stronger value proposition. 5 new tests.
+
 ### What's Implemented vs. Outstanding
 
-**✅ Fully implemented (code layer — 259 unit tests + 48 E2E tests, all GREEN):**
+**✅ Fully implemented (code layer — 288 unit tests + 48 E2E tests, all GREEN):**
 - Auth.js v5 (Google OAuth + Credentials, Drizzle adapter, JWT sessions, middleware, **`trustHost: true`** for reverse-proxy compatibility — T2)
 - Drizzle schema (11 tables, 8 enums) + migration config
 - `verifySession()` DAL + route protection
@@ -512,7 +533,7 @@ The remediation sprint closed 9 of the blueprint's outstanding gaps. The followi
 - Stripe (Checkout, Portal, webhook with signature verification + idempotency)
 - Credit metering (transactional `debitCredits`)
 - Billing page (4-tier plan table)
-- SSE progress stream (`/api/projects/[id]/progress` — 2s polling, owner-checked, **`maxDuration = 900` + client-side reconnect with exponential backoff** — T6)
+- SSE progress stream (`/api/projects/[id]/progress` — 2s polling, owner-checked, **`maxDuration = 800` (corrected from 900 — Vercel Pro/Enterprise GA ceiling under Fluid Compute) + client-side reconnect with exponential backoff** — T6)
 - `useProjectProgress` client hook + `ProjectProgressPanel` (live progress bar, **reconnect UI state** — T6)
 - Download button (signed R2 URL, **server-side signing via `SignedDownloadWrapper` Server Component extracted to its own file** — T1) + Share button (Web Share API + clipboard fallback)
 - `getProject()` LEFT JOINs videos — returns `videoKey` for conditional download render
@@ -553,11 +574,21 @@ The remediation sprint closed 9 of the blueprint's outstanding gaps. The followi
 - ~~`SignedDownloadWrapper` inline in page.tsx~~ → Fixed (extracted to its own file — T1)
 - ~~`SDXL_IPADAPTER_MODEL` fake placeholder hash~~ → Fixed (env-configurable with format validation — T4)
 - ~~`moderateImage` fail-open is silent~~ → Fixed (`moderationSkipped` field + env-configurable policy — T5)
-- ~~SSE disconnects mid-pipeline (300s Vercel cap)~~ → Fixed (`maxDuration = 900` + client reconnect with exponential backoff — T6)
+- ~~SSE disconnects mid-pipeline (300s Vercel cap)~~ → Fixed (`maxDuration = 800` (corrected from 900 — Pro GA ceiling under Fluid Compute is 800s, not 900s) + client reconnect with exponential backoff — T6)
 - ~~`putObject` accepts any buffer size~~ → Fixed (`MAX_PUT_OBJECT_BYTES = 500 MB` + `PayloadTooLargeError` — T7)
 - ~~No CI/CD~~ → Fixed (GitHub Actions workflow — T8)
 - ~~`pnpm-workspace.yaml` missing `packages:` field~~ → Fixed (T0)
 - ~~`OPENAI_API_KEY` validation too strict~~ → Investigated, found unfounded (`sk-` prefix already accepts `sk-proj-`, `sk-svcacct-`, `sk-admin-`); 5 regression-guard tests added (T3)
+
+**✅ Recently closed (post-review hardening — design_critique.md remediation):**
+- ~~Fictional Stripe SDK v22 camelCase fallback~~ → Fixed (`extractSubscriptionPeriodEnd()` pure helper handles the real Basil API 2025-03-31 shape change — 8 tests)
+- ~~SSE `maxDuration = 900` exceeded Vercel Pro GA limit~~ → Fixed (`maxDuration = 800` — Pro/Enterprise GA ceiling under Fluid Compute)
+- ~~React `^19.2.0` vulnerable to CVE-2025-55182 (React2Shell RCE)~~ → Fixed (pinned `^19.2.3`)
+- ~~Obsolete Zod v3 `.refine()` workaround for `DATABASE_URL`~~ → Fixed (`.url().refine()` composition — Zod v4 `.url()` accepts any scheme — 4 tests)
+- ~~`IMAGE_MODERATION_FAIL_OPEN` bypassed Zod env validation~~ → Fixed (moved into schema as `z.enum(['true','false'])`, read from `env` module not `process.env` — 7 tests)
+- ~~`pnpm-workspace.yaml` mixed deprecated + current syntax~~ → Fixed (standardized on `allowBuilds`, removed stale `@ffmpeg-installer/linux-x64`, bumped engine to `>=10.26.0`)
+- ~~`STYLE_CHIPS` drifted from spec (7 chips, wrong labels)~~ → Fixed (restored 8-chip spec set verbatim — 5 tests)
+- ~~Hero headline collapsed to 2-line~~ → Fixed (restored 3-line cinematic stack + subtitle emphasizes OUTPUT over PROCESS — 5 tests)
 
 See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 
@@ -566,8 +597,8 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 - **PostCSS moderate vulnerability** (GHSA-qx2v-qp2m-jg93): 1 moderate vuln in `postcss <8.5.10` (transitive via `next`). Not exploitable. Will resolve when Next.js updates its lockfile. `pnpm audit --audit-level=high` passes clean.
 - **`next-auth@5.0.0-beta.31`** — Auth.js v5 is technically beta but widely used in production. Pin the exact version; test on upgrade.
 - **Replicate IP-Adapter model hash is a placeholder default** — `REPLICATE_SDXL_IPADAPTER_MODEL` defaults to the SDXL base model hash (not IP-Adapter). Operators MUST set this env var to a real `lucataco/sdxl-ipadapter:<sha>` hash before character consistency will work. The env schema validates the `owner/model:sha` format to catch typos. (T4)
-- **FFmpeg on serverless** — Vercel's function timeout (60s Hobby / 300s Pro) may be exceeded for long videos. The SSE route's `maxDuration` was raised to 900s (T6) to cover 5-15min pipelines, but the FFmpeg assembly step itself is bound by Inngest's function timeout (not the SSE route). The blueprint (ADR-006) specifies moving to Shotstack if this occurs.
-- **SSE on Vercel Hobby** — the `maxDuration = 900` (T6) requires Vercel Pro/Enterprise. On Hobby, the cap is 300s; the client-side reconnect (also T6) will reopen the stream after the 300s drop, but the user will see a brief "Reconnecting…" message.
+- **FFmpeg on serverless** — Vercel's function timeout (60s Hobby / 300s Pro) may be exceeded for long videos. The SSE route's `maxDuration` is set to 800s (T6, corrected from 900 — Pro GA ceiling under Fluid Compute) to cover 5-15min pipelines, but the FFmpeg assembly step itself is bound by Inngest's function timeout (not the SSE route). The blueprint (ADR-006) specifies moving to Shotstack if this occurs.
+- **SSE on Vercel Hobby** — the `maxDuration = 800` (T6, corrected) is the Vercel Pro/Enterprise GA ceiling under Fluid Compute (now default on all plans). On Hobby, the cap is 300s; the client-side reconnect (also T6) will reopen the stream after the 300s drop, but the user will see a brief "Reconnecting…" message. NOTE: the previous value of 900 exceeded the Pro GA limit and silently fell back to the platform default — 800 is correct.
 
 ### Troubleshooting
 
@@ -585,7 +616,7 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 | `drizzle-kit generate` errors | `DATABASE_URL_UNPOOLED` not set | Set in `.env.local` (direct Neon connection for DDL) |
 | Inngest function not triggering | Not registered in `src/lib/inngest/functions.ts` | Add to the `functions` array |
 | Stripe webhook 400 "Invalid signature" | Wrong secret or body parsed as JSON | Use `await req.text()` (not `.json()`); verify `STRIPE_WEBHOOK_SECRET` |
-| `pnpm install` warns "Ignored build scripts: esbuild" | `pnpm-workspace.yaml` missing approval | Add `esbuild` to `onlyBuiltDependencies` |
+| `pnpm install` warns "Ignored build scripts: esbuild" | `pnpm-workspace.yaml` missing approval | Add `esbuild: true` to the `allowBuilds` map in `pnpm-workspace.yaml` (pnpm 10.26+ syntax; the older `onlyBuiltDependencies` array was removed in pnpm 11) |
 | `pnpm install` fails with `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION  packages field missing or empty` | `pnpm-workspace.yaml` missing `packages:` field (T0) | Add `packages: ['.']` to `pnpm-workspace.yaml` (already done in this repo) |
 | Tests fail: "Cannot find module 'next/server'" | jsdom can't load Next.js server modules | Mock `next-auth`, `next/navigation`, `@/lib/db` in tests |
 | Tests fail: "Cannot access 'X' before initialization" | `vi.mock()` factory references outer `vi.fn()` | Use `vi.hoisted()`: `const { mockFn } = vi.hoisted(() => ({ mockFn: vi.fn() }))` |
@@ -595,7 +626,7 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 | SSE route returns 307 redirect instead of 401 JSON | Used `verifySession()` (redirects) instead of `auth()` | API routes use `auth()` directly: returns null → 401 JSON |
 | SSE stream hangs / never closes | `controller.close()` not called on terminal status | Poll DB every 2s; close when `status ∈ {completed, failed}` |
 | `EventSource` leaks across navigations | `useEffect` cleanup missing `eventSource.close()` | Return cleanup fn from `useEffect` |
-| SSE stream disconnects after 300s (Vercel Hobby) | `maxDuration = 300` on Hobby plan | Upgrade to Vercel Pro (cap = 900s) OR rely on client-side reconnect (T6) which reopens after 1s/2s/4s backoff |
+| SSE stream disconnects after 300s (Vercel Hobby) | `maxDuration = 800` (Pro/Enterprise GA under Fluid Compute) doesn't apply on Hobby (cap = 300s) | Upgrade to Vercel Pro OR rely on client-side reconnect (T6) which reopens after 1s/2s/4s backoff. UI shows "Reconnecting to live updates…" during reconnect. |
 | Project detail page shows "This page couldn't load" | Client component imports `r2.ts` at module level, triggering env validation in browser where server-only env vars are undefined | **Never import `@/lib/storage/r2` in `'use client'` files.** Sign URLs in Server Components, pass as props to client components. |
 | Auth redirects to `http://localhost:3000` in production | `AUTH_URL` env var set to localhost, OR reverse proxy doesn't forward `X-Forwarded-Host` | Set `AUTH_URL` to the production URL. The `trustHost: true` config (T2) makes Auth.js use the request's Host header as a fallback. The env module also emits a `console.warn` at module load when AUTH_URL and NEXT_PUBLIC_APP_URL hosts differ. |
 | `assemble-video` can't find FFmpeg binary | `@ffmpeg-installer/ffmpeg` removed; system FFmpeg not installed | `sudo apt install ffmpeg` (Ubuntu) or `brew install ffmpeg` (macOS). Set `FFMPEG_PATH` env var if non-standard location. |
@@ -609,19 +640,19 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 **Marketing layer (inherited):**
 1. **`suppressHydrationWarning` belongs on `<body>`, not just `<html>`** — Browser extensions like Grammarly inject attributes into `<body>` before React hydrates.
 2. **Workflow component needs `'use client'`** — Uses `useState` for poster→video fade-in choreography.
-3. **Test counts drift from plans** — The MEP planned 6 unit + 3 E2E; actual is now 259 unit + 48 E2E. Always verify against `pnpm test` output.
+3. **Test counts drift from plans** — The MEP planned 6 unit + 3 E2E; actual is now 288 unit + 48 E2E. Always verify against `pnpm test` output.
 4. **File structure evolves during implementation** — Update docs as you build.
 5. **Playwright requires browser binary installation** — `pnpm install` doesn't install browser binaries.
 
 **Production app layer (new):**
-6. **Zod `.url()` rejects `postgresql://`** — use `.refine()` for non-standard URL schemes.
+6. **Zod v4 `.url()` accepts any scheme (including `postgresql://`)** — compose `.url()` (validates URL format) with `.refine()` (restricts protocol to `postgres:`/`postgresql:`) for `DATABASE_URL`. The Zod v3 limitation where `.url()` rejected `postgresql://` no longer applies in v4.
 7. **Env validation needs build-context fallback** — without it, `next build` fails during page-data collection.
 8. **`postgres()` defers connection until first query** — allows eager db instantiation without breaking the build.
 9. **DrizzleAdapter validates db object structure** — a Proxy-based lazy db was rejected; use a real Drizzle client.
 10. **Inngest v4 changed `createFunction` signature** — trigger is now in the config object, not a second argument.
 11. **Auth unit tests must mock `next-auth` + `next/navigation`** — jsdom can't load `next/server`.
 12. **Source-reading tests are valid** for server-only modules (auth config, middleware, route handlers) that can't be rendered in jsdom.
-13. **Stripe SDK v22 camelCase breaking change** — `currentPeriodEnd` not `current_period_end`.
+13. **Stripe "Basil" API (2025-03-31) moved `current_period_end`** — the field was removed from the top-level Subscription object and moved to `subscription.items.data[0].current_period_end`. The Stripe Node SDK has always used snake_case (no camelCase conversion). The webhook handler uses the `extractSubscriptionPeriodEnd()` pure helper which checks both shapes.
 14. **ElevenLabs returns `Readable`, not `ReadableStream`** — duck-type the input in `streamToBuffer`.
 15. **TDD with mocked AI providers works well** — all 6 pipeline domain functions are fully unit-tested; real API calls only needed for manual E2E validation.
 
@@ -649,10 +680,20 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 34. **`OPENAI_API_KEY.startsWith('sk-')` is NOT too strict** — investigation revealed that `sk-proj-*`, `sk-svcacct-*`, `sk-admin-*` all literally start with `sk-`. The original concern was unfounded. 5 regression-guard tests were added to lock this behavior in. (T3)
 35. **Hardcoded third-party model IDs are an operational liability** — the placeholder `SDXL_IPADAPTER_MODEL` hash (`6f288a8d-7e5e-4f0c-8b3f-3e1f3e6e3e3e`) was a UUID-format string, not Replicate's 64-char hex SHA. Scene generation would have 404'd in production. Moving model IDs to env vars with format validation catches this class of bug at module load. (T4)
 36. **Silent fail-open policies are dangerous** — the original `moderateImage` returned `flagged:false` with no log when the output shape was unknown. Operators had no way to detect the bypass. Adding the `moderationSkipped` field + `console.warn` makes the bypass observable. The policy is now env-configurable (`IMAGE_MODERATION_FAIL_OPEN=false` for production fail-closed). (T5)
-37. **SSE on Vercel needs both server-side and client-side resilience** — raising `maxDuration` from 300 → 900 covers Vercel Pro, but Vercel Hobby still caps at 300s. The client-side reconnect with exponential backoff (1s → 2s → 4s, max 3 attempts) handles the Hobby case gracefully. Both layers are needed. (T6)
+37. **SSE on Vercel needs both server-side and client-side resilience** — setting `maxDuration = 800` covers Vercel Pro/Enterprise GA under Fluid Compute (now default on all plans). 1800s is available in beta only — not stable for production. The previous value of 900 exceeded the Pro GA limit and silently fell back to the default. Vercel Hobby still caps at 300s. The client-side reconnect with exponential backoff (1s → 2s → 4s, max 3 attempts) handles the Hobby case gracefully. Both layers are needed. (T6)
 38. **`putObject` needs a size guard** — R2's hard limit is 5 GB, but function memory is the real constraint (typically 1-8 GB). A 4K FFmpeg output (~4 GB) would OOM the function before reaching R2. The `MAX_PUT_OBJECT_BYTES = 500 MB` cap fails fast with a clear `PayloadTooLargeError` instead of an opaque OOM. (T7)
 39. **`pnpm-workspace.yaml` requires `packages:` field even for single-package repos** — pnpm 9+ enforces this. Fresh clones fail with `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION  packages field missing or empty`. The fix is `packages: ['.']`. (T0)
 40. **CI should run the full quality gate, not just lint-staged** — lint-staged only checks staged files. A bad commit to `main` can pass locally and break production. The GitHub Actions workflow runs `pnpm lint && pnpm typecheck && pnpm test && pnpm build` on every PR. (T8)
+
+**Post-review hardening (design_critique.md remediation):**
+41. **Docs drift into code as bugs** — the fictional "Stripe SDK v22 camelCase" claim in CLAUDE.md/AGENTS.md was implemented as a `currentPeriodEnd ?? current_period_end` fallback in the webhook handler. The code defended against a non-existent problem while missing the REAL Stripe "Basil" API (2025-03-31) shape change. Lesson: validate doc claims against official changelogs before implementing.
+42. **Vercel Fluid Compute changed the maxDuration landscape** — with Fluid Compute now default on all plans, Pro/Enterprise GA caps at 800s (1800s in beta only). The previous "Vercel Pro = 900s" assumption was stale. Always check current platform limits before setting `maxDuration`.
+43. **CVE-2025-55182 ("React2Shell") affects React 19.0.0–19.2.2** — CVSS 10.0 pre-auth RCE via React Server Components. The fix is React 19.2.3+. For Next.js apps the runtime fix comes via `next@16.0.10+`, but direct React pins should also be raised to document the security floor.
+44. **Zod v4 `.url()` uses `new URL()` (not regex)** — Zod v3's `.url()` used regex validation that rejected non-standard schemes like `postgresql://`. Zod v4 switched to `new URL()` which accepts any scheme. The old `.refine()` workaround is obsolete; compose `.url().refine()` for both format validation AND protocol restriction.
+45. **Every env var must go through the Zod schema** — `IMAGE_MODERATION_FAIL_OPEN` was read via `process.env` directly "because it's deliberate, not dynamic". That reasoning conflated runtime mutability with validation. Typos like `IMAGE_MOD_FAIL_OPEN` would silently fall back to the default with no error — exactly the failure mode the env module exists to prevent.
+46. **`pnpm-workspace.yaml` syntax evolved** — `allowBuilds` (map syntax, pnpm 10.26+) replaced `onlyBuiltDependencies` (array syntax, removed in pnpm 11). Having both is contradictory. Pick one syntax and set the engine floor to match.
+47. **Content drift is silent** — the STYLE_CHIPS array drifted from 8 spec chips to 7 with different labels, and the Hero headline collapsed from 3-line to 2-line. Neither broke tests because no tests asserted the spec copy. Lesson: lock spec-mandated content with regression tests.
+48. **TDD on legacy code documents the contract** — the 29 new tests added during post-review hardening serve as living documentation of the intended behavior. The `extractSubscriptionPeriodEnd()` tests document the Basil API shape; the `style-chips.test.ts` tests document the spec label set; the `hero-headline.test.tsx` tests document the 3-line stack.
 
 ### Recommendations
 
@@ -692,7 +733,7 @@ This project has a fixed marketing spec (`Project_Requirements_Document.md`) and
 
 1. `pnpm lint` — zero warnings
 2. `pnpm typecheck` — zero errors
-3. `pnpm test` — 259 unit tests pass
+3. `pnpm test` — 288 unit tests pass
 4. `pnpm test:e2e` — 48 E2E tests pass (requires Playwright browsers)
 5. `pnpm format:check` — all files use Prettier code style
 6. `pnpm build` — zero errors

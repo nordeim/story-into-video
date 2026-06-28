@@ -113,7 +113,7 @@ src/
 │   ├── hooks/                              # use-scrolled, use-reveal, use-reduced-motion, use-project-progress
 │   ├── fonts.ts · utils.ts
 ├── tests/
-│   ├── unit/                     # 33 files, 259 tests
+│   ├── unit/                     # 36 files, 288 tests
 │   ├── e2e/                      # 9 files, 48 tests
 │   └── setup.ts                  # jest-dom + test env vars
 ├── types/index.ts                # 12 marketing interfaces
@@ -270,7 +270,7 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 16. **Buffer → Blob requires `new Uint8Array(buffer)`** — `new File([audioBuffer], ...)` fails TypeScript strict
 17. **`NODE_ENV` is read-only in tests** — use `vi.stubEnv('NODE_ENV', 'test')`
 18. **Middleware runs on Edge** — no DB access, no Node.js APIs
-19. **esbuild build scripts need approval** — add to `onlyBuiltDependencies` in `pnpm-workspace.yaml`
+19. **esbuild build scripts need approval** — add `esbuild: true` to the `allowBuilds` map in `pnpm-workspace.yaml` (pnpm 10.26+ syntax; the older `onlyBuiltDependencies` array was removed in pnpm 11)
 
 ### Remediation Sprint (pipeline wiring + UX + compliance)
 20. **Vitest mock factories are hoisted** — `vi.mock()` factories are lifted above imports. Use `vi.hoisted()` for any `vi.fn()` referenced inside the factory. Symptom: `Cannot access 'X' before initialization`.
@@ -297,12 +297,12 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 39. **Hardcoded third-party model IDs are an operational liability** — the placeholder `SDXL_IPADAPTER_MODEL` hash was a UUID-format string, not Replicate's 64-char hex SHA. Scene generation would have 404'd. Model IDs are now env-configurable with format validation. (T4)
 40. **`putObject` needs a size guard** — `MAX_PUT_OBJECT_BYTES = 500 MB` + `PayloadTooLargeError`. R2's limit is 5 GB, but function memory is the real constraint. (T7)
 41. **SSE needs both server-side and client-side resilience** — `maxDuration = 800` (T6, corrected) is the Vercel Pro/Enterprise GA ceiling under Fluid Compute (now default). The previous value of 900 exceeded the GA limit. Client-side reconnect with exponential backoff (1s → 2s → 4s, max 3 attempts) handles Vercel Hobby's 300s cap. (T6)
-42. **`pnpm-workspace.yaml` requires `packages:` field** — pnpm 9+ enforces this even for single-package repos. Fresh clones fail with `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION`. Fix: `packages: ['.']`. (T0)
+42. **`pnpm-workspace.yaml` requires `packages:` field** — pnpm 9+ enforces this even for single-package repos. Fresh clones fail with `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION`. Fix: `packages: ['.']`. The engine floor is now `pnpm >=10.26.0` to match the `allowBuilds` syntax. (T0)
 43. **CI runs the full quality gate** — `.github/workflows/ci.yml` runs `pnpm lint && pnpm typecheck && pnpm test && pnpm build` on every PR. lint-staged only checks staged files; CI catches whole-codebase regressions. (T8)
 
 ## What's Implemented vs. Outstanding
 
-### ✅ Implemented (code layer — 259 unit tests + 48 E2E tests, all GREEN)
+### ✅ Implemented (code layer — 288 unit tests + 48 E2E tests, all GREEN)
 - Auth.js v5 (Google OAuth + Credentials, Drizzle adapter, JWT sessions, **`trustHost: true`** for reverse-proxy compatibility — T2)
 - Drizzle schema (11 tables, 8 enums) + migration config
 - `verifySession()` DAL + middleware route protection
@@ -331,8 +331,8 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 - husky + lint-staged pre-commit hook (`.husky/pre-commit`)
 - **AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch warning** at module load — T2
 - **GitHub Actions CI** (`.github/workflows/ci.yml`) running lint + typecheck + test + build on every PR — T8
-- **`pnpm-workspace.yaml` fixed** with `packages: ['.']` field for pnpm 9+ compatibility — T0
-- 259 unit tests (33 files) + 48 E2E tests (9 files)
+- **`pnpm-workspace.yaml` fixed** with `packages: ['.']` field + standardized on `allowBuilds` syntax (removed deprecated `onlyBuiltDependencies`); engine floor bumped to `pnpm >=10.26.0` — T0
+- 288 unit tests (36 files) + 48 E2E tests (9 files)
 
 ### ⚠️ Outstanding (requires external resources / not yet done)
 - **External service credentials** — Neon, Google OAuth, OpenAI, Replicate, ElevenLabs, R2, Stripe, Inngest, Resend, Upstash, Sentry (fill `.env.local` from `.env.example`)
@@ -368,6 +368,16 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 - ~~`pnpm-workspace.yaml` missing `packages:` field~~ → Fixed (T0)
 - ~~`OPENAI_API_KEY` validation too strict~~ → Investigated, found unfounded (`sk-` prefix already accepts `sk-proj-`, `sk-svcacct-`, `sk-admin-`); 5 regression-guard tests added (T3)
 
+### ✅ Recently Closed (post-review hardening — design_critique.md remediation)
+- ~~Fictional Stripe SDK v22 camelCase fallback in webhook~~ → Fixed (`extractSubscriptionPeriodEnd()` pure helper handles the real Basil API 2025-03-31 shape change — 8 tests)
+- ~~SSE `maxDuration = 900` exceeded Vercel Pro GA limit~~ → Fixed (`maxDuration = 800` — Pro/Enterprise GA ceiling under Fluid Compute)
+- ~~React `^19.2.0` vulnerable to CVE-2025-55182 (React2Shell RCE)~~ → Fixed (pinned `^19.2.3`)
+- ~~Obsolete Zod v3 `.refine()` workaround for `DATABASE_URL`~~ → Fixed (`.url().refine()` composition — Zod v4 `.url()` accepts any scheme — 4 tests)
+- ~~`IMAGE_MODERATION_FAIL_OPEN` bypassed Zod env validation~~ → Fixed (moved into schema as `z.enum(['true','false'])`, read from `env` module not `process.env` — 7 tests)
+- ~~`pnpm-workspace.yaml` mixed deprecated + current syntax~~ → Fixed (standardized on `allowBuilds`, removed stale `@ffmpeg-installer/linux-x64`, bumped engine to `>=10.26.0`)
+- ~~`STYLE_CHIPS` drifted from spec (7 chips, wrong labels)~~ → Fixed (restored 8-chip spec set verbatim — 5 tests)
+- ~~Hero headline collapsed to 2-line~~ → Fixed (restored 3-line cinematic stack + subtitle emphasizes OUTPUT over PROCESS — 5 tests)
+
 ## Troubleshooting
 
 | Issue | Cause | Fix |
@@ -384,7 +394,7 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 | `drizzle-kit generate` errors | `DATABASE_URL_UNPOOLED` not set | Set in `.env.local` (direct Neon connection, not pooled) |
 | Inngest function not triggering | Not registered in `src/lib/inngest/functions.ts` | Add to the `functions` array |
 | Stripe webhook 400 "Invalid signature" | Wrong secret or body parsed as JSON | Use `await req.text()` (not `.json()`); verify `STRIPE_WEBHOOK_SECRET` |
-| `pnpm install` warns "Ignored build scripts: esbuild" | `pnpm-workspace.yaml` missing approval | Add `esbuild` to `onlyBuiltDependencies` |
+| `pnpm install` warns "Ignored build scripts: esbuild" | `pnpm-workspace.yaml` missing approval | Add `esbuild: true` to the `allowBuilds` map in `pnpm-workspace.yaml` (pnpm 10.26+ syntax; the older `onlyBuiltDependencies` array was removed in pnpm 11) |
 | Tests fail: "Cannot find module 'next/server'" | jsdom can't load Next.js server modules | Mock `next-auth`, `next/navigation`, `@/lib/db` in tests |
 | `replicate.run()` returns wrong shape | Model output type varies | Cast `as unknown as string[]`, check length before indexing |
 | Tests fail: "Cannot access 'X' before initialization" | `vi.mock()` factory references outer `vi.fn()` | Use `vi.hoisted()`: `const { mockFn } = vi.hoisted(() => ({ mockFn: vi.fn() }))` |
@@ -441,7 +451,7 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 33. **Hardcoded third-party model IDs are an operational liability** — the placeholder `SDXL_IPADAPTER_MODEL` hash was a UUID-format string, not Replicate's 64-char hex SHA. Scene generation would have 404'd. Model IDs are now env-configurable with format validation. (T4)
 34. **SSE needs both server-side and client-side resilience** — `maxDuration = 800` (T6, corrected) is the Vercel Pro/Enterprise GA ceiling under Fluid Compute. The previous value of 900 exceeded the GA limit. Client-side reconnect with exponential backoff (1s → 2s → 4s, max 3 attempts) handles Vercel Hobby's 300s cap. (T6)
 35. **`putObject` needs a size guard** — `MAX_PUT_OBJECT_BYTES = 500 MB` + `PayloadTooLargeError`. R2's limit is 5 GB, but function memory is the real constraint. (T7)
-36. **`pnpm-workspace.yaml` requires `packages:` field** — pnpm 9+ enforces this even for single-package repos. Fresh clones fail with `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION`. Fix: `packages: ['.']`. (T0)
+36. **`pnpm-workspace.yaml` requires `packages:` field** — pnpm 9+ enforces this even for single-package repos. Fresh clones fail with `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION`. Fix: `packages: ['.']`. The engine floor is now `pnpm >=10.26.0` to match the `allowBuilds` syntax. (T0)
 37. **CI runs the full quality gate** — `.github/workflows/ci.yml` runs `pnpm lint && pnpm typecheck && pnpm test && pnpm build` on every PR. lint-staged only checks staged files; CI catches whole-codebase regressions. (T8)
 
 ## Reference
@@ -478,7 +488,16 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 18. **SSE reconnect with exponential backoff** — `useProjectProgress` reopens the EventSource after errors, with 1s → 2s → 4s backoff, up to 3 attempts. New `connectionState: 'reconnecting'` value surfaces in the UI as "Reconnecting to live updates…". `maxDuration` on the SSE route set to 800 (Vercel Pro/Enterprise GA ceiling under Fluid Compute; the earlier value of 900 exceeded the GA limit and silently fell back to the platform default). (T6)
 19. **`putObject` size guard** — `MAX_PUT_OBJECT_BYTES = 500 MB` constant + `PayloadTooLargeError` thrown when exceeded. R2's hard limit is 5 GB, but function memory is the real constraint. (T7)
 20. **GitHub Actions CI** — `.github/workflows/ci.yml` runs `pnpm lint && pnpm typecheck && pnpm test && pnpm build` on every push to main and every PR. pnpm store cache keyed on lockfile hash. E2E tests not yet in CI (need Postgres service + Playwright browsers). (T8)
-21. **`pnpm-workspace.yaml` fixed** — added the missing `packages: ['.']` field. Fresh clones with pnpm 9+ were failing with `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION  packages field missing or empty`. (T0)
+21. **`pnpm-workspace.yaml` fixed** — added the missing `packages: ['.']` field + standardized on `allowBuilds` syntax (removed deprecated `onlyBuiltDependencies` array); engine floor bumped to `pnpm >=10.26.0`. (T0)
+
+### Post-Review Hardening (design_critique.md remediation)
+22. **`extractSubscriptionPeriodEnd()` pure helper** — extracted from the webhook route into `src/features/billing/domain/extract-period-end.ts`. Handles the Stripe "Basil" API (2025-03-31) shape change (`items.data[0].current_period_end`) with a pre-Basil top-level fallback. Replaced the fictional `currentPeriodEnd ?? current_period_end` camelCase cast. 8 new tests.
+23. **SSE `maxDuration` corrected 900 → 800** — the previous value of 900 exceeded the Vercel Pro/Enterprise GA ceiling under Fluid Compute (now default on all plans). 800 is the correct GA ceiling; 1800s is available in beta only. 1 test updated.
+24. **React pinned at `^19.2.3`** — the previous `^19.2.0` allowed versions 19.2.0–19.2.2 which are vulnerable to CVE-2025-55182 ("React2Shell", CVSS 10.0 RCE). For Next.js apps the runtime fix comes via `next@16.0.10+`, but the direct React pins are raised to document the security floor.
+25. **Zod v4 `DATABASE_URL` validation** — replaced the bare `.refine()` with `startsWith()` (a Zod v3 workaround) with `.url().refine()` composition. Zod v4's `.url()` uses `new URL()` which accepts any scheme — so `.url()` validates URL format AND `.refine()` restricts the protocol to `postgres:`/`postgresql:`. Catches MORE typos than the old approach. 4 new tests.
+26. **`IMAGE_MODERATION_FAIL_OPEN` moved into the Zod env schema** — was previously read via `process.env` directly in `moderate-image.ts`, bypassing validation. Now validated as `z.enum(['true','false']).optional().default('true')` and read from `env.IMAGE_MODERATION_FAIL_OPEN`. 6 new env tests + 1 new moderate-image test.
+27. **`STYLE_CHIPS` restored to spec** — the hero marquee had drifted to 7 chips with different labels. Restored the spec-mandated 8-chip set verbatim from `deviation_report_v3.md` §1.6: Ghibli, Medieval, Oil Painting, Anime, Japanese animation, Realistic, Cyberpunk, Watercolor. 5 new tests.
+28. **Hero headline restored to 3-line cinematic stack** — the H1 had collapsed to 2 lines. Restored the 3-line stack: "Turn" / "Story Into Video" / "with AI Magic". Subtitle copy changed from PROCESS ("subtitles, all generated in minutes") to OUTPUT ("a finished video in minutes"). 5 new tests.
 
 ## Asset Pipeline
 

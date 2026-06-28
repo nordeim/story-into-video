@@ -111,7 +111,7 @@ cd /home/z/my-project && tar --exclude='story-into-video/node_modules' --exclude
 
 ---
 
-Awesome meticulous job so far. Please keep up the good work. Now, please meticulously create an updated tar archive of the entire (remediated) codebase, including the updated docs and SKILL.md but excluding the `node_modules` , `.next` and `.git` folders, so I can download and use it to refresh my GitHub repo.
+Awesome meticulous job so far. Please keep up the good work. Now, please meticulously create an updated v2 tar archive of the entire (remediated) codebase, including the updated docs and SKILL.md but excluding the `node_modules` , `.next` and `.git` folders, so I can download and use it to refresh my GitHub repo.
 
 cd /home/z/my-project && tar --exclude='story-into-video/node_modules' --exclude='story-into-video/.next' --exclude='story-into-video/.git' --exclude='story-into-video/.husky/_' -czf /home/z/my-project/download/story-into-video-remediated-v2.tar.gz story-into-video/ 2>&1 | tail -5 && echo "---DONE---" && ls -lh /home/z/my-project/download/story-into-video-remediated-v2.tar.gz
 
