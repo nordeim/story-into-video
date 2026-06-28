@@ -28,7 +28,16 @@
  *     Set to 'false' to fail-closed (flag unknown shapes as flagged:true).
  *     This is the recommended setting for production launches where the
  *     model output shape is known and stable.
+ *
+ * ENV MODULE INTEGRATION:
+ *   The fail-open flag is read from the validated `env` module (NOT
+ *   process.env directly). This catches typos like IMAGE_MOD_FAIL_OPEN
+ *   that would silently fall back to the default with no error — exactly
+ *   the failure mode the env module exists to prevent. Per CLAUDE.md
+ *   pitfall #14 / AGENTS.md pitfall #9: never read process.env.* directly.
  */
+
+import { env } from '@/lib/env';
 
 export interface ModerateImageInput {
   imageUrl: string;
@@ -46,24 +55,17 @@ export interface ImageModerationResult {
   moderationSkipped: boolean;
 }
 
-const FLAGGED_KEYWORDS = new Set([
-  'nsfw',
-  'sexual',
-  'violence',
-  'gore',
-  'hate',
-  'self-harm',
-]);
+const FLAGGED_KEYWORDS = new Set(['nsfw', 'sexual', 'violence', 'gore', 'hate', 'self-harm']);
 
 /**
- * Read the fail-open policy from env. Defaults to 'true' (fail-open) to
- * preserve the existing behavior. Set IMAGE_MODERATION_FAIL_OPEN=false in
- * production to fail-closed.
+ * Read the fail-open policy from the validated env module. Defaults to
+ * 'true' (fail-open) per the env schema. Set IMAGE_MODERATION_FAIL_OPEN=false
+ * in production to fail-closed.
  *
  * Read at module load — changing the env var requires a restart. This is
  * intentional: moderation policy changes should be deliberate, not dynamic.
  */
-const FAIL_OPEN = (process.env.IMAGE_MODERATION_FAIL_OPEN ?? 'true').toLowerCase() !== 'false';
+const FAIL_OPEN = env.IMAGE_MODERATION_FAIL_OPEN === 'true';
 
 function extractSafetyCategories(rawOutput: unknown): string[] {
   if (typeof rawOutput !== 'object' || rawOutput === null) {
@@ -108,9 +110,7 @@ function isOutputShapeKnown(rawOutput: unknown): boolean {
   return 'safety_concept' in obj || 'api_safety_concept' in obj || 'safety' in obj;
 }
 
-export async function moderateImage(
-  input: ModerateImageInput,
-): Promise<ImageModerationResult> {
+export async function moderateImage(input: ModerateImageInput): Promise<ImageModerationResult> {
   const categories = extractSafetyCategories(input.rawOutput);
   const shapeKnown = isOutputShapeKnown(input.rawOutput);
   const moderationSkipped = !shapeKnown;

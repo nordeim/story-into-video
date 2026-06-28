@@ -25,12 +25,21 @@ import { eq } from 'drizzle-orm';
  */
 
 export const dynamic = 'force-dynamic';
-// T6 (remediation): Raised from 300 to 900. The pipeline runs 5-15min;
-// 300s (Vercel Hobby ceiling) caused mid-stream disconnects. 900s is the
-// Vercel Pro/Enterprise ceiling. If deploying on Hobby, either upgrade
-// or rely on the client-side reconnect in useProjectProgress (which will
-// reopen the stream after a 1s/2s/4s backoff).
-export const maxDuration = 900;
+// T6 (remediation, corrected): 800s is the Vercel Pro/Enterprise GA ceiling
+// under Fluid Compute (now default on all Vercel plans). The pipeline runs
+// 5-15min; the previous value of 300s (Vercel Hobby ceiling) caused
+// mid-stream disconnects.
+//
+// Why 800 and not 900: with Fluid Compute enabled, Vercel Pro/Enterprise
+// caps function duration at 800s GA (1800s is available in beta only —
+// not stable for production configuration). The earlier value of 900
+// exceeded the GA limit and silently fell back to the platform default.
+//
+// Vercel Hobby still caps at 300s — the client-side reconnect in
+// useProjectProgress (1s → 2s → 4s exponential backoff, max 3 attempts)
+// handles that case gracefully with a "Reconnecting to live updates…"
+// UI state.
+export const maxDuration = 800;
 
 const POLL_INTERVAL_MS = 2000;
 const TERMINAL_STATUSES = new Set(['completed', 'failed']);

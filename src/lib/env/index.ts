@@ -36,18 +36,27 @@ const KNOWN_WEAK_SECRETS = [
 const envSchema = z
   .object({
     // ── Database (Neon) ──
+    // Zod v4's .url() uses new URL() which accepts any scheme — so we
+    // compose .url() (validates URL format) with .refine() (restricts
+    // the protocol to postgres). This catches more typos than the bare
+    // .refine() with startsWith() did (e.g., "postgresql://not a url"
+    // is now correctly rejected as a malformed URL).
     DATABASE_URL: z
       .string()
       .min(1)
-      .refine((url) => url.startsWith('postgres://') || url.startsWith('postgresql://'), {
-        message: 'DATABASE_URL must be a postgresql:// URL',
-      }),
+      .url('DATABASE_URL must be a valid URL')
+      .refine((url) => {
+        const parsed = new URL(url);
+        return parsed.protocol === 'postgres:' || parsed.protocol === 'postgresql:';
+      }, 'DATABASE_URL must use the postgres:// or postgresql:// scheme'),
     DATABASE_URL_UNPOOLED: z
       .string()
       .min(1)
-      .refine((url) => url.startsWith('postgres://') || url.startsWith('postgresql://'), {
-        message: 'DATABASE_URL_UNPOOLED must be a postgresql:// URL',
-      }),
+      .url('DATABASE_URL_UNPOOLED must be a valid URL')
+      .refine((url) => {
+        const parsed = new URL(url);
+        return parsed.protocol === 'postgres:' || parsed.protocol === 'postgresql:';
+      }, 'DATABASE_URL_UNPOOLED must use the postgres:// or postgresql:// scheme'),
 
     // ── Auth (Auth.js v5) ──
     AUTH_SECRET: z
@@ -75,7 +84,9 @@ const envSchema = z
         /^[a-z0-9-]+\/[a-z0-9-]+:[a-f0-9]{8,}$/,
         'REPLICATE_SDXL_MODEL must match Replicate format: owner/model:sha (e.g. stability-ai/sdxl:39ed52f2...)',
       )
-      .default('stability-ai/sdxl:39ed52f2a788939d832ec6675557c771a6b0f9b6ce8bcd3ff0f4e4f3f1e0a6e3'),
+      .default(
+        'stability-ai/sdxl:39ed52f2a788939d832ec6675557c771a6b0f9b6ce8bcd3ff0f4e4f3f1e0a6e3',
+      ),
     REPLICATE_SDXL_IPADAPTER_MODEL: z
       .string()
       .regex(
@@ -90,7 +101,9 @@ const envSchema = z
       // version hash is configured via env. **Operators must set
       // REPLICATE_SDXL_IPADAPTER_MODEL to a real lucataco/sdxl-ipadapter
       // version before the pipeline can generate consistent scenes.**
-      .default('stability-ai/sdxl:39ed52f2a788939d832ec6675557c771a6b0f9b6ce8bcd3ff0f4e4f3f1e0a6e3'),
+      .default(
+        'stability-ai/sdxl:39ed52f2a788939d832ec6675557c771a6b0f9b6ce8bcd3ff0f4e4f3f1e0a6e3',
+      ),
 
     // ── Stripe ──
     STRIPE_SECRET_KEY: z.string().min(1).startsWith('sk_'),
@@ -118,6 +131,14 @@ const envSchema = z
 
     // ── Monitoring (Sentry) ──
     SENTRY_DSN: z.string().url(),
+
+    // ── Image Moderation Policy (optional, default: 'true' = fail-open) ──
+    // When the Replicate output shape is unknown (no recognized safety field):
+    //   - 'true'  (default): fail-open — flagged=false, moderationSkipped=true
+    //   - 'false':           fail-closed — flagged=true with 'unknown-output-shape'
+    // The enum is case-sensitive to catch typos like "True" or "TRUE" that
+    // would silently fall back to default in a plain process.env read.
+    IMAGE_MODERATION_FAIL_OPEN: z.enum(['true', 'false']).optional().default('true'),
 
     // ── App ──
     NEXT_PUBLIC_APP_URL: z.string().url(),
@@ -208,8 +229,10 @@ function parseEnv(): EnvData {
       AUTH_URL: 'http://localhost:3000',
       OPENAI_API_KEY: 'sk-placeholder',
       REPLICATE_API_TOKEN: 'r8_placeholder',
-      REPLICATE_SDXL_MODEL: 'stability-ai/sdxl:39ed52f2a788939d832ec6675557c771a6b0f9b6ce8bcd3ff0f4e4f3f1e0a6e3',
-      REPLICATE_SDXL_IPADAPTER_MODEL: 'stability-ai/sdxl:39ed52f2a788939d832ec6675557c771a6b0f9b6ce8bcd3ff0f4e4f3f1e0a6e3',
+      REPLICATE_SDXL_MODEL:
+        'stability-ai/sdxl:39ed52f2a788939d832ec6675557c771a6b0f9b6ce8bcd3ff0f4e4f3f1e0a6e3',
+      REPLICATE_SDXL_IPADAPTER_MODEL:
+        'stability-ai/sdxl:39ed52f2a788939d832ec6675557c771a6b0f9b6ce8bcd3ff0f4e4f3f1e0a6e3',
       ELEVENLABS_API_KEY: 'placeholder',
       STRIPE_SECRET_KEY: 'sk_placeholder',
       STRIPE_WEBHOOK_SECRET: 'whsec_placeholder',
@@ -226,6 +249,7 @@ function parseEnv(): EnvData {
       UPSTASH_REDIS_REST_URL: 'https://placeholder.upstash.io',
       UPSTASH_REDIS_REST_TOKEN: 'placeholder',
       SENTRY_DSN: 'https://placeholder@sentry.io/1',
+      IMAGE_MODERATION_FAIL_OPEN: 'true',
       NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
       NODE_ENV: 'development',
     };

@@ -69,10 +69,10 @@ importers:
         specifier: ^3.4.9
         version: 3.4.9
       react:
-        specifier: ^19.2.0
+        specifier: ^19.2.3
         version: 19.2.7
       react-dom:
-        specifier: ^19.2.0
+        specifier: ^19.2.3
         version: 19.2.7(react@19.2.7)
       replicate:
         specifier: ^1.4.0

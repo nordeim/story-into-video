@@ -6,18 +6,25 @@
 packages:
   - '.'
 
-# Allow specific native build scripts to run during install (pnpm 9 default
-# is to skip them unless explicitly approved).
+# Allow specific native build scripts to run during install.
+#
+# In pnpm 10.26+, `allowBuilds` (a map of package→boolean) REPLACED the older
+# `onlyBuiltDependencies` (an array) and `ignoredBuiltDependencies`. In pnpm 11,
+# the older arrays were removed entirely and are silently ignored if present.
+#
+# We use `allowBuilds` exclusively (single syntax, no redundancy). The engine
+# floor in package.json is set to pnpm >=10.26.0 to enforce this.
+#
+# Security hardening: only packages explicitly listed here can run postinstall
+# scripts. All other packages' build scripts are skipped — prevents malicious
+# packages from running arbitrary code on install.
 allowBuilds:
-  '@ffmpeg-installer/linux-x64': true
+  # esbuild: required by drizzle-kit, vitest, tsx — they bundle via esbuild
   esbuild: true
+  # protobufjs: transitive dep (used by @bufbuild/protobuf ecosystem) — has a
+  # postinstall that generates dynamic code. Present in pnpm-lock.yaml.
   protobufjs: true
+  # sharp: image optimization (Next.js image component). Native module.
   sharp: true
+  # unrs-resolver: native resolver used by eslint-plugin-import-x and friends.
   unrs-resolver: true
-
-# Only run postinstall scripts for these packages (security hardening —
-# prevents malicious packages from running arbitrary code on install).
-onlyBuiltDependencies:
-  - sharp
-  - unrs-resolver
-  - esbuild

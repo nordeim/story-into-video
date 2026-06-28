@@ -243,15 +243,21 @@ describe('T6: use-project-progress reconnect behavior', () => {
     expect(hookSource).toMatch(/reconnectAttempt|attempt/i);
   });
 
-  it('source raises maxDuration on the SSE route to 900s', async () => {
+  it('source sets maxDuration on the SSE route to 800s (Vercel Pro GA ceiling)', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSource = readFileSync(
       resolve(__dirname, '../../app/api/projects/[id]/progress/route.ts'),
       'utf-8',
     );
-    // Was 300, must be raised to 900 (Vercel Pro ceiling) so a 5-15min
-    // pipeline doesn't disconnect mid-stream.
-    expect(routeSource).toMatch(/maxDuration\s*=\s*900/);
+    // Vercel Fluid Compute (now default) caps Pro/Enterprise GA at 800s,
+    // with 1800s available in beta. Hobby caps at 300s.
+    //
+    // The previous value of 900 EXCEEDED the GA limit and would silently
+    // fall back to the default (~60s) on Vercel Pro, causing mid-pipeline
+    // disconnects worse than the original 300s baseline. 800 is the correct
+    // Pro GA ceiling; the client-side reconnect (also T6) handles Hobby's
+    // 300s cap via exponential backoff (1s → 2s → 4s).
+    expect(routeSource).toMatch(/maxDuration\s*=\s*800/);
   });
 });

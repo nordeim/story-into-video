@@ -101,15 +101,21 @@ describe('T5: moderateImage env-configurable fail-open policy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
+    vi.resetModules();
   });
 
   it('returns flagged:true for unknown shapes when IMAGE_MODERATION_FAIL_OPEN=false', async () => {
-    vi.stubEnv('IMAGE_MODERATION_FAIL_OPEN', 'false');
-    // Re-import to pick up the new env value
-    vi.resetModules();
-    const { moderateImage: freshModerateImage } = await import(
-      '@/features/pipeline/domain/moderate-image'
-    );
+    // Mock the env module to return IMAGE_MODERATION_FAIL_OPEN='false'.
+    // This avoids the complexity of re-importing the real env module with
+    // full Zod validation (which requires all 25+ env vars to be set).
+    vi.doMock('@/lib/env', () => ({
+      env: {
+        IMAGE_MODERATION_FAIL_OPEN: 'false',
+      },
+    }));
+
+    const { moderateImage: freshModerateImage } =
+      await import('@/features/pipeline/domain/moderate-image');
 
     const result = await freshModerateImage({
       imageUrl: 'https://r2.example.com/scene-5.png',
@@ -118,6 +124,29 @@ describe('T5: moderateImage env-configurable fail-open policy', () => {
 
     expect(result.flagged).toBe(true);
     expect(result.moderationSkipped).toBe(true);
+
+    vi.doUnmock('@/lib/env');
+  });
+
+  it('returns flagged:false for unknown shapes when IMAGE_MODERATION_FAIL_OPEN=true (default)', async () => {
+    vi.doMock('@/lib/env', () => ({
+      env: {
+        IMAGE_MODERATION_FAIL_OPEN: 'true',
+      },
+    }));
+
+    const { moderateImage: freshModerateImage } =
+      await import('@/features/pipeline/domain/moderate-image');
+
+    const result = await freshModerateImage({
+      imageUrl: 'https://r2.example.com/scene-7.png',
+      rawOutput: { unknown_field: 'foo' },
+    });
+
+    expect(result.flagged).toBe(false);
+    expect(result.moderationSkipped).toBe(true);
+
+    vi.doUnmock('@/lib/env');
   });
 
   it('logs a warning when moderation is skipped (fail-open default)', async () => {

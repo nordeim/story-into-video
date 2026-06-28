@@ -8,6 +8,7 @@ import { db } from '@/lib/db';
 import { subscriptions, usageEvents } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { TIER_LIMITS } from '@/features/billing/domain/tier-limits';
+import { extractSubscriptionPeriodEnd } from '@/features/billing/domain/extract-period-end';
 
 /**
  * Stripe webhook handler — receives events from Stripe and syncs subscription
@@ -84,10 +85,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             ? 'canceled'
             : (subscription.status as 'active' | 'past_due' | 'canceled' | 'unpaid');
 
-        // Stripe SDK v22+ uses camelCase; fall back to snake_case for older
-        const periodEnd =
-          (subscription as unknown as { currentPeriodEnd?: number }).currentPeriodEnd ??
-          (subscription as unknown as { current_period_end?: number }).current_period_end;
+        // Stripe "Basil" API version (2025-03-31) removed
+        // `current_period_end` from the top-level Subscription object and
+        // moved it to `subscription.items.data[0].current_period_end`.
+        // The helper checks both shapes for backward compatibility with
+        // older Stripe API versions.
+        const periodEnd = extractSubscriptionPeriodEnd(subscription);
 
         await db
           .update(subscriptions)

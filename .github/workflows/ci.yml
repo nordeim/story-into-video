@@ -4,7 +4,7 @@
 #   1. Install dependencies (pnpm, frozen lockfile)
 #   2. Lint (eslint .)
 #   3. Typecheck (tsc --noEmit, strict mode)
-#   4. Unit tests (vitest run, 257+ tests)
+#   4. Unit tests (vitest run — see vitest.config.ts for include paths)
 #   5. Build (next build — exercises the build-context env fallback)
 #
 # E2E tests (Playwright) are NOT run in CI yet — they require a live dev

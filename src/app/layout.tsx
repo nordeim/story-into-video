@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://storyintovideo-clone.example.com'),
   title: 'StoryIntoVideo - Turn Stories Into Videos with AI',
   description:
-    'Paste your story and AI handles the rest — characters, storyboards, voiceover, and subtitles, all generated in minutes. AI-powered story-into-video generation.',
+    'Paste your story and AI handles the rest — characters, storyboards, voiceover, and a finished video in minutes. AI-powered story-into-video generation.',
   keywords: [
     'story into video',
     'AI video generation',
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'StoryIntoVideo - Turn Stories Into Videos with AI',
     description:
-      'Paste your story and AI handles the rest — characters, storyboards, voiceover, and subtitles.',
+      'Paste your story and AI handles the rest — characters, storyboards, voiceover, and a finished video in minutes.',
     url: 'https://storyintovideo-clone.example.com',
     siteName: 'StoryIntoVideo',
     images: [{ url: '/og-image.png', width: 1200, height: 630 }],

@@ -66,19 +66,31 @@ export function Hero() {
           AI-Powered Story Into Video
         </span>
 
-        {/* H1 — Outfit weight 820 via inline style */}
+        {/* H1 — Outfit weight 820 via inline style.
+            3-line cinematic stack per spec §4.1 (deviation report v3):
+              Line 1: "Turn"
+              Line 2: "Story Into Video"
+              Line 3: "with AI Magic"
+            The 3-line stacking gives the hero its poster-quality title card.
+            A prior implementation collapsed this to 2 lines, losing the
+            cinematic effect. */}
         <h1
           className="font-heading mb-6 animate-[fade-in-up_0.6s_ease-out_0.1s_both] text-4xl leading-[1.02] tracking-[-0.04em] text-white sm:text-5xl md:text-6xl lg:text-[4.5rem]"
           style={{ fontWeight: 820 }}
         >
-          Turn Story Into Video
-          <br className="hidden sm:block" /> with AI Magic
+          Turn
+          <br />
+          Story Into Video
+          <br />
+          with AI Magic
         </h1>
 
-        {/* Subtitle */}
+        {/* Subtitle — spec §4.2 (deviation report v3): emphasizes the OUTPUT
+            ("a finished video in minutes"), not the PROCESS ("subtitles, all
+            generated"). The original is the stronger value proposition. */}
         <p className="mb-10 max-w-[52ch] animate-[fade-in-up_0.6s_ease-out_0.15s_both] text-base leading-relaxed text-zinc-300/80 drop-shadow-[0_1px_10px_rgba(0,0,0,0.5)] sm:text-lg">
-          Paste your story and AI handles the rest — characters, storyboards, voiceover, and
-          subtitles, all generated in minutes.
+          Paste your story and AI handles the rest — characters, storyboards, voiceover, and a
+          finished video in minutes.
         </p>
 
         {/* Glass input widget */}
