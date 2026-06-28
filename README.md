@@ -296,7 +296,15 @@ src/
 │   ├── primitives/               # Marketing presentational (7 files)
 │   ├── sections/                 # Marketing page sections (10 files)
 │   ├── ui/                       # Hand-written shadcn (4: button, accordion, sheet, dropdown-menu)
-│   └── app/                      # App components (8: auth-form, create-wizard, empty-state, providers, project-progress-panel, signed-download-wrapper, project-download-button, project-share-button)
+│   └── app/                      # App components (8 files)
+│       ├── auth-form.tsx
+│       ├── create-wizard.tsx
+│       ├── empty-state.tsx
+│       ├── providers.tsx
+│       ├── project-progress-panel.tsx
+│       ├── signed-download-wrapper.tsx
+│       ├── project-download-button.tsx
+│       └── project-share-button.tsx
 ├── features/                     # Layer 2 + 3: Feature modules
 │   ├── auth/domain/verify-session.ts       # DAL auth function
 │   ├── projects/{queries,actions}.ts       # DB access + Server Actions
@@ -410,7 +418,7 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 | Test file | Tests | What it covers |
 |---|---|---|
 | `routing.test.ts` | 2 | `force-static` removal verified |
-| `env.test.ts` | 25 | Zod env validation (fail-fast, weak-secret rejection, build-context fallback, AUTH_URL host-mismatch warning, OPENAI_API_KEY prefix variants, REPLICATE_SDXL_*_MODEL format validation, **DATABASE_URL `.url().refine()` composition** (Zod v4), **IMAGE_MODERATION_FAIL_OPEN enum validation**) |
+| `env.test.ts` | 29 | Zod env validation (fail-fast, weak-secret rejection, build-context fallback, AUTH_URL host-mismatch warning, OPENAI_API_KEY prefix variants, REPLICATE_SDXL_*_MODEL format validation, **DATABASE_URL `.url().refine()` composition** (Zod v4), **IMAGE_MODERATION_FAIL_OPEN enum validation**) |
 | `schema.test.ts` | 10 | Drizzle schema structural validation (all 11 tables + columns) |
 | `auth-config.test.ts` | 10 | Auth.js v5 config (providers, adapter, JWT, AUTH_SECRET from env, `trustHost: true`) |
 | `verify-session.test.ts` | 4 | `verifySession()` DAL (returns session or throws NEXT_REDIRECT) |
@@ -430,12 +438,12 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 | Test file | Tests | What it covers |
 |---|---|---|
 | `r2-putobject.test.ts` | 6 | R2 `putObject` helper (Buffer → S3 via `PutObjectCommand`) + `MAX_PUT_OBJECT_BYTES` size guard + `PayloadTooLargeError` |
-| `pipeline-queries.test.ts` | 5 | `appendVoiceover`, `getProjectVoiceover`, `appendVideo`, `updateVideoSubtitle` |
-| `assemble-video.test.ts` | 9 | FFmpeg rewrite: SRT temp file, inputOptions per image, Buffer readback, cleanup |
+| `pipeline-queries.test.ts` | 6 | `appendVoiceover`, `getProjectVoiceover`, `appendVideo`, `updateVideoSubtitle`, `updateProjectProgress` |
+| `assemble-video.test.ts` | 11 | FFmpeg rewrite: SRT temp file, inputOptions per image, Buffer readback, cleanup, temp file lifecycle |
 | `pipeline-sprint5.test.ts` | 8 | Steps 4-6 wiring: voiceover, subtitles, video assembly, credit debits, completion |
 | `sse-progress.test.ts` | 15 | SSE route source guarantees + `useProjectProgress` hook with mocked EventSource + reconnect with exponential backoff (T6) |
 | `project-download.test.tsx` | 15 | `getProject` LEFT JOIN videos, `ProjectDownloadButton` with server-side `downloadUrl` prop (no `r2.ts` import in client), `SignedDownloadWrapper` extracted to its own file (T1), `ProjectShareButton` clipboard fallback, source-level guarantees |
-| `moderate-image.test.ts` | 8 | `moderateImage` parses Replicate safety output, `moderationSkipped` field, env-configurable fail-open policy via `IMAGE_MODERATION_FAIL_OPEN` (read from validated `env` module, not `process.env` directly) (T5) |
+| `moderate-image.test.ts` | 8 | `moderateImage` parses Replicate safety output, `moderationSkipped` field, env-configurable fail-open policy via `IMAGE_MODERATION_FAIL_OPEN` (read from validated `env` module, not `process.env` directly) (T5) — 7 domain tests + 1 env integration test |
 | `legal-pages.test.ts` | 10 | `/privacy` + `/terms` source guarantees (server components, required sections) |
 
 **Remediation Sprint 2 (post-review hardening):**

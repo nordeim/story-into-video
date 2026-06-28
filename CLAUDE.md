@@ -219,7 +219,7 @@ All four must pass with zero warnings/errors before any commit. **husky + lint-s
 
 **Production app layer (Sprints 1-4):**
 - `routing.test.ts` (2) — `force-static` removal verified
-- `env.test.ts` (19) — Zod env validation (fail-fast, weak-secret rejection, build-context fallback, AUTH_URL host-mismatch warning, OPENAI_API_KEY prefix variants, REPLICATE_SDXL_*_MODEL format validation)
+- `env.test.ts` (29) — Zod env validation (fail-fast, weak-secret rejection, build-context fallback, AUTH_URL host-mismatch warning, OPENAI_API_KEY prefix variants, REPLICATE_SDXL_*_MODEL format validation, DATABASE_URL `.url().refine()` composition, IMAGE_MODERATION_FAIL_OPEN enum validation)
 - `schema.test.ts` (10) — Drizzle schema structural validation (all 11 tables + columns)
 - `auth-config.test.ts` (10) — Auth.js v5 config (providers, adapter, JWT, AUTH_SECRET from env, `trustHost: true`)
 - `verify-session.test.ts` (4) — `verifySession()` DAL (returns session or throws NEXT_REDIRECT)
@@ -236,12 +236,12 @@ All four must pass with zero warnings/errors before any commit. **husky + lint-s
 
 **Remediation sprint (pipeline wiring + UX + compliance):**
 - `r2-putobject.test.ts` (6) — R2 `putObject` helper (Buffer → S3 via `PutObjectCommand`) + `MAX_PUT_OBJECT_BYTES` size guard + `PayloadTooLargeError`
-- `pipeline-queries.test.ts` (5) — `appendVoiceover`, `getProjectVoiceover`, `appendVideo`, `updateVideoSubtitle`
-- `assemble-video.test.ts` (9) — FFmpeg rewrite: SRT temp file, inputOptions per image, output Buffer readback, cleanup, source-level guarantees (no placeholder, no `.find(includes('concat'))`)
+- `pipeline-queries.test.ts` (6) — `appendVoiceover`, `getProjectVoiceover`, `appendVideo`, `updateVideoSubtitle`, `updateProjectProgress`
+- `assemble-video.test.ts` (11) — FFmpeg rewrite: SRT temp file, inputOptions per image, output Buffer readback, cleanup, temp file lifecycle, source-level guarantees (no placeholder, no `.find(includes('concat'))`
 - `pipeline-sprint5.test.ts` (8) — Steps 4-6 wiring: voiceover synthesis, subtitle alignment, video assembly, credit debits, final completion step
 - `sse-progress.test.ts` (15) — SSE route source-level guarantees + `useProjectProgress` hook functional behavior with mocked `EventSource` + reconnect with exponential backoff (T6)
 - `project-download.test.tsx` (15) — `getProject` LEFT JOIN videos, `ProjectDownloadButton` with server-side `downloadUrl` prop (no `r2.ts` import in client), `SignedDownloadWrapper` extracted to its own file (T1), `ProjectShareButton` clipboard fallback, source-level guarantee
-- `moderate-image.test.ts` (7) — `moderateImage` parses Replicate `safety_concept` / `api_safety_concept`, `moderationSkipped` field, env-configurable fail-open policy via `IMAGE_MODERATION_FAIL_OPEN` (T5)
+- `moderate-image.test.ts` (8) — `moderateImage` parses Replicate `safety_concept` / `api_safety_concept`, `moderationSkipped` field, env-configurable fail-open policy via `IMAGE_MODERATION_FAIL_OPEN` (T5)
 - `legal-pages.test.ts` (10) — `/privacy` + `/terms` source-level guarantees (server components, required sections, AI-specific clauses)
 
 **Post-review hardening (design_critique.md remediation):**
@@ -295,7 +295,6 @@ Key rules:
 ```
 src/
 ├── app/                          # Layer 1: App Router
-│   ├── (marketing)/              # (planned) route group for marketing page
 │   ├── (auth)/                   # Route group: auth pages
 │   │   ├── sign-in/page.tsx
 │   │   └── sign-up/page.tsx
@@ -350,7 +349,9 @@ src/
 │   └── billing/
 │       ├── queries.ts            # getOrCreateSubscription, debitCredits (transactional)
 │       ├── actions.ts            # 'use server' — checkoutAction, portalAction
-│       └── domain/tier-limits.ts # TIER_LIMITS + CREDIT_COSTS
+│       └── domain/
+│           ├── tier-limits.ts         # TIER_LIMITS + CREDIT_COSTS
+│           └── extract-period-end.ts  # Stripe Basil API period-end extraction
 ├── lib/                          # Layer 4: Infrastructure
 │   ├── db/
 │   │   ├── index.ts              # Drizzle client (Neon pooled connection)

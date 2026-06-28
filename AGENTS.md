@@ -92,15 +92,15 @@ src/
 │   ├── primitives/               # Marketing presentational (7 files)
 │   ├── sections/                 # Marketing page sections (10 files)
 │   ├── ui/                       # Hand-written shadcn (4: button, accordion, sheet, dropdown-menu)
-│   └── app/                      # App components (4: auth-form, create-wizard, empty-state, providers)
+│   └── app/                      # App components (8: auth-form, create-wizard, empty-state, providers, project-progress-panel, signed-download-wrapper, project-download-button, project-share-button)
 ├── features/                     # Layer 2 + 3: Feature modules
 │   ├── auth/domain/verify-session.ts       # DAL auth function (throws NEXT_REDIRECT)
 │   ├── projects/{queries,actions}.ts       # getUserProjects, createProjectAction
 │   ├── pipeline/
 │   │   ├── queries.ts                      # appendCharacter, appendScene, updateProjectProgress
 │   │   ├── inngest.ts                      # 6-step pipeline function
-│   │   └── domain/                         # Pure functions (6 files: analyze, moderate, generate-*, synthesize, align, assemble)
-│   └── billing/{queries,actions,domain/tier-limits}.ts
+│   │   └── domain/                         # Pure functions (8 files: analyze, moderate-content, moderate-image, generate-character, generate-scene, synthesize-voice, align-subtitles, assemble-video)
+│   └── billing/{queries,actions,domain/}  # domain: tier-limits.ts + extract-period-end.ts
 ├── lib/                          # Layer 4: Infrastructure
 │   ├── db/{index,schema/*}.ts              # Drizzle client + schema (11 tables, 8 enums)
 │   ├── env/index.ts                        # Zod-validated env (CRITICAL: never process.env.*)
