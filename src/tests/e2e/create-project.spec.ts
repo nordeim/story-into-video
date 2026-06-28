@@ -27,8 +27,18 @@ test.describe('create-project', () => {
     // Story textarea
     await expect(page.getByLabel('Your story')).toBeVisible();
 
-    // Style chips (7 total)
-    const styleChips = ['Ghibli', 'Oil Painting', 'Anime', 'Realistic', 'Cyberpunk', 'Watercolor', 'Comic'];
+    // Style chips (8 total — H3 fix restored Medieval + Japanese animation from spec)
+    // Note: 'Comic' exists in the DB enum but is NOT a UI style chip
+    const styleChips = [
+      'Ghibli',
+      'Medieval',
+      'Oil Painting',
+      'Anime',
+      'Japanese animation',
+      'Realistic',
+      'Cyberpunk',
+      'Watercolor',
+    ];
     for (const chip of styleChips) {
       await expect(page.getByRole('button', { name: chip })).toBeVisible();
     }
@@ -38,9 +48,7 @@ test.describe('create-project', () => {
     await expect(page.getByRole('button', { name: '16:9' })).toBeVisible();
 
     // Generate Video button (should be disabled initially)
-    await expect(
-      page.getByRole('button', { name: 'Generate Video' }),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Generate Video' })).toBeVisible();
   });
 
   test('Generate Video button is disabled when textarea is empty', async ({ page }) => {
@@ -68,7 +76,9 @@ test.describe('create-project', () => {
   test('story example chips are visible', async ({ page }) => {
     // The CreateWizard renders DEFAULT_STORY_EXAMPLES
     // We verify at least one chip is visible (the exact labels depend on seed data)
-    const chips = page.getByRole('button', { name: /Time travel|Space odyssey|Rival chefs|Victorian mystery/ });
+    const chips = page.getByRole('button', {
+      name: /Time travel|Space odyssey|Rival chefs|Victorian mystery/,
+    });
     await expect(chips.first()).toBeVisible();
   });
 
