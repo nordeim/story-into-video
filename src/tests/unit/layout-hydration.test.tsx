@@ -8,6 +8,14 @@ vi.mock('@/lib/fonts', () => ({
   fontVariables: 'geistsans-variable geistmono-variable outfit-variable',
 }));
 
+// Mock next-auth/react — SessionProvider fires a fetch('/api/auth/session')
+// on mount which fails in jsdom (no base URL). Replace it with a pass-through
+// that renders children unchanged. This eliminates act() warnings, AuthError
+// spam, and the "<html> cannot be child of <div>" hydration noise.
+vi.mock('next-auth/react', () => ({
+  SessionProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 import RootLayout from '@/app/layout';
 
 const LAYOUT_PATH = resolve(__dirname, '../../app/layout.tsx');

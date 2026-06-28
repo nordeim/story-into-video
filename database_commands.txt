@@ -1,0 +1,331 @@
+$ docker ps 2>&1 | grep -i postgres | head -5 
+ 
+c37b49064159   postgres:17-alpine                    "docker-entrypoint.s…"   29 hours ago   Up 18 hours (healthy)   127.0.0.1:5432->5432/tcp                      storyintovideo-postgres-dev 
+ 
+
+ 
+$ psql -h localhost -p 5432 -U storyintovideo -d storyintovideo_dev -c "\dt" 2>&1 | head -25 
+ 
+... (10 earlier lines, ctrl+o to expand) 
+ public | users               | table | storyintovideo 
+ public | verification_tokens | table | storyintovideo 
+ public | videos              | table | storyintovideo 
+ public | voiceovers          | table | storyintovideo 
+(11 rows) 
+ 
+
+The database is running and has the base schema. Let me check what migrations have already been applied: 
+
+ 
+$ psql -h localhost -p 5432 -U storyintovideo -d storyintovideo_dev -c "SELECT * FROM drizzle.__drizzle_migrations ORDER BY id;" 2>&1 
+ 
+... (3 earlier lines, ctrl+o to expand) 
+  2 | adb6902814ddc7fb015a356e9e49be5684f257c291c3a58a8336d48de637258f | 1782623541055 
+  3 | c414a5a3f4a9c9c35a43e3b2bb4a78c88bba5f545391c9a2592845dbb974faab | 1782624008474 
+  4 | 19e426d8ffa29c6849f726114bfcd4a5c76fb27dedacd3b730f897f79410195b | 1782626042680 
+  5 | a5e4871bb4db5d48f61e9b1c6b842661018de9056f4ed692c6fba8ce63f1a3b2 | 1782626785391 
+(5 rows) 
+ 
+
+Interesting! Let me check what's actually in the DB vs. what the migration SQL files say: 
+
+ 
+$ psql -h localhost -p 5432 -U storyintovideo -d storyintovideo_dev -c "\d+ usage_events" 2>&1 | head -25 
+ 
+... (13 earlier lines, ctrl+o to expand) 
+    "usage_events_idempotency_key_unique_idx" UNIQUE, btree (idempotency_key) 
+Foreign-key constraints: 
+    "usage_events_project_id_projects_id_fk" FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL 
+    "usage_events_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE 
+Access method: heap 
+ 
+
+ 
+$ psql -h localhost -p 5432 -U storyintovideo -d storyintovideo_dev -d storyintovideo_dev -c "\d+ videos" 2>&1 | head -20 
+ 
+... (12 earlier lines, ctrl+o to expand) 
+    "videos_pkey" PRIMARY KEY, btree (id) 
+    "videos_project_id_unique_idx" UNIQUE, btree (project_id) 
+Foreign-key constraints: 
+    "videos_project_id_projects_id_fk" FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE 
+Access method: heap 
+ 
+
+ 
+$ psql -h localhost -p 5432 -U storyintovideo -d storyintovideo_dev -c "\d+ voiceovers" 2>&1 | head -20 
+ 
+... (12 earlier lines, ctrl+o to expand) 
+    "voiceovers_pkey" PRIMARY KEY, btree (id) 
+    "voiceovers_project_id_unique_idx" UNIQUE, btree (project_id) 
+Foreign-key constraints: 
+    "voiceovers_project_id_projects_id_fk" FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE 
+Access method: heap 
+ 
+
+ 
+$ psql -h localhost -p 5432 -U storyintovideo -d storyintovideo_dev -c "\d+ characters" 2>&1 | head -20 
+ 
+... (10 earlier lines, ctrl+o to expand) 
+    "characters_pkey" PRIMARY KEY, btree (id) 
+    "characters_project_name_unique_idx" UNIQUE, btree (project_id, name) 
+Foreign-key constraints: 
+    "characters_project_id_projects_id_fk" FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE 
+Access method: heap 
+ 
+
+ 
+$ psql -h localhost -p 5432 -U storyintovideo -d storyintovideo_dev -c "\d+ scenes" 2>&1 | head -20 
+ 
+... (11 earlier lines, ctrl+o to expand) 
+    "scenes_pkey" PRIMARY KEY, btree (id) 
+    "scenes_project_order_unique_idx" UNIQUE, btree (project_id, "order") 
+Foreign-key constraints: 
+    "scenes_project_id_projects_id_fk" FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE 
+Access method: heap 
+ 
+
+ 
+$ psql -h localhost -p 5432 -U storyintovideo -d storyintovideo_dev -c "SELECT enum_range(NULL::visual_style);" 2>&1 
+ 
+enum_range 
+---------------------------------------------------------------------------------------------- 
+ {ghibli,medieval,oil-painting,anime,japanese-animation,realistic,cyberpunk,watercolor,comic} 
+(1 row) 
+ 
+
+Now let me check the data in the database to understand what we're working with: 
+
+ 
+$ psql -h localhost -p 5432 -U storyintovideo -d storyintovideo_dev -c "SELECT 'users' as tbl, count(*) FROM users UNION ALL SELECT 'projects', count(*) FROM projects UNION ALL SELECT 'videos', count(*) FROM videos UNION ALL SELECT    
+'voiceovers', count(*) FROM voiceovers UNION ALL SELECT 'characters', count(*) FROM characters UNION ALL SELECT 'scenes', count(*) FROM scenes UNION ALL SELECT 'usage_events', count(*) FROM usage_events UNION ALL SELECT 
+'subscriptions', count(*) FROM subscriptions;" 2>&1 
+ 
+... (6 earlier lines, ctrl+o to expand) 
+ characters    |     3 
+ scenes        |     6 
+ usage_events  |    15 
+ subscriptions |     1 
+(8 rows) 
+ 
+
+Now let me examine the existing migration journal entries to understand the hash matching: 
+
+ 
+$ psql -h localhost -p 5432 -U storyintovideo -d storyintovideo_dev -c "SELECT id, hash, created_at FROM drizzle.__drizzle_migrations ORDER BY created_at;" 2>&1 
+ 
+... (3 earlier lines, ctrl+o to expand) 
+  2 | adb6902814ddc7fb015a356e9e49be5684f257c291c3a58a8336d48de637258f | 1782623541055 
+  3 | c414a5a3f4a9c9c35a43e3b2bb4a78c88bba5f545391c9a2592845dbb974faab | 1782624008474 
+  4 | 19e426d8ffa29c6849f726114bfcd4a5c76fb27dedacd3b730f897f79410195b | 1782626042680 
+  5 | a5e4871bb4db5d48f61e9b1c6b842661018de9056f4ed692c6fba8ce63f1a3b2 | 1782626785391 
+(5 rows) 
+ 
+
+ 
+$ cat drizzle/meta/0000_snapshot.json | python3 -c "import json,sys; d=json.load(sys.stdin); print('snapshot hash:', d.get('id','N/A')); print('prev:', d.get('prev','N/A')[:20]+'...' if d.get('prev') else 'N/A')" 
+ 
+snapshot hash: b171bd84-9e5e-41b0-b127-a53bd6de0d7c 
+prev: N/A 
+ 
+
+Let me verify the hashes match between the journal and the snapshot files: 
+
+ 
+$ for f in drizzle/meta/*.json; do echo "=== $f ==="; python3 -c "import json,sys; d=json.load(open('$f')); print('hash:', d.get('id','N/A')); print('created_at:', d.get('newMigrationId','N/A')[:40] if d.get('newMigrationId') else     
+'N/A')" 2>/dev/null; done 
+ 
+... (13 earlier lines, ctrl+o to expand) 
+hash: e25e8d68-58ab-46cd-859e-94e03adfb93e 
+created_at: N/A 
+=== drizzle/meta/_journal.json === 
+hash: N/A 
+created_at: N/A 
+ 
+
+Let me check how drizzle-kit computes the hash to understand if the journal hashes match the SQL content: 
+
+ 
+$ # The journal hash is sha256 of the SQL file content. Let's verify: 
+for f in drizzle/*.sql; do 
+  h=$(sha256sum "$f" | cut -d' ' -f1) 
+  echo "$h  $f" 
+done 
+ 
+aee8390017200b24d77e4aa67a952be55aebffdd21cc81c770faa68842e50f39  drizzle/0000_parched_wind_dancer.sql 
+adb6902814ddc7fb015a356e9e49be5684f257c291c3a58a8336d48de637258f  drizzle/0001_add_idempotency_and_unique_constraints.sql 
+c414a5a3f4a9c9c35a43e3b2bb4a78c88bba5f545391c9a2592845dbb974faab  drizzle/0002_add_character_scene_unique_constraints.sql 
+19e426d8ffa29c6849f726114bfcd4a5c76fb27dedacd3b730f897f79410195b  drizzle/0003_make_usage_events_user_id_nullable.sql 
+a5e4871bb4db5d48f61e9b1c6b842661018de9056f4ed692c6fba8ce63f1a3b2  drizzle/0004_add_medieval_japanese_animation_styles.sql 
+ 
+
+All hashes match perfectly. Let me now check the schema definition to understand what still needs to align: 
+
+ 
+$ ls src/lib/db/schema/ 
+ 
+auth.ts 
+billing.ts 
+index.ts 
+media.ts 
+projects.ts 
+ 
+
+ 
+$ cat src/lib/db/schema/index.ts 
+ 
+... (21 earlier lines, ctrl+o to expand) 
+  usageEvents, 
+  planEnum, 
+  subscriptionStatusEnum, 
+  usageEventTypeEnum, 
+} from './billing'; 
+ 
+
+ 
+read /home/project/story-into-video-prod/src/lib/db/schema/projects.ts 
+ 
+
+ 
+read /home/project/story-into-video-prod/src/lib/db/schema/billing.ts 
+ 
+
+ 
+read /home/project/story-into-video-prod/src/lib/db/schema/media.ts 
+ 
+
+ 
+read /home/project/story-into-video-prod/src/lib/db/schema/auth.ts 
+ 
+
+Now let me check if there's a seed file and what it contains: 
+
+ 
+$ cat src/lib/db/seed.ts 2>/dev/null | head -60 
+ 
+... (55 earlier lines, ctrl+o to expand) 
+  console.log('  Creating dev user...'); 
+  const passwordHash = await bcrypt.hash('password123', 10); 
+  const [devUser] = await db 
+    .insert(users) 
+    .values({ 
+ 
+
+ 
+$ psql -h localhost -p 5432 -U storyintovideo -d storyintovideo_dev -c "SELECT id, email, name FROM users;" 2>&1 
+ 
+id                  |         email          |   name 
+--------------------------------------+------------------------+---------- 
+ e1274904-0b74-48b8-8f26-57feaa589cab | dev@storyintovideo.com | Dev User 
+(1 row) 
+ 
+
+ 
+$ psql -h localhost -p 5432 -U storyintovideo -d storyintovideo_dev -c "SELECT p.id, p.title, p.status, v.id as vid, v.video_key, vo.id as vaid, vo.audio_key FROM projects p LEFT JOIN videos v ON v.project_id = p.id LEFT JOIN 
+voiceovers vo ON vo.project_id = p.id;" 2>&1 
+ 
+... (3 earlier lines, ctrl+o to expand) 
+----------------------------------- 
+ 8b300d90-697b-4bb1-8c19-f69a46732e69 | The Dragon's Quest | completed | b362baf3-566a-4549-aeb0-7ef05af17678 | videos/8b300d90-697b-4bb1-8c19-f69a46732e69/final.mp4 | b2de8d40-2829-4a16-a411-1ee6369bc799 | 
+voiceovers/8b300d90-697b-4bb1-8c19-f69a46732e69/narration.mp3 
+ e40f0db0-b902-4645-ae9f-24a47f61bce6 | Ocean Mystery      | pending   |                                      |                                                       |                                      | 
+(2 rows) 
+ 
+
+ 
+$ psql -h localhost -p 5432 -U storyintovideo -d storyintovideo_dev -c "SELECT id, type, cost, idempotency_key FROM usage_events ORDER BY timestamp;" 2>&1 
+ 
+... (13 earlier lines, ctrl+o to expand) 
+ 322e241f-8fd3-412d-9adb-5b90d752bbd3 | voiceover            |   15 | 
+ 6f7622b3-27d9-4d15-939c-bfdb7287362e | subtitle_alignment   |    3 | 
+ 8e3f60ac-a500-4d9b-a0b3-8acf576422e3 | video_assembly       |   30 | 
+ 27c401b2-4258-4758-acfb-0a89779c66ea | moderation_check     |    0 | 
+(15 rows) 
+ 
+
+Now I have the complete picture. Let me generate a fresh migration from the current schema to see if there are any drift issues: 
+
+ 
+$ dotenv -e .env.local -- drizzle-kit generate --name=schema_drift_check 2>&1 | head -30 (timeout 60000s) 
+ 
+Usage: dotenv [OPTIONS] COMMAND [ARGS]... 
+Try 'dotenv --help' for help. 
+ 
+Error: Invalid value for '-e' / '--export': '.env.local' is not a valid boolean. 
+ 
+
+ 
+$ export $(grep -v '^#' .env.local | xargs) && drizzle-kit generate --name=schema_drift_check 2>&1 | head -30 (timeout 60000s) 
+ 
+/bin/bash: line 1: drizzle-kit: command not found 
+ 
+
+ 
+$ export $(grep -v '^#' .env.local | xargs) && npx drizzle-kit generate --name=schema_drift_check 2>&1 | head -30 (timeout 60000s) 
+ 
+... (15 earlier lines, ctrl+o to expand) 
+verification_tokens 3 columns 0 indexes 0 fks 
+videos 8 columns 1 indexes 1 fks 
+voiceovers 8 columns 1 indexes 1 fks 
+ 
+No schema changes, nothing to migrate 😴 
+ 
+
+This is a critical finding. Let me now verify the database matches the schema exactly: 
+
+ 
+$ export $(grep -v '^#' .env.local | xargs) && npx drizzle-kit check 2>&1 | head -20 (timeout 60000s) 
+ 
+... (2 earlier lines, ctrl+o to expand) 
+npm warn Unknown project config "auto-install-peers". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options. 
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options. 
+No config path provided, using default 'drizzle.config.ts' 
+Reading config file '/home/project/story-into-video-prod/drizzle.config.ts' 
+Everything's fine 🐶🔥 
+ 
+
+Now let me also verify the migration journal is consistent: 
+
+ 
+$ export $(grep -v '^#' .env.local | xargs) && npx drizzle-kit migrate --dry-run 2>&1 | head -20 (timeout 60000s) 
+ 
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options. 
+npm warn Unknown project config "strict-peer-dependencies". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options. 
+npm warn Unknown project config "auto-install-peers". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options. 
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options. 
+Unrecognized options for command 'migrate': --dry-run 
+ 
+
+ 
+$ export $(grep -v '^#' .env.local | xargs) && npx drizzle-kit up 2>&1 | head -20 (timeout 60000s) 
+ 
+... (2 earlier lines, ctrl+o to expand) 
+npm warn Unknown project config "auto-install-peers". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options. 
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options. 
+No config path provided, using default 'drizzle.config.ts' 
+Reading config file '/home/project/story-into-video-prod/drizzle.config.ts' 
+Everything's fine 🐶🔥 
+ 
+
+Excellent! Now I have the full picture. Let me also check what the __drizzle_migrations table structure looks like: 
+
+ 
+$ psql -h localhost -p 5432 -U storyintovideo -d storyintovideo_dev -c "\d drizzle.__drizzle_migrations" 2>&1 
+ 
+... (3 earlier lines, ctrl+o to expand) 
+ id         | integer |           | not null | nextval('drizzle.__drizzle_migrations_id_seq'::regclass) 
+ hash       | text    |           | not null | 
+ created_at | bigint  |           |          | 
+Indexes: 
+    "__drizzle_migrations_pkey" PRIMARY KEY, btree (id) 
+ 
+
+ 
+$ cat drizzle/meta/_journal.json 
+ 
+... (36 earlier lines, ctrl+o to expand) 
+      "tag": "0004_add_medieval_japanese_animation_styles", 
+      "breakpoints": true 
+    } 
+  ] 
+} 
+ 
