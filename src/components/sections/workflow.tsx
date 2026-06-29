@@ -50,7 +50,7 @@ function WorkflowVideo({ src, poster }: { src: string; poster: string }) {
 export function Workflow() {
   return (
     <section
-      className="relative overflow-hidden bg-zinc-950 py-16 sm:py-20 lg:py-24"
+      className="bg-background relative overflow-hidden py-16 sm:py-20 lg:py-24"
       aria-labelledby="workflow-heading"
     >
       <div className="mx-auto max-w-7xl px-6">
@@ -66,7 +66,7 @@ export function Workflow() {
                 {/* Media side */}
                 <div
                   className={cn(
-                    'relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900',
+                    'bg-card relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/10',
                     step.mediaPosition === 'left' ? 'lg:order-1' : 'lg:order-2',
                   )}
                 >

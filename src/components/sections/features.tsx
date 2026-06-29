@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
  * Features — composes ScrollReveal (client) so becomes client via composition.
  * 4×2 grid (desktop) / 2-col (tablet) / 1-col (mobile) with continuous hairline
  * borders (NOT boxed cards). Three coordinated hover effects per card:
- *   1. Left accent bar: neutral-800 → amber-400 (300ms)
+ *   1. Left accent bar: neutral-800 → primary (300ms)
  *   2. Title: translate-x-0 → translate-x-2 (300ms)
  *   3. Bottom gradient sheen: opacity 0 → 1 (300ms)
  * Anti-generic: continuous surface separated by hairlines, not generic card grid.
@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 export function Features() {
   return (
     <section
-      className="relative overflow-hidden bg-zinc-950 py-24"
+      className="bg-background relative overflow-hidden py-24"
       aria-labelledby="features-heading"
     >
       <div className="mx-auto max-w-7xl px-6">
@@ -51,11 +51,11 @@ export function Features() {
                 {/* Left accent bar — neutral→amber on hover */}
                 <div
                   aria-hidden="true"
-                  className="absolute start-0 top-8 bottom-8 w-[3px] rounded-e-full bg-neutral-800 transition-colors duration-300 group-hover:bg-amber-400"
+                  className="group-hover:bg-primary absolute start-0 top-8 bottom-8 w-[3px] rounded-e-full bg-neutral-800 transition-colors duration-300"
                 />
 
                 {/* Icon — zinc→amber on hover */}
-                <div className="mb-5 text-zinc-400 transition-colors duration-300 group-hover:text-amber-400">
+                <div className="group-hover:text-primary mb-5 text-zinc-400 transition-colors duration-300">
                   <Icon className="h-6 w-6" strokeWidth={1.5} aria-hidden="true" />
                 </div>
 

@@ -28,11 +28,11 @@ async function ProjectDetail({ projectId }: { projectId: string }) {
   if (!project) notFound();
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-6 py-16">
+    <main className="bg-background min-h-screen px-6 py-16">
       <div className="mx-auto max-w-3xl">
         <a
           href="/dashboard"
-          className="mb-6 inline-block text-sm text-zinc-400 transition-colors hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+          className="hover:text-primary focus-visible:outline-primary mb-6 inline-block text-sm text-zinc-400 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
         >
           ← Back to dashboard
         </a>
@@ -86,7 +86,7 @@ async function ProjectDetail({ projectId }: { projectId: string }) {
 
 function ProjectDetailSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-950 px-6 py-16">
+    <div className="bg-background min-h-screen px-6 py-16">
       <div className="mx-auto max-w-3xl">
         <div className="h-8 w-32 animate-pulse rounded bg-white/[0.04]" />
         <div className="mt-6 h-10 w-3/4 animate-pulse rounded bg-white/[0.04]" />

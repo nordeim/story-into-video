@@ -59,3 +59,21 @@ export async function portalAction(): Promise<void> {
     redirect(portalSession.url);
   }
 }
+
+/**
+ * T1 (C-1): Server Action wrapper for the billing page upgrade form.
+ *
+ * The billing page renders `<form action={billingCheckoutAction}>` with a
+ * `<button name="plan" value={plan}>` for each tier. This wrapper extracts
+ * the plan from formData and delegates to `checkoutAction(plan)`.
+ *
+ * Lives here (not in the page component) because Server Actions must be in a
+ * module with `"use server"` at the top — the billing page is a Server Component,
+ * not a Server Action module.
+ */
+export async function billingCheckoutAction(formData: FormData): Promise<void> {
+  const plan = formData.get('plan');
+  if (plan === 'creator' || plan === 'pro' || plan === 'studio') {
+    await checkoutAction(plan);
+  }
+}

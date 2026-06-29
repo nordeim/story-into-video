@@ -86,9 +86,12 @@ export function useProjectProgress(projectId: string): ProjectProgressState {
           });
 
           // Close the EventSource when terminal — server will also close,
-          // but this avoids a redundant reconnect attempt
+          // but this avoids a redundant reconnect attempt.
+          // T12/L-2: Set eventSource to null after close so the cleanup
+          // function's `if (eventSource)` guard skips the double-close.
           if (TERMINAL_STATUSES.has(data.status)) {
             eventSource?.close();
+            eventSource = null;
             setState((prev) => ({ ...prev, connectionState: 'closed' }));
           }
         } catch {

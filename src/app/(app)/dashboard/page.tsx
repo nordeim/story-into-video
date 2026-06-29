@@ -64,9 +64,9 @@ async function ProjectList() {
         <a
           key={project.id}
           href={`/projects/${project.id}`}
-          className="group rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-colors hover:border-amber-400/20 hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+          className="group hover:border-primary/20 focus-visible:outline-primary rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2"
         >
-          <h3 className="font-heading mb-2 text-lg font-bold text-white group-hover:text-amber-300">
+          <h3 className="font-heading group-hover:text-primary mb-2 text-lg font-bold text-white">
             {project.title}
           </h3>
           <p className="text-xs text-zinc-500">
@@ -83,7 +83,7 @@ async function ProjectList() {
 
 export default function DashboardPage() {
   return (
-    <main className="min-h-screen bg-zinc-950 px-6 py-16">
+    <main className="bg-background min-h-screen px-6 py-16">
       <div className="mx-auto max-w-7xl">
         <div className="mb-12 flex items-center justify-between">
           <div>
@@ -94,7 +94,7 @@ export default function DashboardPage() {
           </div>
           <a
             href="/create"
-            className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-5 py-2.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+            className="bg-primary hover:bg-primary focus-visible:outline-primary inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold text-zinc-950 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             New Project
           </a>

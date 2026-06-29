@@ -70,11 +70,10 @@ describe('H2: Brand color system — baseline violation count (CI guard)', () =>
       `H2 baseline: ${totalAmberViolations} amber-* violations across ${filesWithViolations.length} files`,
     );
 
-    // This test PASSES with the current violation count — it's a measurement.
-    // When the brand token replacement is complete, change this to:
-    //   expect(totalAmberViolations).toBe(0);
-    expect(totalAmberViolations).toBeGreaterThan(0);
-    expect(filesWithViolations.length).toBeGreaterThan(0);
+    // T11 (M-6): The brand token replacement is now complete.
+    // All amber-300/400/500/600 usages have been replaced with `primary`
+    // (the custom @theme token #febf00). This test now ENFORCES zero violations.
+    expect(totalAmberViolations).toBe(0);
   });
 
   it('counts bg-zinc-950/900/black violations (baseline)', () => {
@@ -100,7 +99,8 @@ describe('H2: Brand color system — baseline violation count (CI guard)', () =>
       `H2 baseline: ${totalZincBlackViolations} bg-zinc-950/900/black violations across ${filesWithViolations.length} files`,
     );
 
-    // Same as above — measurement, not enforcement (yet).
-    expect(totalZincBlackViolations).toBeGreaterThan(0);
+    // T11 (M-6): The brand token replacement is now complete.
+    // All bg-zinc-950/900/black usages have been replaced with bg-background/bg-card.
+    expect(totalZincBlackViolations).toBe(0);
   });
 });

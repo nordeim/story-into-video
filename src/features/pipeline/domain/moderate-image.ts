@@ -62,10 +62,14 @@ const FLAGGED_KEYWORDS = new Set(['nsfw', 'sexual', 'violence', 'gore', 'hate', 
  * 'true' (fail-open) per the env schema. Set IMAGE_MODERATION_FAIL_OPEN=false
  * in production to fail-closed.
  *
- * Read at module load — changing the env var requires a restart. This is
- * intentional: moderation policy changes should be deliberate, not dynamic.
+ * T9 (M-4): Read INSIDE the function body (not at module load) so tests can
+ * mock the env module per-call and verify both policies in the same test run.
+ * The previous module-load constant made the policy impossible to test without
+ * re-importing the module between tests.
  */
-const FAIL_OPEN = env.IMAGE_MODERATION_FAIL_OPEN === 'true';
+function getFailOpen(): boolean {
+  return env.IMAGE_MODERATION_FAIL_OPEN === 'true';
+}
 
 function extractSafetyCategories(rawOutput: unknown): string[] {
   if (typeof rawOutput !== 'object' || rawOutput === null) {
@@ -114,10 +118,11 @@ export async function moderateImage(input: ModerateImageInput): Promise<ImageMod
   const categories = extractSafetyCategories(input.rawOutput);
   const shapeKnown = isOutputShapeKnown(input.rawOutput);
   const moderationSkipped = !shapeKnown;
+  const failOpen = getFailOpen();
 
   // Fail-open (default): unknown shape → not flagged, but skipped=true
   // Fail-closed: unknown shape → flagged=true with a synthetic category
-  if (moderationSkipped && !FAIL_OPEN) {
+  if (moderationSkipped && !failOpen) {
     console.warn(
       `[moderate-image] Moderation FAIL-CLOSED: unknown output shape for ${input.imageUrl}. ` +
         `Flagging as 'unknown-output-shape'. Set IMAGE_MODERATION_FAIL_OPEN=true to allow.`,

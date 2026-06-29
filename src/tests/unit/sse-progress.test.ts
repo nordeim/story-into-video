@@ -65,16 +65,20 @@ describe('T9: SSE progress route source-level guarantees', () => {
     expect(source).toMatch(/completed|failed/);
   });
 
-  // C3: SSE route must rate-limit to 1 concurrent connection per user/project
-  it('C3: route imports sseRateLimit from @/lib/rate-limit', () => {
+  // C3 + T5: SSE route must limit to 1 concurrent connection per user/project.
+  // T5 replaced sseRateLimit.fixedWindow with claimSseSlot/releaseSseSlot/refreshSseSlot
+  // to fix the H-3 bug where the slot was never released on disconnect.
+  it('C3+T5: route imports claim/release/refresh from @/lib/rate-limit', () => {
     const source = readFileSync(routePath, 'utf-8');
     expect(source).toMatch(/from ['"]@\/lib\/rate-limit['"]/);
-    expect(source).toMatch(/sseRateLimit/);
+    expect(source).toMatch(/claimSseSlot/);
+    expect(source).toMatch(/releaseSseSlot/);
+    expect(source).toMatch(/refreshSseSlot/);
   });
 
-  it('C3: route calls sseRateLimit.limit before opening the stream', () => {
+  it('C3+T5: route calls claimSseSlot before opening the stream', () => {
     const source = readFileSync(routePath, 'utf-8');
-    expect(source).toMatch(/sseRateLimit\.limit/);
+    expect(source).toMatch(/claimSseSlot\s*\(/);
   });
 
   it('C3: route returns 429 when SSE rate limit is exceeded', () => {

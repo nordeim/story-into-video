@@ -82,7 +82,7 @@ export function ProjectDownloadButton({ projectId, hasVideo }: ProjectDownloadBu
           'group relative overflow-hidden rounded-full border border-neutral-800 bg-[#060607] px-4 py-2 text-sm font-medium text-zinc-300 transition-all duration-300',
           // Hover: Rationed amber accent
           'hover:border-[#febf00]/50 hover:text-[#febf00]',
-          // A11y: AAA Focus rings (using the brand amber, not Tailwind amber-400)
+          // A11y: AAA Focus rings (using the brand amber, not Tailwind primary)
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#febf00]',
           // Disabled states
           'disabled:cursor-not-allowed disabled:opacity-50',

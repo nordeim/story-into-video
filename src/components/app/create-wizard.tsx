@@ -74,7 +74,7 @@ export function CreateWizard() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-6 py-16">
+    <main className="bg-background min-h-screen px-6 py-16">
       <div className="mx-auto max-w-2xl">
         <div className="mb-8 text-center">
           <span className="eyebrow mb-4">
@@ -109,7 +109,7 @@ export function CreateWizard() {
               <span
                 className={cn(
                   'font-mono text-[10px] tabular-nums',
-                  story.length >= WARNING_THRESHOLD ? 'text-amber-400' : 'text-zinc-600',
+                  story.length >= WARNING_THRESHOLD ? 'text-primary' : 'text-zinc-600',
                 )}
               >
                 {story.length} / {MAX_STORY_LENGTH}
@@ -123,7 +123,7 @@ export function CreateWizard() {
                   key={ex.label}
                   type="button"
                   onClick={() => handleChipClick(ex.label)}
-                  className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/[0.1] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+                  className="focus-visible:outline-primary rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/[0.1] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
                   {ex.label}
                 </button>
@@ -142,9 +142,9 @@ export function CreateWizard() {
                       setStyle(chip.label.toLowerCase().replace(/\s+/g, '-') as typeof style)
                     }
                     className={cn(
-                      'rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400',
+                      'focus-visible:outline-primary rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2',
                       style === chip.label.toLowerCase().replace(/\s+/g, '-')
-                        ? 'border-amber-400/40 bg-amber-400/10 text-amber-400'
+                        ? 'border-primary/40 bg-primary/10 text-primary'
                         : 'border-white/10 bg-white/[0.02] text-zinc-400 hover:text-white',
                     )}
                   >
@@ -166,9 +166,9 @@ export function CreateWizard() {
                       onClick={() => setActiveRatio(ratio)}
                       aria-pressed={isActive}
                       className={cn(
-                        'flex min-h-[44px] min-w-[44px] items-center justify-center px-2 py-1 font-mono text-[10px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400',
+                        'focus-visible:outline-primary flex min-h-[44px] min-w-[44px] items-center justify-center px-2 py-1 font-mono text-[10px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2',
                         isActive
-                          ? 'bg-white/[0.1] text-amber-400'
+                          ? 'text-primary bg-white/[0.1]'
                           : 'text-zinc-600 hover:text-zinc-400',
                       )}
                     >
@@ -181,7 +181,7 @@ export function CreateWizard() {
               <button
                 type="submit"
                 disabled={!canSubmit}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-amber-400 px-5 py-2.5 text-[13px] font-bold text-zinc-950 transition-all hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+                className="bg-primary hover:bg-primary focus-visible:outline-primary inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-bold text-zinc-950 transition-all focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting ? 'Generating…' : 'Generate Video'}
                 {!submitting && <ArrowRight className="h-3 w-3" aria-hidden="true" />}

@@ -159,7 +159,11 @@ export async function appendVideo(
       subtitleKey,
       duration,
       resolution,
-      status: 'completed',
+      // T8 (M-3): Use 'rendering' (not 'completed') at insert time. The video
+      // row is created in Step 5 (subtitles) with videoKey=null — the MP4 doesn't
+      // exist yet. Step 6 calls updateVideo() to set videoKey + status='completed'.
+      // The video_status enum has: pending, rendering, completed, failed.
+      status: 'rendering',
     })
     .onConflictDoNothing({
       target: videos.projectId,
@@ -185,7 +189,12 @@ export async function updateVideo(
   videoKey: string,
   duration: number,
 ): Promise<void> {
-  await db.update(videos).set({ videoKey, duration }).where(eq(videos.projectId, projectId));
+  // T8 (M-3): Set status='completed' alongside videoKey + duration. The row was
+  // inserted by appendVideo with status='rendering'; this update marks it done.
+  await db
+    .update(videos)
+    .set({ videoKey, duration, status: 'completed' })
+    .where(eq(videos.projectId, projectId));
 }
 
 export async function getProjectVideo(projectId: string) {

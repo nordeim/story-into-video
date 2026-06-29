@@ -51,16 +51,14 @@ export function ProjectProgressPanel({
     <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
       <h2 className="font-heading mb-3 text-lg font-bold text-white">Pipeline Status</h2>
       <p className="text-sm text-zinc-400">
-        {status === 'failed' && errorMessage
-          ? `${label} ${errorMessage}`
-          : label}
+        {status === 'failed' && errorMessage ? `${label} ${errorMessage}` : label}
       </p>
       {progressDetail && <p className="mt-2 text-xs text-zinc-500">{progressDetail}</p>}
 
       {/* Progress bar */}
       <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/[0.04]">
         <div
-          className="h-full rounded-full bg-amber-400 transition-all duration-500"
+          className="bg-primary h-full rounded-full transition-all duration-500"
           style={{ width: `${progressPercent}%` }}
           role="progressbar"
           aria-valuenow={progressPercent}
@@ -71,15 +69,13 @@ export function ProjectProgressPanel({
       <p className="mt-2 text-right text-xs text-zinc-500">{progressPercent}%</p>
 
       {progress.connectionState === 'error' && (
-        <p className="mt-2 text-xs text-amber-400">
+        <p className="text-primary mt-2 text-xs">
           Live updates disconnected. Refresh the page to retry.
         </p>
       )}
 
       {progress.connectionState === 'reconnecting' && (
-        <p className="mt-2 text-xs text-zinc-500">
-          Reconnecting to live updates…
-        </p>
+        <p className="mt-2 text-xs text-zinc-500">Reconnecting to live updates…</p>
       )}
     </div>
   );

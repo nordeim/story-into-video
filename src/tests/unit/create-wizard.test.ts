@@ -48,9 +48,10 @@ describe('S2-01: Create wizard page', () => {
 
   it('create-wizard uses the luxury-dark design system', () => {
     const source = readFileSync(CREATE_WIZARD_PATH, 'utf-8');
-    expect(source).toMatch(/bg-zinc-950/);
+    // T11: bg-zinc-950 → bg-background, text-amber-400 → text-primary
+    expect(source).toMatch(/bg-background/);
     expect(source).toMatch(/glass-input/);
-    expect(source).toMatch(/text-amber-400/);
+    expect(source).toMatch(/text-primary/);
   });
 
   it('/create page is a server component wrapping CreateWizard', () => {

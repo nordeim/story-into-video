@@ -7,7 +7,7 @@ interface EyebrowProps {
 
 /**
  * Amber eyebrow badge used in every section header. Renders the `eyebrow`
- * @utility class (defined in globals.css): amber-400/10 bg, amber-400/25 border,
+ * @utility class (defined in globals.css): primary/10 bg, primary/25 border,
  * 11px uppercase tracking-widest text, ambient glow shadow.
  *
  * Server component — pure presentation, no client interactivity.

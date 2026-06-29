@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * Navbar — client component.
- * Fixed nav with scroll-aware background (transparent → bg-zinc-950/70
+ * Fixed nav with scroll-aware background (transparent → bg-background/70
  * backdrop-blur-[24px] border-b border-white/10 at scrollY > 10).
  * Desktop: logo + 4 nav links + EN dropdown + Sign in + Get Started.
  * Mobile (<sm): logo + EN + hamburger → right-side Sheet.
@@ -38,7 +38,7 @@ export function Navbar() {
       className={cn(
         'fixed top-0 right-0 left-0 z-50 transition-all duration-300',
         scrolled
-          ? 'border-b border-white/10 bg-zinc-950/70 backdrop-blur-[24px]'
+          ? 'bg-background/70 border-b border-white/10 backdrop-blur-[24px]'
           : 'bg-transparent',
       )}
     >
@@ -49,7 +49,7 @@ export function Navbar() {
         {/* Logo */}
         <Link
           href="/"
-          className="font-heading text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+          className="font-heading focus-visible:outline-primary text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2"
         >
           StoryIntoVideo
         </Link>
@@ -60,7 +60,7 @@ export function Navbar() {
             <a
               key={link.href}
               href={link.href}
-              className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-all duration-200 hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+              className="focus-visible:outline-primary rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-all duration-200 hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
             >
               {link.label}
             </a>
@@ -72,7 +72,7 @@ export function Navbar() {
           {/* Language switcher */}
           <DropdownMenu>
             <DropdownMenuTrigger
-              className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 sm:px-3"
+              className="focus-visible:outline-primary flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 sm:px-3"
               aria-label="Switch language"
             >
               EN
@@ -87,7 +87,7 @@ export function Navbar() {
                   key={lang}
                   className={cn(
                     'cursor-pointer focus:bg-white/[0.04]',
-                    lang === 'EN' && 'text-amber-400',
+                    lang === 'EN' && 'text-primary',
                   )}
                 >
                   {lang}
@@ -99,7 +99,7 @@ export function Navbar() {
           {/* Sign in (desktop only) */}
           <a
             href="/sign-in"
-            className="hidden rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 sm:inline"
+            className="focus-visible:outline-primary hidden rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 sm:inline"
           >
             Sign in
           </a>
@@ -107,7 +107,7 @@ export function Navbar() {
           {/* Get Started (desktop) */}
           <a
             href="/sign-up"
-            className="hidden rounded-full px-5 py-2 text-base font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 sm:inline"
+            className="focus-visible:outline-primary hidden rounded-full px-5 py-2 text-base font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 sm:inline"
           >
             Get Started
           </a>
@@ -117,7 +117,7 @@ export function Navbar() {
             <SheetTrigger asChild>
               <button
                 type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 sm:hidden"
+                className="focus-visible:outline-primary inline-flex h-10 w-10 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 sm:hidden"
                 aria-label="Open menu"
               >
                 <Menu className="h-5 w-5" aria-hidden="true" />
@@ -125,7 +125,7 @@ export function Navbar() {
             </SheetTrigger>
             <SheetContent
               side="right"
-              className="w-[300px] border-l border-white/10 bg-zinc-950 p-6"
+              className="bg-background w-[300px] border-l border-white/10 p-6"
             >
               <SheetHeader className="mb-6 flex flex-row items-center justify-between">
                 <SheetTitle className="font-heading text-base font-medium text-white">
@@ -134,7 +134,7 @@ export function Navbar() {
                 <SheetClose asChild>
                   <button
                     type="button"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+                    className="focus-visible:outline-primary inline-flex h-10 w-10 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2"
                     aria-label="Close menu"
                   >
                     <X className="h-5 w-5" aria-hidden="true" />
@@ -147,7 +147,7 @@ export function Navbar() {
                     key={link.href}
                     href={link.href}
                     onClick={() => setMobileOpen(false)}
-                    className="rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+                    className="focus-visible:outline-primary rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
                   >
                     {link.label}
                   </a>
@@ -156,14 +156,14 @@ export function Navbar() {
                 <a
                   href="/sign-in"
                   onClick={() => setMobileOpen(false)}
-                  className="rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+                  className="focus-visible:outline-primary rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
                   Sign in
                 </a>
                 <a
                   href="/sign-up"
                   onClick={() => setMobileOpen(false)}
-                  className="rounded-lg px-3 py-2 text-base font-medium text-amber-400 transition-colors hover:bg-amber-400/10 hover:text-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+                  className="text-primary hover:bg-primary/10 hover:text-primary focus-visible:outline-primary rounded-lg px-3 py-2 text-base font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
                   Get Started
                 </a>

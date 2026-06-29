@@ -52,7 +52,7 @@ export function Examples() {
             <button
               type="button"
               onClick={() => scrollByCards('prev')}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-600/60 text-zinc-400 transition-colors hover:border-amber-400/60 hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+              className="hover:border-primary/60 hover:text-primary focus-visible:outline-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-600/60 text-zinc-400 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
               aria-label="Previous examples"
             >
               <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -60,7 +60,7 @@ export function Examples() {
             <button
               type="button"
               onClick={() => scrollByCards('next')}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-600/60 text-zinc-400 transition-colors hover:border-amber-400/60 hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+              className="hover:border-primary/60 hover:text-primary focus-visible:outline-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-600/60 text-zinc-400 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
               aria-label="Next examples"
             >
               <ChevronRight className="h-4 w-4" aria-hidden="true" />
@@ -79,7 +79,7 @@ export function Examples() {
             {EXAMPLE_CARDS.map((card) => (
               <article
                 key={card.id}
-                className="group relative w-[260px] shrink-0 cursor-pointer snap-start focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-amber-400"
+                className="group focus-within:outline-primary relative w-[260px] shrink-0 cursor-pointer snap-start focus-within:outline-2 focus-within:outline-offset-2"
               >
                 {/* Hover glow — yellow→purple gradient (the singular purple exception) */}
                 <div
@@ -90,7 +90,7 @@ export function Examples() {
                 {/* Card body */}
                 <a
                   href={card.href}
-                  className="relative block aspect-[9/16] overflow-hidden rounded-[20px] border border-white/5 bg-zinc-900 transition-colors group-hover:border-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+                  className="bg-card focus-visible:outline-primary relative block aspect-[9/16] overflow-hidden rounded-[20px] border border-white/5 transition-colors group-hover:border-white/10 focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
                   <Image
                     src={card.thumbnail}

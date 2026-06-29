@@ -33,7 +33,7 @@ export function Hero() {
   };
 
   return (
-    <section className="relative flex flex-col overflow-hidden bg-zinc-950">
+    <section className="bg-background relative flex flex-col overflow-hidden">
       {/* Layer 1: Background video + overlays */}
       <div className="absolute inset-0 z-0" aria-hidden="true">
         <video
@@ -116,7 +116,7 @@ export function Hero() {
               <span
                 className={cn(
                   'font-mono text-[10px] tabular-nums',
-                  story.length >= 4500 ? 'text-amber-400' : 'text-zinc-600',
+                  story.length >= 4500 ? 'text-primary' : 'text-zinc-600',
                 )}
               >
                 {story.length} / 5000
@@ -130,7 +130,7 @@ export function Hero() {
                   key={ex.label}
                   type="button"
                   onClick={() => handleChipClick(ex.label)}
-                  className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/[0.1] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+                  className="focus-visible:outline-primary rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/[0.1] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
                   {ex.label}
                 </button>
@@ -150,9 +150,9 @@ export function Hero() {
                       onClick={() => setActiveRatio(ratio)}
                       aria-pressed={isActive}
                       className={cn(
-                        'flex min-h-[44px] min-w-[44px] items-center justify-center px-2 py-1 font-mono text-[10px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400',
+                        'focus-visible:outline-primary flex min-h-[44px] min-w-[44px] items-center justify-center px-2 py-1 font-mono text-[10px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2',
                         isActive
-                          ? 'bg-white/[0.1] text-amber-400'
+                          ? 'text-primary bg-white/[0.1]'
                           : 'text-zinc-600 hover:text-zinc-400',
                       )}
                     >
@@ -165,7 +165,7 @@ export function Hero() {
               {/* Start Creating CTA — glass pill with amber text */}
               <a
                 href="/create"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-zinc-800 to-zinc-900 px-5 py-2.5 text-[13px] font-bold text-amber-300 transition-all hover:from-zinc-700 hover:to-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 sm:py-2"
+                className="text-primary focus-visible:outline-primary inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-zinc-800 to-zinc-900 px-5 py-2.5 text-[13px] font-bold transition-all hover:from-zinc-700 hover:to-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 sm:py-2"
               >
                 Start Creating
                 <ArrowRight className="h-3 w-3" aria-hidden="true" />

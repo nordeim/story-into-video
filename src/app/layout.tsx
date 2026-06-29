@@ -1,11 +1,14 @@
 import type { Metadata } from 'next';
 
+import { env } from '@/lib/env';
 import { fontVariables } from '@/lib/fonts';
 import { Providers } from '@/components/app/providers';
 import './globals.css';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://storyintovideo-clone.example.com'),
+  // T12/L-4: Use env.NEXT_PUBLIC_APP_URL instead of a hardcoded placeholder.
+  // The previous value 'https://storyintovideo-clone.example.com' broke OG previews.
+  metadataBase: new URL(env.NEXT_PUBLIC_APP_URL),
   title: 'StoryIntoVideo - Turn Stories Into Videos with AI',
   description:
     'Paste your story and AI handles the rest — characters, storyboards, voiceover, and a finished video in minutes. AI-powered story-into-video generation.',
@@ -21,7 +24,7 @@ export const metadata: Metadata = {
     title: 'StoryIntoVideo - Turn Stories Into Videos with AI',
     description:
       'Paste your story and AI handles the rest — characters, storyboards, voiceover, and a finished video in minutes.',
-    url: 'https://storyintovideo-clone.example.com',
+    url: env.NEXT_PUBLIC_APP_URL,
     siteName: 'StoryIntoVideo',
     images: [{ url: '/og-image.png', width: 1200, height: 630 }],
     locale: 'en_US',
@@ -64,7 +67,7 @@ export default function RootLayout({
       >
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:bg-amber-400 focus:px-4 focus:py-2 focus:font-medium focus:text-zinc-950 focus:shadow-lg"
+          className="focus:bg-primary sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:px-4 focus:py-2 focus:font-medium focus:text-zinc-950 focus:shadow-lg"
         >
           Skip to content
         </a>

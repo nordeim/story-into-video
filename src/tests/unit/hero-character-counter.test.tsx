@@ -35,7 +35,7 @@ describe('Hero character counter', () => {
 
     const counter = screen.getByText('4500 / 5000');
     // Amber warning state activates at ≥4500 chars (90% of 5000)
-    expect(counter).toHaveClass('text-amber-400');
+    expect(counter).toHaveClass('text-primary');
   });
 
   it('uses the muted default style below the 4500-char threshold', () => {
@@ -46,6 +46,6 @@ describe('Hero character counter', () => {
 
     const counter = screen.getByText('4499 / 5000');
     expect(counter).toHaveClass('text-zinc-600');
-    expect(counter).not.toHaveClass('text-amber-400');
+    expect(counter).not.toHaveClass('text-primary');
   });
 });

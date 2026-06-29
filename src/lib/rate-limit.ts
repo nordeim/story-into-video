@@ -62,3 +62,58 @@ export const sseRateLimit = new Ratelimit({
   prefix: 'siv:sse',
   analytics: true,
 });
+
+// ── T5 (H-3): Active-connection slot management ─────────────────────────────
+//
+// H-3 bug: sseRateLimit (above) used fixedWindow(1, '1 m') — 1 connection per
+// user:project per 60s. When the client disconnected cleanly, the abort handler
+// closed the stream but did NOT release the rate-limit counter. Users who closed
+// and reopened within 60s got 429 despite having zero active connections.
+//
+// T5 fix: Track active connections with a Redis key using SET NX (only-if-not-exists)
+// + short TTL. The slot is:
+//   - CLAIMED on stream open (SET NX EX 30 — fails if a slot already exists)
+//   - REFRESHED every poll interval (EXPIRE to 30s — keeps the slot alive while streaming)
+//   - RELEASED on disconnect (DEL — allows immediate reconnection)
+//
+// The 30s TTL is the safety net: if the server crashes or the abort handler
+// doesn't fire, the slot auto-expires after 30s. The refresh every 2s (poll
+// interval) keeps it alive during normal operation.
+
+const SSE_SLOT_TTL_SEC = 30;
+const SSE_SLOT_PREFIX = 'siv:sse:active';
+
+function slotKey(userId: string, projectId: string): string {
+  return `${SSE_SLOT_PREFIX}:${userId}:${projectId}`;
+}
+
+/**
+ * Claim an SSE slot for a user:project. Returns true if the slot was claimed
+ * (no existing active connection), false if a slot is already held.
+ *
+ * Uses Redis SET NX (only-if-not-exists) with a TTL. Atomic — no race condition.
+ */
+export async function claimSseSlot(userId: string, projectId: string): Promise<boolean> {
+  const result = await redis.set(slotKey(userId, projectId), '1', {
+    ex: SSE_SLOT_TTL_SEC,
+    nx: true,
+  });
+  return result === 'OK';
+}
+
+/**
+ * Release an SSE slot. Called when the client disconnects (abort signal) or
+ * when the stream reaches a terminal status. Allows immediate reconnection.
+ */
+export async function releaseSseSlot(userId: string, projectId: string): Promise<void> {
+  await redis.del(slotKey(userId, projectId));
+}
+
+/**
+ * Refresh an SSE slot's TTL. Called every poll interval (2s) to keep the slot
+ * alive while the stream is active. If the server stops refreshing (crash,
+// OOM), the slot expires after 30s — the safety net.
+ */
+export async function refreshSseSlot(userId: string, projectId: string): Promise<void> {
+  await redis.expire(slotKey(userId, projectId), SSE_SLOT_TTL_SEC);
+}

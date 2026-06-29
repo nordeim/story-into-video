@@ -33,6 +33,14 @@ describe('C3: Rate limiting client module', () => {
     expect(source).toMatch(/export.*sseRateLimit/);
   });
 
+  // T5: New claim/release/refresh functions for SSE slot management
+  it('T5: exports claimSseSlot, releaseSseSlot, and refreshSseSlot', () => {
+    const source = readFileSync(RATE_LIMIT_PATH, 'utf-8');
+    expect(source).toMatch(/export.*claimSseSlot/);
+    expect(source).toMatch(/export.*releaseSseSlot/);
+    expect(source).toMatch(/export.*refreshSseSlot/);
+  });
+
   it('uses @upstash/ratelimit + @upstash/redis', () => {
     const source = readFileSync(RATE_LIMIT_PATH, 'utf-8');
     expect(source).toMatch(/from ['"]@upstash\/ratelimit['"]/);

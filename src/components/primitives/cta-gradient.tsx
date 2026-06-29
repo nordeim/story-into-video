@@ -7,7 +7,7 @@ interface CtaGradientProps {
 }
 
 /**
- * Tier-3 CTA: amber gradient pill (`from-amber-400 to-amber-500`). More
+ * Tier-3 CTA: amber gradient pill (`from-primary to-primary`). More
  * assertive than the ghost link, less than the solid amber pill. Used only
  * by the Examples section ("Clone this project for free"). Hidden on mobile
  * (where the carousel auto-scrolls).
@@ -21,9 +21,9 @@ export function CtaGradient({ children, href, className }: CtaGradientProps) {
       className={cn(
         'group inline-flex items-center gap-2.5 rounded-full px-10 py-4',
         'text-[15px] font-semibold transition-all duration-200',
-        'bg-gradient-to-r from-amber-400 to-amber-500 text-zinc-950',
-        'hover:shadow-lg hover:shadow-amber-400/30',
-        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400',
+        'from-primary to-primary bg-gradient-to-r text-zinc-950',
+        'hover:shadow-primary/30 hover:shadow-lg',
+        'focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2',
         className,
       )}
     >

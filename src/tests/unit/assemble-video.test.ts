@@ -53,11 +53,7 @@ vi.mock('@/lib/env', () => ({
   env: mockEnv,
 }));
 
-import {
-  assembleVideo,
-  buildFfmpegCommand,
-  getFfmpegPath,
-} from '@/features/pipeline/domain/assemble-video';
+import { assembleVideo, getFfmpegPath } from '@/features/pipeline/domain/assemble-video';
 
 describe('T3: assemble-video rewrite', () => {
   beforeEach(() => {
@@ -152,14 +148,9 @@ describe('T3: assemble-video rewrite', () => {
     expect(result.duration).toBe(20); // 8 + 12
   });
 
-  it('buildFfmpegCommand produces a filter string containing concat + scale + subtitles', () => {
-    const args = buildFfmpegCommand(validInput, '/tmp/out.mp4');
-    const filterArg = args.find((a) => typeof a === 'string' && a.includes('concat'));
-    expect(filterArg).toBeDefined();
-    expect(filterArg).toMatch(/concat=/);
-    expect(filterArg).toMatch(/scale=/);
-    expect(filterArg).toMatch(/subtitles=/);
-  });
+  // T10 (M-5): Removed buildFfmpegCommand test — the function was dead code
+  // (never called in production). The filter string is now tested via the
+  // assembleVideo integration test above which verifies the full FFmpeg pipeline.
 });
 
 describe('T1: system ffmpeg path resolution', () => {

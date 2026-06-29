@@ -55,7 +55,39 @@ export async function GET(
     const signedUrl = await getSignedDownloadUrl('videos', project.videoKey);
     return NextResponse.json({ url: signedUrl }, { status: 200 });
   } catch (err) {
-    console.error('[Download] R2 signing failed:', err);
+    // T6 (M-1): Classify the error so operators can distinguish transient
+    // from permanent failures. AWS SDK errors carry a `.name` property.
+    const errorName = err instanceof Error ? err.name : 'UnknownError';
+    const message = err instanceof Error ? err.message : String(err);
+
+    if (
+      errorName.includes('S3') ||
+      errorName.includes('NoSuchKey') ||
+      errorName.includes('NoSuchBucket')
+    ) {
+      // R2/S3 service error — the bucket or key doesn't exist, or credentials are wrong.
+      console.error('[Download] R2/S3 service error:', errorName, message);
+      return NextResponse.json(
+        { error: 'Storage service error — the video file may not exist.' },
+        { status: 502 },
+      );
+    }
+
+    if (
+      errorName.includes('Timeout') ||
+      errorName.includes('Networking') ||
+      errorName.includes('Connection')
+    ) {
+      // Transient network error — the user can retry.
+      console.error('[Download] R2 network/timeout error:', errorName, message);
+      return NextResponse.json(
+        { error: 'Storage timeout — please retry in a moment.' },
+        { status: 504 },
+      );
+    }
+
+    // Unexpected error — log full details for operators, return generic 500.
+    console.error('[Download] Unexpected signing error:', errorName, message);
     return NextResponse.json(
       { error: 'Storage error — could not generate download URL.' },
       { status: 500 },

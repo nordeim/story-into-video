@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Check } from 'lucide-react';
 
 import type { Plan as TierPlan } from '@/features/billing/domain/tier-limits';
+import { billingCheckoutAction } from '@/features/billing/actions';
 
 type BillingPlan = TierPlan | 'free';
 
@@ -57,7 +58,7 @@ export const metadata = {
 
 export default function BillingPage() {
   return (
-    <main className="min-h-screen bg-zinc-950 px-6 py-16">
+    <main className="bg-background min-h-screen px-6 py-16">
       <div className="mx-auto max-w-5xl">
         <div className="mb-12 text-center">
           <h1 className="font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl">
@@ -80,10 +81,7 @@ export default function BillingPage() {
                 <ul className="mt-6 space-y-2">
                   {features.map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-xs text-zinc-400">
-                      <Check
-                        className="mt-0.5 h-3 w-3 shrink-0 text-amber-400"
-                        aria-hidden="true"
-                      />
+                      <Check className="text-primary mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
                       {feature}
                     </li>
                   ))}
@@ -91,10 +89,12 @@ export default function BillingPage() {
                 {plan === 'free' ? (
                   <p className="mt-6 text-center text-xs text-zinc-500">Current plan</p>
                 ) : (
-                  <form action={`/api/stripe/checkout?plan=${plan}`} method="POST" className="mt-6">
+                  <form action={billingCheckoutAction} className="mt-6">
                     <button
                       type="submit"
-                      className="w-full rounded-full bg-amber-400 px-4 py-2 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+                      name="plan"
+                      value={plan}
+                      className="bg-primary hover:bg-primary focus-visible:outline-primary w-full rounded-full px-4 py-2 text-sm font-bold text-zinc-950 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
                     >
                       Upgrade to {plan}
                     </button>
@@ -108,7 +108,7 @@ export default function BillingPage() {
         <div className="mt-12 text-center">
           <Link
             href="/dashboard"
-            className="text-sm text-zinc-400 transition-colors hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+            className="hover:text-primary focus-visible:outline-primary text-sm text-zinc-400 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             ← Back to dashboard
           </Link>

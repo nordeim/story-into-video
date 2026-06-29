@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-// Mock the db
-vi.mock('@/lib/db', () => ({
-  db: {
+// Mock the db — T3: now includes db.transaction that calls the callback with a mock tx
+vi.mock('@/lib/db', () => {
+  const mockTx = {
     insert: vi.fn(() => ({
       values: vi.fn(() => ({
         returning: vi
@@ -14,8 +14,18 @@ vi.mock('@/lib/db', () => ({
           ]),
       })),
     })),
-  },
-}));
+  };
+  return {
+    db: {
+      // T3: db.transaction calls the callback with a mock tx
+      transaction: vi.fn(async (callback: (tx: typeof mockTx) => Promise<unknown>) => {
+        return callback(mockTx);
+      }),
+      // Keep insert at the top level for backward compat with any direct db.insert calls
+      insert: mockTx.insert,
+    },
+  };
+});
 
 // Mock verifySession
 vi.mock('@/features/auth/domain/verify-session', () => ({
@@ -27,11 +37,17 @@ vi.mock('@/features/pipeline/domain/moderate-content', () => ({
   moderateContent: vi.fn(),
 }));
 
-// Mock billing queries
+// Mock billing queries — T3: now exports debitCreditsTx (transaction-scoped variant)
 vi.mock('@/features/billing/queries', () => ({
   getOrCreateSubscription: vi.fn(),
   // C5: debitCredits now returns DebitResult { idempotent, eventId, creditsRemaining }
   debitCredits: vi.fn().mockResolvedValue({
+    idempotent: false,
+    eventId: 'evt-1',
+    creditsRemaining: 45,
+  }),
+  // T3: debitCreditsTx is the transaction-scoped variant called inside db.transaction
+  debitCreditsTx: vi.fn().mockResolvedValue({
     idempotent: false,
     eventId: 'evt-1',
     creditsRemaining: 45,
@@ -82,7 +98,7 @@ import { verifySession } from '@/features/auth/domain/verify-session';
 import { moderateContent } from '@/features/pipeline/domain/moderate-content';
 import {
   getOrCreateSubscription,
-  debitCredits,
+  debitCreditsTx,
   InsufficientCreditsError,
 } from '@/features/billing/queries';
 import { inngest, PIPELINE_EVENT } from '@/lib/inngest/client';
@@ -151,7 +167,8 @@ describe('S2-02: createProjectAction Server Action', () => {
       expires: '',
     } as never);
     vi.mocked(moderateContent).mockResolvedValue({ flagged: false, categories: [] });
-    vi.mocked(debitCredits).mockRejectedValue(new InsufficientCreditsError(5, 2));
+    // T3: the action now calls debitCreditsTx inside a transaction
+    vi.mocked(debitCreditsTx).mockRejectedValue(new InsufficientCreditsError(5, 2));
 
     const result = await createProjectAction(validInput);
     expect(result.success).toBe(false);
@@ -165,7 +182,7 @@ describe('S2-02: createProjectAction Server Action', () => {
     } as never);
     vi.mocked(moderateContent).mockResolvedValue({ flagged: false, categories: [] });
     vi.mocked(getOrCreateSubscription).mockResolvedValue({} as never);
-    vi.mocked(debitCredits).mockResolvedValue({
+    vi.mocked(debitCreditsTx).mockResolvedValue({
       idempotent: false,
       eventId: 'evt-1',
       creditsRemaining: 45,
@@ -174,9 +191,9 @@ describe('S2-02: createProjectAction Server Action', () => {
     // The action calls redirect() at the end — which throws NEXT_REDIRECT
     await expect(createProjectAction(validInput)).rejects.toThrow('NEXT_REDIRECT');
 
-    // Verify the db.insert was called
+    // T3: verify the db.transaction was called (wraps INSERT + debit)
     const { db } = await import('@/lib/db');
-    expect(db.insert).toHaveBeenCalled();
+    expect(db.transaction).toHaveBeenCalled();
   });
 
   it('follows auth-first pattern: verifySession is the first call', async () => {
@@ -185,7 +202,7 @@ describe('S2-02: createProjectAction Server Action', () => {
       expires: '',
     } as never);
     vi.mocked(moderateContent).mockResolvedValue({ flagged: false, categories: [] });
-    vi.mocked(debitCredits).mockResolvedValue({
+    vi.mocked(debitCreditsTx).mockResolvedValue({
       idempotent: false,
       eventId: 'evt-1',
       creditsRemaining: 45,
@@ -207,7 +224,7 @@ describe('S2-02: createProjectAction Server Action', () => {
     } as never);
     vi.mocked(moderateContent).mockResolvedValue({ flagged: false, categories: [] });
     vi.mocked(getOrCreateSubscription).mockResolvedValue({} as never);
-    vi.mocked(debitCredits).mockResolvedValue({
+    vi.mocked(debitCreditsTx).mockResolvedValue({
       idempotent: false,
       eventId: 'evt-1',
       creditsRemaining: 45,
@@ -225,16 +242,17 @@ describe('S2-02: createProjectAction Server Action', () => {
     });
   });
 
-  // C4: Credits must be debited AFTER the project insert succeeds.
-  // If the DB insert fails, the user should NOT lose credits.
-  // We verify this by checking the source code order: the projects insert
-  // must appear BEFORE debitCredits in the action source.
-  it('C4: project insert happens BEFORE credit debit (source order check)', () => {
+  // C4 + T3: Credits must be debited AFTER the project insert succeeds, and
+  // both must be inside the same db.transaction() so a debit failure rolls back
+  // the insert. We verify by checking the source code order: the projects insert
+  // must appear BEFORE debitCreditsTx in the action source.
+  it('C4+T3: project insert happens BEFORE credit debit inside the transaction (source order check)', () => {
     const actionsPath = resolve(__dirname, '../../features/projects/actions.ts');
     const source = readFileSync(actionsPath, 'utf-8');
-    // Use .insert(projects) to match across the multiline db.insert(projects) call
+    // Use .insert(projects) to match across the multiline tx.insert(projects) call
     const insertPos = source.indexOf('.insert(projects)');
-    const debitPos = source.indexOf('debitCredits(');
+    // T3: the action now calls debitCreditsTx (not debitCredits) inside the transaction
+    const debitPos = source.indexOf('debitCreditsTx(');
     expect(insertPos).toBeGreaterThan(-1);
     expect(debitPos).toBeGreaterThan(-1);
     expect(insertPos).toBeLessThan(debitPos);

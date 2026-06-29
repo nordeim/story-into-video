@@ -1,6 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
+import type { Database } from '@/lib/db';
 import { subscriptions, usageEvents } from '@/lib/db/schema';
 
 /**
@@ -95,6 +96,12 @@ export type DebitOperation =
  *   key (which handles cross-connection retries), this is mathematically
  *   race-condition-proof.
  *
+ * T3 — Transaction variant:
+ *   This is the standalone entry point that opens its own transaction.
+ *   Callers that already hold a transaction (e.g., createProjectAction
+ *   wrapping INSERT + debit atomically) should call `debitCreditsTx(tx, ...)`
+ *   instead to avoid nested transactions.
+ *
  * @param userId - The user to debit
  * @param amount - Credits to deduct
  * @param operationType - The operation enum value (for the audit log)
@@ -108,69 +115,93 @@ export async function debitCredits(
   idempotencyKey: string,
   projectId?: string,
 ): Promise<DebitResult> {
-  return await db.transaction(async (tx) => {
-    // 1. IDEMPOTENCY GATE — attempt to insert the usage_event first.
-    // If this key was already processed (e.g., Inngest retry), the
-    // ON CONFLICT DO NOTHING returns an empty array and we abort without
-    // touching the credit balance.
-    const [inserted] = await tx
-      .insert(usageEvents)
-      .values({
-        userId,
-        projectId: projectId ?? null,
-        type: operationType,
-        cost: amount,
-        idempotencyKey,
-      })
-      .onConflictDoNothing({
-        target: usageEvents.idempotencyKey,
-      })
-      .returning({ id: usageEvents.id });
+  return await db.transaction(async (tx) =>
+    debitCreditsTx(tx, userId, amount, operationType, idempotencyKey, projectId),
+  );
+}
 
-    if (!inserted) {
-      // Duplicate idempotencyKey — this exact debit was already processed.
-      // Return without debiting. The caller should skip side effects too.
-      return { idempotent: true, eventId: null, creditsRemaining: null };
-    }
+/**
+ * T3 (H-1) — Transaction-scoped variant of debitCredits.
+ *
+ * Accepts an existing transaction handle (`tx`) from a caller that has already
+ * opened `db.transaction(...)`. This lets the caller wrap multiple operations
+ * (e.g., project INSERT + credit debit) in a SINGLE transaction so that if the
+ * debit throws InsufficientCreditsError, the INSERT is rolled back too — no
+ * orphan project rows.
+ *
+ * The standalone `debitCredits(userId, ...)` (above) is a thin wrapper that
+ * opens its own transaction and delegates to this function. Pipeline steps
+ * that don't need a shared transaction should keep using `debitCredits`.
+ */
+export async function debitCreditsTx(
+  tx: Parameters<Parameters<Database['transaction']>[0]>[0],
+  userId: string,
+  amount: number,
+  operationType: DebitOperation,
+  idempotencyKey: string,
+  projectId?: string,
+): Promise<DebitResult> {
+  // 1. IDEMPOTENCY GATE — attempt to insert the usage_event first.
+  // If this key was already processed (e.g., Inngest retry), the
+  // ON CONFLICT DO NOTHING returns an empty array and we abort without
+  // touching the credit balance.
+  const [inserted] = await tx
+    .insert(usageEvents)
+    .values({
+      userId,
+      projectId: projectId ?? null,
+      type: operationType,
+      cost: amount,
+      idempotencyKey,
+    })
+    .onConflictDoNothing({
+      target: usageEvents.idempotencyKey,
+    })
+    .returning({ id: usageEvents.id });
 
-    // 2. LOCK the subscription row for the duration of the transaction.
-    // .for('update') prevents concurrent transactions from reading the same
-    // creditsRemaining value until this transaction commits or rolls back.
-    const [sub] = await tx
-      .select()
-      .from(subscriptions)
-      .where(eq(subscriptions.userId, userId))
-      .for('update')
-      .limit(1);
+  if (!inserted) {
+    // Duplicate idempotencyKey — this exact debit was already processed.
+    // Return without debiting. The caller should skip side effects too.
+    return { idempotent: true, eventId: null, creditsRemaining: null };
+  }
 
-    if (!sub) {
-      // Throw to roll back the usage_event insert — the user has no subscription.
-      throw new Error(`No subscription found for user ${userId}`);
-    }
+  // 2. LOCK the subscription row for the duration of the transaction.
+  // .for('update') prevents concurrent transactions from reading the same
+  // creditsRemaining value until this transaction commits or rolls back.
+  const [sub] = await tx
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.userId, userId))
+    .for('update')
+    .limit(1);
 
-    if (sub.creditsRemaining < amount) {
-      // Throw to roll back the usage_event insert — InsufficientCreditsError
-      // propagates to the caller, who can surface it to the user. The
-      // transaction rollback means the user can retry later after topping up.
-      throw new InsufficientCreditsError(amount, sub.creditsRemaining);
-    }
+  if (!sub) {
+    // Throw to roll back the usage_event insert — the user has no subscription.
+    throw new Error(`No subscription found for user ${userId}`);
+  }
 
-    // 3. DEBIT — subtract the credits from the locked row.
-    const newBalance = sub.creditsRemaining - amount;
-    await tx
-      .update(subscriptions)
-      .set({
-        creditsRemaining: newBalance,
-        updatedAt: new Date(),
-      })
-      .where(eq(subscriptions.id, sub.id));
+  if (sub.creditsRemaining < amount) {
+    // Throw to roll back the usage_event insert — InsufficientCreditsError
+    // propagates to the caller, who can surface it to the user. The
+    // transaction rollback means the user can retry later after topping up.
+    throw new InsufficientCreditsError(amount, sub.creditsRemaining);
+  }
 
-    return {
-      idempotent: false,
-      eventId: inserted.id,
+  // 3. DEBIT — subtract the credits from the locked row.
+  const newBalance = sub.creditsRemaining - amount;
+  await tx
+    .update(subscriptions)
+    .set({
       creditsRemaining: newBalance,
-    };
-  });
+      updatedAt: new Date(),
+    })
+    .where(eq(subscriptions.id, sub.id));
+
+  return {
+    idempotent: false,
+    eventId: inserted.id,
+    creditsRemaining: newBalance,
+  };
 }
 
 /** Refill credits (called on subscription renewal or credit purchase) */

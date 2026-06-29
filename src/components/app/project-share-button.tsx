@@ -15,7 +15,10 @@ interface ProjectShareButtonProps {
   title?: string;
 }
 
-export function ProjectShareButton({ url, title = 'My StoryIntoVideo project' }: ProjectShareButtonProps) {
+export function ProjectShareButton({
+  url,
+  title = 'My StoryIntoVideo project',
+}: ProjectShareButtonProps) {
   const [copied, setCopied] = useState(false);
 
   async function handleShare() {
@@ -44,10 +47,10 @@ export function ProjectShareButton({ url, title = 'My StoryIntoVideo project' }:
     <button
       type="button"
       onClick={handleShare}
-      className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+      className="focus-visible:outline-primary inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2"
       aria-label="Share project"
     >
-      {copied ? <Check className="h-4 w-4 text-amber-400" /> : <Share2 className="h-4 w-4" />}
+      {copied ? <Check className="text-primary h-4 w-4" /> : <Share2 className="h-4 w-4" />}
       {copied ? 'Copied!' : 'Share'}
     </button>
   );

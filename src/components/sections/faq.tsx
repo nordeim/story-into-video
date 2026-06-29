@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
  */
 export function Faq() {
   return (
-    <section className="bg-zinc-950 py-24" aria-labelledby="faq-heading">
+    <section className="bg-background py-24" aria-labelledby="faq-heading">
       <div className="mx-auto max-w-3xl px-6">
         <div className="mb-12 text-center">
           <Eyebrow className="mb-4">FAQ</Eyebrow>
@@ -39,15 +39,15 @@ export function Faq() {
               <AccordionTrigger
                 className={cn(
                   'flex w-full items-center justify-between gap-4 py-6 text-start',
-                  'focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400',
+                  'focus-visible:outline-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2',
                   'group hover:no-underline',
                 )}
               >
-                <span className="pr-4 text-start text-base font-medium text-white transition-colors group-hover:text-amber-300 sm:text-lg">
+                <span className="group-hover:text-primary pr-4 text-start text-base font-medium text-white transition-colors sm:text-lg">
                   {item.question}
                 </span>
                 <span
-                  className="shrink-0 text-zinc-500 transition-transform duration-300 group-hover:text-amber-400 [[data-state=open]>&]:rotate-45"
+                  className="group-hover:text-primary shrink-0 text-zinc-500 transition-transform duration-300 [[data-state=open]>&]:rotate-45"
                   aria-hidden="true"
                 >
                   <Plus className="h-5 w-5" />

@@ -62,7 +62,13 @@ export default auth(async (req) => {
   const isProtectedPath = protectedPaths.some((p) => nextUrl.pathname.startsWith(p));
 
   if (isProtectedPath && !isAuthenticated) {
-    const signInUrl = new URL('/sign-in', nextUrl.origin);
+    // T2 fix: Use env.NEXT_PUBLIC_APP_URL (canonical public HTTPS URL) as the
+    // redirect base, NOT nextUrl.origin. Behind a TLS-terminating reverse proxy
+    // (Cloudflare Tunnel), nextUrl.protocol is 'http:' and/or the Host header
+    // may not match the public domain — causing the browser to connect to
+    // http://public-domain:80 → ERR_CONNECTION_REFUSED. env.NEXT_PUBLIC_APP_URL
+    // is always the canonical HTTPS URL the user's browser can actually reach.
+    const signInUrl = new URL('/sign-in', env.NEXT_PUBLIC_APP_URL);
     signInUrl.searchParams.set('callbackUrl', nextUrl.pathname);
     return NextResponse.redirect(signInUrl);
   }

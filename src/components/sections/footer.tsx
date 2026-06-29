@@ -9,21 +9,21 @@ import { FOOTER_COLUMNS, FOOTER_BRAND, FOOTER_COPYRIGHT } from '@/lib/data/foote
  */
 export function Footer() {
   return (
-    <footer className="border-t border-white/[0.06] bg-zinc-950 px-6 py-16">
+    <footer className="bg-background border-t border-white/[0.06] px-6 py-16">
       <div className="mx-auto max-w-7xl">
         <div className="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-4">
           {/* Brand block */}
           <div className="lg:col-span-1">
             <Link
               href="/"
-              className="font-heading text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+              className="font-heading focus-visible:outline-primary text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2"
             >
               {FOOTER_BRAND.name}
             </Link>
             <p className="mt-2 max-w-[24ch] text-sm text-zinc-400">{FOOTER_BRAND.tagline}</p>
             <a
               href={`mailto:${FOOTER_BRAND.supportEmail}`}
-              className="mt-4 inline-block text-sm text-zinc-400 transition-colors hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+              className="hover:text-primary focus-visible:outline-primary mt-4 inline-block text-sm text-zinc-400 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
             >
               {FOOTER_BRAND.supportEmail}
             </a>
@@ -40,7 +40,7 @@ export function Footer() {
                   <li key={link.label}>
                     <a
                       href={link.href}
-                      className="block py-1.5 text-sm text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+                      className="focus-visible:outline-primary block py-1.5 text-sm text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
                     >
                       {link.label}
                     </a>
@@ -57,19 +57,19 @@ export function Footer() {
           <nav className="flex gap-6" aria-label="Legal">
             <a
               href="/privacy"
-              className="text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+              className="focus-visible:outline-primary text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
             >
               Privacy Policy
             </a>
             <a
               href="/terms"
-              className="text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+              className="focus-visible:outline-primary text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
             >
               Terms of Service
             </a>
             <a
               href="/contact"
-              className="text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+              className="focus-visible:outline-primary text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
             >
               Contact
             </a>

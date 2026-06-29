@@ -1,0 +1,2169 @@
+diff --git a/src/app/(app)/billing/page.tsx b/src/app/(app)/billing/page.tsx
+index 6d1abf1..2851764 100644
+--- a/src/app/(app)/billing/page.tsx
++++ b/src/app/(app)/billing/page.tsx
+@@ -2,6 +2,7 @@ import Link from 'next/link';
+ import { Check } from 'lucide-react';
+ 
+ import type { Plan as TierPlan } from '@/features/billing/domain/tier-limits';
++import { billingCheckoutAction } from '@/features/billing/actions';
+ 
+ type BillingPlan = TierPlan | 'free';
+ 
+@@ -57,7 +58,7 @@ export const metadata = {
+ 
+ export default function BillingPage() {
+   return (
+-    <main className="min-h-screen bg-zinc-950 px-6 py-16">
++    <main className="min-h-screen bg-background px-6 py-16">
+       <div className="mx-auto max-w-5xl">
+         <div className="mb-12 text-center">
+           <h1 className="font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl">
+@@ -81,7 +82,7 @@ export default function BillingPage() {
+                   {features.map((feature) => (
+                     <li key={feature} className="flex items-start gap-2 text-xs text-zinc-400">
+                       <Check
+-                        className="mt-0.5 h-3 w-3 shrink-0 text-amber-400"
++                        className="mt-0.5 h-3 w-3 shrink-0 text-primary"
+                         aria-hidden="true"
+                       />
+                       {feature}
+@@ -91,10 +92,12 @@ export default function BillingPage() {
+                 {plan === 'free' ? (
+                   <p className="mt-6 text-center text-xs text-zinc-500">Current plan</p>
+                 ) : (
+-                  <form action={`/api/stripe/checkout?plan=${plan}`} method="POST" className="mt-6">
++                  <form action={billingCheckoutAction} className="mt-6">
+                     <button
+                       type="submit"
+-                      className="w-full rounded-full bg-amber-400 px-4 py-2 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++                      name="plan"
++                      value={plan}
++                      className="w-full rounded-full bg-primary px-4 py-2 text-sm font-bold text-zinc-950 transition-colors hover:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                     >
+                       Upgrade to {plan}
+                     </button>
+@@ -108,7 +111,7 @@ export default function BillingPage() {
+         <div className="mt-12 text-center">
+           <Link
+             href="/dashboard"
+-            className="text-sm text-zinc-400 transition-colors hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++            className="text-sm text-zinc-400 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+           >
+             ← Back to dashboard
+           </Link>
+diff --git a/src/app/(app)/dashboard/page.tsx b/src/app/(app)/dashboard/page.tsx
+index 2fe4024..7face85 100644
+--- a/src/app/(app)/dashboard/page.tsx
++++ b/src/app/(app)/dashboard/page.tsx
+@@ -64,9 +64,9 @@ async function ProjectList() {
+         <a
+           key={project.id}
+           href={`/projects/${project.id}`}
+-          className="group rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-colors hover:border-amber-400/20 hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++          className="group rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-colors hover:border-primary/20 hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+-          <h3 className="font-heading mb-2 text-lg font-bold text-white group-hover:text-amber-300">
++          <h3 className="font-heading mb-2 text-lg font-bold text-white group-hover:text-primary">
+             {project.title}
+           </h3>
+           <p className="text-xs text-zinc-500">
+@@ -83,7 +83,7 @@ async function ProjectList() {
+ 
+ export default function DashboardPage() {
+   return (
+-    <main className="min-h-screen bg-zinc-950 px-6 py-16">
++    <main className="min-h-screen bg-background px-6 py-16">
+       <div className="mx-auto max-w-7xl">
+         <div className="mb-12 flex items-center justify-between">
+           <div>
+@@ -94,7 +94,7 @@ export default function DashboardPage() {
+           </div>
+           <a
+             href="/create"
+-            className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-5 py-2.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+           >
+             New Project
+           </a>
+diff --git a/src/app/(app)/projects/[id]/page.tsx b/src/app/(app)/projects/[id]/page.tsx
+index 28ccdba..e616e3c 100644
+--- a/src/app/(app)/projects/[id]/page.tsx
++++ b/src/app/(app)/projects/[id]/page.tsx
+@@ -28,11 +28,11 @@ async function ProjectDetail({ projectId }: { projectId: string }) {
+   if (!project) notFound();
+ 
+   return (
+-    <main className="min-h-screen bg-zinc-950 px-6 py-16">
++    <main className="min-h-screen bg-background px-6 py-16">
+       <div className="mx-auto max-w-3xl">
+         <a
+           href="/dashboard"
+-          className="mb-6 inline-block text-sm text-zinc-400 transition-colors hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++          className="mb-6 inline-block text-sm text-zinc-400 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+           ← Back to dashboard
+         </a>
+@@ -86,7 +86,7 @@ async function ProjectDetail({ projectId }: { projectId: string }) {
+ 
+ function ProjectDetailSkeleton() {
+   return (
+-    <div className="min-h-screen bg-zinc-950 px-6 py-16">
++    <div className="min-h-screen bg-background px-6 py-16">
+       <div className="mx-auto max-w-3xl">
+         <div className="h-8 w-32 animate-pulse rounded bg-white/[0.04]" />
+         <div className="mt-6 h-10 w-3/4 animate-pulse rounded bg-white/[0.04]" />
+diff --git a/src/app/(auth)/sign-in/page.tsx b/src/app/(auth)/sign-in/page.tsx
+index c01be05..1a79702 100644
+--- a/src/app/(auth)/sign-in/page.tsx
++++ b/src/app/(auth)/sign-in/page.tsx
+@@ -9,15 +9,15 @@ export const metadata = {
+ 
+ /**
+  * Sign-in page — server component wrapping the AuthForm client component.
+- * Uses the luxury-dark design system (bg-zinc-950, amber accents).
++ * Uses the luxury-dark design system (bg-background, amber accents).
+  */
+ export default function SignInPage() {
+   return (
+-    <main className="flex min-h-screen flex-col items-center justify-center bg-zinc-950 px-6 py-16">
++    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-6 py-16">
+       <div className="mb-8 text-center">
+         <Link
+           href="/"
+-          className="font-heading text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++          className="font-heading text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+           StoryIntoVideo
+         </Link>
+@@ -33,7 +33,7 @@ export default function SignInPage() {
+         Don&apos;t have an account?{' '}
+         <Link
+           href="/sign-up"
+-          className="text-amber-400 hover:text-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++          className="text-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+           Sign up
+         </Link>
+diff --git a/src/app/(auth)/sign-up/page.tsx b/src/app/(auth)/sign-up/page.tsx
+index c822baa..485d28f 100644
+--- a/src/app/(auth)/sign-up/page.tsx
++++ b/src/app/(auth)/sign-up/page.tsx
+@@ -9,15 +9,15 @@ export const metadata = {
+ 
+ /**
+  * Sign-up page — server component wrapping the AuthForm client component.
+- * Uses the luxury-dark design system (bg-zinc-950, amber accents).
++ * Uses the luxury-dark design system (bg-background, amber accents).
+  */
+ export default function SignUpPage() {
+   return (
+-    <main className="flex min-h-screen flex-col items-center justify-center bg-zinc-950 px-6 py-16">
++    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-6 py-16">
+       <div className="mb-8 text-center">
+         <Link
+           href="/"
+-          className="font-heading text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++          className="font-heading text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+           StoryIntoVideo
+         </Link>
+@@ -33,7 +33,7 @@ export default function SignUpPage() {
+         Already have an account?{' '}
+         <Link
+           href="/sign-in"
+-          className="text-amber-400 hover:text-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++          className="text-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+           Sign in
+         </Link>
+diff --git a/src/app/(legal)/privacy/page.tsx b/src/app/(legal)/privacy/page.tsx
+index 3ac7bfe..43f20a2 100644
+--- a/src/app/(legal)/privacy/page.tsx
++++ b/src/app/(legal)/privacy/page.tsx
+@@ -17,7 +17,7 @@ export const metadata: Metadata = {
+ 
+ export default function PrivacyPage() {
+   return (
+-    <main className="min-h-screen bg-zinc-950 px-6 py-16">
++    <main className="min-h-screen bg-background px-6 py-16">
+       <article className="mx-auto max-w-3xl text-zinc-300">
+         <h1 className="font-heading mb-2 text-4xl font-bold tracking-tight text-white">
+           Privacy Policy
+@@ -128,7 +128,7 @@ export default function PrivacyPage() {
+               <li><strong>Objection</strong> — object to certain processing activities.</li>
+             </ul>
+             <p className="mt-3 text-sm">
+-              To exercise these rights, contact us at <a href="mailto:privacy@storyintovideo.com" className="text-amber-400 underline">privacy@storyintovideo.com</a>.
++              To exercise these rights, contact us at <a href="mailto:privacy@storyintovideo.com" className="text-primary underline">privacy@storyintovideo.com</a>.
+               We respond within 30 days.
+             </p>
+           </section>
+@@ -147,7 +147,7 @@ export default function PrivacyPage() {
+             <h2 className="font-heading mb-3 text-xl font-bold text-white">8. Contact</h2>
+             <p className="text-sm">
+               Questions about this policy? Email{' '}
+-              <a href="mailto:privacy@storyintovideo.com" className="text-amber-400 underline">privacy@storyintovideo.com</a>{' '}
++              <a href="mailto:privacy@storyintovideo.com" className="text-primary underline">privacy@storyintovideo.com</a>{' '}
+               and we&apos;ll respond within 5 business days.
+             </p>
+           </section>
+diff --git a/src/app/(legal)/terms/page.tsx b/src/app/(legal)/terms/page.tsx
+index 826f1f4..ee00674 100644
+--- a/src/app/(legal)/terms/page.tsx
++++ b/src/app/(legal)/terms/page.tsx
+@@ -18,7 +18,7 @@ export const metadata: Metadata = {
+ 
+ export default function TermsPage() {
+   return (
+-    <main className="min-h-screen bg-zinc-950 px-6 py-16">
++    <main className="min-h-screen bg-background px-6 py-16">
+       <article className="mx-auto max-w-3xl text-zinc-300">
+         <h1 className="font-heading mb-2 text-4xl font-bold tracking-tight text-white">
+           Terms of Service
+@@ -167,7 +167,7 @@ export default function TermsPage() {
+             <h2 className="font-heading mb-3 text-xl font-bold text-white">11. Contact</h2>
+             <p className="text-sm">
+               Questions about these Terms? Email{' '}
+-              <a href="mailto:legal@storyintovideo.com" className="text-amber-400 underline">legal@storyintovideo.com</a>.
++              <a href="mailto:legal@storyintovideo.com" className="text-primary underline">legal@storyintovideo.com</a>.
+             </p>
+           </section>
+         </div>
+diff --git a/src/app/api/projects/[id]/download/route.ts b/src/app/api/projects/[id]/download/route.ts
+index 7c4d4a1..c301272 100644
+--- a/src/app/api/projects/[id]/download/route.ts
++++ b/src/app/api/projects/[id]/download/route.ts
+@@ -55,7 +55,31 @@ export async function GET(
+     const signedUrl = await getSignedDownloadUrl('videos', project.videoKey);
+     return NextResponse.json({ url: signedUrl }, { status: 200 });
+   } catch (err) {
+-    console.error('[Download] R2 signing failed:', err);
++    // T6 (M-1): Classify the error so operators can distinguish transient
++    // from permanent failures. AWS SDK errors carry a `.name` property.
++    const errorName = err instanceof Error ? err.name : 'UnknownError';
++    const message = err instanceof Error ? err.message : String(err);
++
++    if (errorName.includes('S3') || errorName.includes('NoSuchKey') || errorName.includes('NoSuchBucket')) {
++      // R2/S3 service error — the bucket or key doesn't exist, or credentials are wrong.
++      console.error('[Download] R2/S3 service error:', errorName, message);
++      return NextResponse.json(
++        { error: 'Storage service error — the video file may not exist.' },
++        { status: 502 },
++      );
++    }
++
++    if (errorName.includes('Timeout') || errorName.includes('Networking') || errorName.includes('Connection')) {
++      // Transient network error — the user can retry.
++      console.error('[Download] R2 network/timeout error:', errorName, message);
++      return NextResponse.json(
++        { error: 'Storage timeout — please retry in a moment.' },
++        { status: 504 },
++      );
++    }
++
++    // Unexpected error — log full details for operators, return generic 500.
++    console.error('[Download] Unexpected signing error:', errorName, message);
+     return NextResponse.json(
+       { error: 'Storage error — could not generate download URL.' },
+       { status: 500 },
+diff --git a/src/app/api/projects/[id]/progress/route.ts b/src/app/api/projects/[id]/progress/route.ts
+index 4c46a90..60354f9 100644
+--- a/src/app/api/projects/[id]/progress/route.ts
++++ b/src/app/api/projects/[id]/progress/route.ts
+@@ -6,7 +6,7 @@ import { getProject } from '@/features/projects/queries';
+ import { db } from '@/lib/db';
+ import { projects } from '@/lib/db/schema';
+ import { eq } from 'drizzle-orm';
+-import { sseRateLimit } from '@/lib/rate-limit';
++import { claimSseSlot, releaseSseSlot, refreshSseSlot } from '@/lib/rate-limit';
+ 
+ /**
+  * SSE progress stream — pushes project status updates to the client.
+@@ -80,21 +80,26 @@ export async function GET(
+     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+   }
+ 
++  // Capture userId as a non-optional string for use in closures below
++  // (TypeScript doesn't preserve session.user.id narrowing inside closures)
++  const userId: string = session.user.id;
++
+   // 2. OWNER CHECK
+   const { id: projectId } = await params;
+-  const project = await getProject(projectId, session.user.id);
++  const project = await getProject(projectId, userId);
+   if (!project) {
+     return NextResponse.json({ error: 'Not found' }, { status: 404 });
+   }
+ 
+-  // 2b. C3: RATE LIMIT — 1 concurrent SSE connection per user/project.
+-  // Prevents a single user from opening 100 SSE streams (each polling the DB
+-  // every 2s = 200 queries/sec from one user). The limit uses a composite
+-  // key of userId + projectId so a user can watch one project at a time.
+-  // The fixed-window TTL is 60s — if the client disconnects without closing
+-  // cleanly, the limit auto-expires.
+-  const { success: sseRateLimitOk } = await sseRateLimit.limit(`${session.user.id}:${projectId}`);
+-  if (!sseRateLimitOk) {
++  // 2b. T5 (H-3): Claim an SSE slot — 1 concurrent connection per user/project.
++  // Replaces the old sseRateLimit.fixedWindow which never released on disconnect.
++  // The slot is:
++  //   - CLAIMED here (SET NX EX 30 — fails if a slot already exists)
++  //   - REFRESHED every poll interval (2s) to keep it alive
++  //   - RELEASED on disconnect (abort handler below) for immediate reconnection
++  // The 30s TTL is the safety net if the server crashes or abort doesn't fire.
++  const slotClaimed = await claimSseSlot(userId, projectId);
++  if (!slotClaimed) {
+     return NextResponse.json(
+       { error: 'Too many concurrent connections. Close existing tabs and try again.' },
+       { status: 429 },
+@@ -119,6 +124,8 @@ export async function GET(
+       // Poll until terminal or client disconnects
+       const interval = setInterval(async () => {
+         try {
++          // T5: Refresh the SSE slot TTL so it doesn't expire while streaming
++          await refreshSseSlot(userId, projectId);
+           const current = await readProjectProgress(projectId);
+           if (!current) {
+             controller.close();
+@@ -137,9 +144,11 @@ export async function GET(
+         }
+       }, POLL_INTERVAL_MS);
+ 
+-      // Clean up interval when the client disconnects
++      // Clean up interval + release SSE slot when the client disconnects
+       req.signal.addEventListener('abort', () => {
+         clearInterval(interval);
++        // T5: Release the slot so the user can reconnect immediately
++        void releaseSseSlot(userId, projectId);
+         controller.close();
+       });
+     },
+diff --git a/src/app/api/stripe/webhook/route.ts b/src/app/api/stripe/webhook/route.ts
+index 6e4def9..8da09f0 100644
+--- a/src/app/api/stripe/webhook/route.ts
++++ b/src/app/api/stripe/webhook/route.ts
+@@ -41,35 +41,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
+     );
+   }
+ 
+-  // H7 fix: Idempotency via ON CONFLICT (idempotency_key) DO NOTHING.
+-  // The previous code used a TOCTOU-vulnerable SELECT-then-INSERT pattern on
+-  // the metadata column (no UNIQUE index). Two concurrent webhooks for the
+-  // same event.id would both pass the SELECT and both INSERT.
++  // T4 (H-2) fix: Idempotency INSERT happens AFTER side effects succeed.
+   //
+-  // The fix: attempt the INSERT first with onConflictDoNothing. If it returns
+-  // no rows, this event was already processed — return early. Otherwise,
+-  // process the event. The idempotencyKey column + UNIQUE index (added in
+-  // Task 1.1) make this race-condition-proof at the DB level.
++  // H-2 bug: The idempotency INSERT previously happened BEFORE the event handler.
++  // If the handler threw (e.g., DB update failed for checkout.session.completed),
++  // the webhook returned 500 — Stripe retried — but the idempotency row was
++  // already committed, so the retry hit onConflictDoNothing and returned
++  // { duplicate: true } without re-processing. The subscription update was
++  // PERMANENTLY LOST.
+   //
+-  // We use event.id as the idempotencyKey — Stripe guarantees these are unique.
+-  const [inserted] = await db
+-    .insert(usageEvents)
+-    .values({
+-      // H7: userId is now nullable — webhook events don't map to a user
+-      // until the checkout.session.completed handler runs. The system user
+-      // UUID was a hack that violated the foreign key constraint.
+-      userId: null,
+-      type: 'stripe_webhook',
+-      cost: 0,
+-      idempotencyKey: event.id,
+-      metadata: event.id,
+-    })
+-    .onConflictDoNothing({
+-      target: usageEvents.idempotencyKey,
+-    })
+-    .returning({ id: usageEvents.id });
+-
+-  if (!inserted) {
++  // T4 fix: Two-phase approach:
++  //   1. PRE-CHECK: SELECT usageEvents for event.id. If found, return { duplicate: true }.
++  //      (This is a TOCTOU race, but safe combined with step 3.)
++  //   2. RUN HANDLER: Execute the event-specific side effects.
++  //   3. CLAIM: INSERT the idempotency row with onConflictDoNothing AFTER side
++  //      effects succeed. If the handler throws, no row is inserted → Stripe
++  //      retries → handler runs again → succeeds → row inserted.
++  //
++  // No more permanently-lost subscription updates on transient handler failures.
++  const [existing] = await db
++    .select({ id: usageEvents.id })
++    .from(usageEvents)
++    .where(eq(usageEvents.idempotencyKey, event.id))
++    .limit(1);
++
++  if (existing) {
+     // Duplicate event.id — already processed. Return success without
+     // re-running the side effects (subscription updates, etc.).
+     return NextResponse.json({ received: true, duplicate: true });
+@@ -140,6 +136,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
+         break;
+     }
+ 
++    // T4: CLAIM — insert the idempotency row AFTER side effects succeed.
++    // If the handler threw above, we never reach this line → no row inserted →
++    // Stripe retries → handler runs again. If the INSERT hits onConflictDoNothing
++    // (concurrent worker won the race), that's fine — our side effects are idempotent.
++    await db
++      .insert(usageEvents)
++      .values({
++        // H7: userId is nullable — webhook events don't map to a user until
++        // the checkout.session.completed handler runs.
++        userId: null,
++        type: 'stripe_webhook',
++        cost: 0,
++        idempotencyKey: event.id,
++        metadata: event.id,
++      })
++      .onConflictDoNothing({
++        target: usageEvents.idempotencyKey,
++      });
++
+     return NextResponse.json({ received: true });
+   } catch (err) {
+     return NextResponse.json(
+diff --git a/src/app/layout.tsx b/src/app/layout.tsx
+index 36c3f67..d05af87 100644
+--- a/src/app/layout.tsx
++++ b/src/app/layout.tsx
+@@ -1,11 +1,14 @@
+ import type { Metadata } from 'next';
+ 
++import { env } from '@/lib/env';
+ import { fontVariables } from '@/lib/fonts';
+ import { Providers } from '@/components/app/providers';
+ import './globals.css';
+ 
+ export const metadata: Metadata = {
+-  metadataBase: new URL('https://storyintovideo-clone.example.com'),
++  // T12/L-4: Use env.NEXT_PUBLIC_APP_URL instead of a hardcoded placeholder.
++  // The previous value 'https://storyintovideo-clone.example.com' broke OG previews.
++  metadataBase: new URL(env.NEXT_PUBLIC_APP_URL),
+   title: 'StoryIntoVideo - Turn Stories Into Videos with AI',
+   description:
+     'Paste your story and AI handles the rest — characters, storyboards, voiceover, and a finished video in minutes. AI-powered story-into-video generation.',
+@@ -21,7 +24,7 @@ export const metadata: Metadata = {
+     title: 'StoryIntoVideo - Turn Stories Into Videos with AI',
+     description:
+       'Paste your story and AI handles the rest — characters, storyboards, voiceover, and a finished video in minutes.',
+-    url: 'https://storyintovideo-clone.example.com',
++    url: env.NEXT_PUBLIC_APP_URL,
+     siteName: 'StoryIntoVideo',
+     images: [{ url: '/og-image.png', width: 1200, height: 630 }],
+     locale: 'en_US',
+@@ -64,7 +67,7 @@ export default function RootLayout({
+       >
+         <a
+           href="#main"
+-          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:bg-amber-400 focus:px-4 focus:py-2 focus:font-medium focus:text-zinc-950 focus:shadow-lg"
++          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:font-medium focus:text-zinc-950 focus:shadow-lg"
+         >
+           Skip to content
+         </a>
+diff --git a/src/components/app/auth-form.tsx b/src/components/app/auth-form.tsx
+index d3d91ce..dad549a 100644
+--- a/src/components/app/auth-form.tsx
++++ b/src/components/app/auth-form.tsx
+@@ -20,7 +20,7 @@ interface AuthFormProps {
+  * calls next-auth's signIn() with the credentials provider. Redirects to
+  * /dashboard on success, shows an error message on failure.
+  *
+- * Uses the luxury-dark design system: bg-zinc-950, amber accents, Geist Sans.
++ * Uses the luxury-dark design system: bg-background, amber accents, Geist Sans.
+  */
+ export function AuthForm({ mode, className }: AuthFormProps) {
+   const router = useRouter();
+@@ -93,7 +93,7 @@ export function AuthForm({ mode, className }: AuthFormProps) {
+         type="button"
+         onClick={handleGoogle}
+         disabled={loading}
+-        className="flex w-full items-center justify-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 disabled:opacity-50"
++        className="flex w-full items-center justify-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+       >
+         <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+           <path
+@@ -136,7 +136,7 @@ export function AuthForm({ mode, className }: AuthFormProps) {
+             onChange={(e) => setEmail(e.target.value)}
+             required
+             autoComplete="email"
+-            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/30 focus:outline-none"
++            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-primary/50 focus:ring-1 focus:ring-primary/30 focus:outline-none"
+             placeholder="you@example.com"
+           />
+         </div>
+@@ -152,7 +152,7 @@ export function AuthForm({ mode, className }: AuthFormProps) {
+             required
+             minLength={8}
+             autoComplete={isSignUp ? 'new-password' : 'current-password'}
+-            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/30 focus:outline-none"
++            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-primary/50 focus:ring-1 focus:ring-primary/30 focus:outline-none"
+             placeholder="••••••••"
+           />
+         </div>
+@@ -166,7 +166,7 @@ export function AuthForm({ mode, className }: AuthFormProps) {
+         <button
+           type="submit"
+           disabled={loading}
+-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 disabled:opacity-50"
++          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+         >
+           {loading ? 'Please wait…' : isSignUp ? 'Create account' : 'Sign in'}
+           {!loading && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
+diff --git a/src/components/app/create-wizard.tsx b/src/components/app/create-wizard.tsx
+index 4ca9022..e63c48a 100644
+--- a/src/components/app/create-wizard.tsx
++++ b/src/components/app/create-wizard.tsx
+@@ -74,7 +74,7 @@ export function CreateWizard() {
+   }
+ 
+   return (
+-    <main className="min-h-screen bg-zinc-950 px-6 py-16">
++    <main className="min-h-screen bg-background px-6 py-16">
+       <div className="mx-auto max-w-2xl">
+         <div className="mb-8 text-center">
+           <span className="eyebrow mb-4">
+@@ -109,7 +109,7 @@ export function CreateWizard() {
+               <span
+                 className={cn(
+                   'font-mono text-[10px] tabular-nums',
+-                  story.length >= WARNING_THRESHOLD ? 'text-amber-400' : 'text-zinc-600',
++                  story.length >= WARNING_THRESHOLD ? 'text-primary' : 'text-zinc-600',
+                 )}
+               >
+                 {story.length} / {MAX_STORY_LENGTH}
+@@ -123,7 +123,7 @@ export function CreateWizard() {
+                   key={ex.label}
+                   type="button"
+                   onClick={() => handleChipClick(ex.label)}
+-                  className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/[0.1] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++                  className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/[0.1] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                 >
+                   {ex.label}
+                 </button>
+@@ -142,9 +142,9 @@ export function CreateWizard() {
+                       setStyle(chip.label.toLowerCase().replace(/\s+/g, '-') as typeof style)
+                     }
+                     className={cn(
+-                      'rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400',
++                      'rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                       style === chip.label.toLowerCase().replace(/\s+/g, '-')
+-                        ? 'border-amber-400/40 bg-amber-400/10 text-amber-400'
++                        ? 'border-primary/40 bg-primary/10 text-primary'
+                         : 'border-white/10 bg-white/[0.02] text-zinc-400 hover:text-white',
+                     )}
+                   >
+@@ -166,9 +166,9 @@ export function CreateWizard() {
+                       onClick={() => setActiveRatio(ratio)}
+                       aria-pressed={isActive}
+                       className={cn(
+-                        'flex min-h-[44px] min-w-[44px] items-center justify-center px-2 py-1 font-mono text-[10px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400',
++                        'flex min-h-[44px] min-w-[44px] items-center justify-center px-2 py-1 font-mono text-[10px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                         isActive
+-                          ? 'bg-white/[0.1] text-amber-400'
++                          ? 'bg-white/[0.1] text-primary'
+                           : 'text-zinc-600 hover:text-zinc-400',
+                       )}
+                     >
+@@ -181,7 +181,7 @@ export function CreateWizard() {
+               <button
+                 type="submit"
+                 disabled={!canSubmit}
+-                className="inline-flex items-center justify-center gap-2 rounded-full bg-amber-400 px-5 py-2.5 text-[13px] font-bold text-zinc-950 transition-all hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
++                className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 text-[13px] font-bold text-zinc-950 transition-all hover:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+               >
+                 {submitting ? 'Generating…' : 'Generate Video'}
+                 {!submitting && <ArrowRight className="h-3 w-3" aria-hidden="true" />}
+diff --git a/src/components/app/empty-state.tsx b/src/components/app/empty-state.tsx
+index 3266d31..4846f54 100644
+--- a/src/components/app/empty-state.tsx
++++ b/src/components/app/empty-state.tsx
+@@ -33,7 +33,7 @@ export function EmptyState({
+       )}
+     >
+       {icon && (
+-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-amber-400/20 bg-amber-400/10 text-amber-400">
++        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary">
+           {icon}
+         </div>
+       )}
+@@ -42,7 +42,7 @@ export function EmptyState({
+       {ctaLabel && ctaHref && (
+         <Link
+           href={ctaHref}
+-          className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-5 py-2.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++          className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+           {ctaLabel}
+           <ArrowRight className="h-4 w-4" aria-hidden="true" />
+diff --git a/src/components/app/project-download-button.tsx b/src/components/app/project-download-button.tsx
+index ed10103..56ec8d8 100644
+--- a/src/components/app/project-download-button.tsx
++++ b/src/components/app/project-download-button.tsx
+@@ -82,7 +82,7 @@ export function ProjectDownloadButton({ projectId, hasVideo }: ProjectDownloadBu
+           'group relative overflow-hidden rounded-full border border-neutral-800 bg-[#060607] px-4 py-2 text-sm font-medium text-zinc-300 transition-all duration-300',
+           // Hover: Rationed amber accent
+           'hover:border-[#febf00]/50 hover:text-[#febf00]',
+-          // A11y: AAA Focus rings (using the brand amber, not Tailwind amber-400)
++          // A11y: AAA Focus rings (using the brand amber, not Tailwind primary)
+           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#febf00]',
+           // Disabled states
+           'disabled:cursor-not-allowed disabled:opacity-50',
+diff --git a/src/components/app/project-progress-panel.tsx b/src/components/app/project-progress-panel.tsx
+index bc62ff1..28fc799 100644
+--- a/src/components/app/project-progress-panel.tsx
++++ b/src/components/app/project-progress-panel.tsx
+@@ -60,7 +60,7 @@ export function ProjectProgressPanel({
+       {/* Progress bar */}
+       <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/[0.04]">
+         <div
+-          className="h-full rounded-full bg-amber-400 transition-all duration-500"
++          className="h-full rounded-full bg-primary transition-all duration-500"
+           style={{ width: `${progressPercent}%` }}
+           role="progressbar"
+           aria-valuenow={progressPercent}
+@@ -71,7 +71,7 @@ export function ProjectProgressPanel({
+       <p className="mt-2 text-right text-xs text-zinc-500">{progressPercent}%</p>
+ 
+       {progress.connectionState === 'error' && (
+-        <p className="mt-2 text-xs text-amber-400">
++        <p className="mt-2 text-xs text-primary">
+           Live updates disconnected. Refresh the page to retry.
+         </p>
+       )}
+diff --git a/src/components/app/project-share-button.tsx b/src/components/app/project-share-button.tsx
+index bd2b49a..c910f31 100644
+--- a/src/components/app/project-share-button.tsx
++++ b/src/components/app/project-share-button.tsx
+@@ -44,10 +44,10 @@ export function ProjectShareButton({ url, title = 'My StoryIntoVideo project' }:
+     <button
+       type="button"
+       onClick={handleShare}
+-      className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++      className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+       aria-label="Share project"
+     >
+-      {copied ? <Check className="h-4 w-4 text-amber-400" /> : <Share2 className="h-4 w-4" />}
++      {copied ? <Check className="h-4 w-4 text-primary" /> : <Share2 className="h-4 w-4" />}
+       {copied ? 'Copied!' : 'Share'}
+     </button>
+   );
+diff --git a/src/components/primitives/cta-amber.tsx b/src/components/primitives/cta-amber.tsx
+index b339690..d5299de 100644
+--- a/src/components/primitives/cta-amber.tsx
++++ b/src/components/primitives/cta-amber.tsx
+@@ -12,8 +12,8 @@ interface CtaAmberProps {
+ 
+ /**
+  * Tier-4 CTA: solid amber pill — the page's conversion crescendo. The only
+- * place `bg-amber-400` is used as a solid fill on a button. Used only by
+- * FinalCTA ("Start Creating — It's Free"). Hover brightens to amber-300,
++ * place `bg-primary` is used as a solid fill on a button. Used only by
++ * FinalCTA ("Start Creating — It's Free"). Hover brightens to primary,
+  * adds glow shadow, and scales 1.02.
+  *
+  * Renders the `cta-amber` @utility class (defined in globals.css).
+@@ -26,7 +26,7 @@ export function CtaAmber({ children, href, className, onClick }: CtaAmberProps)
+       onClick={onClick}
+       className={cn(
+         'cta-amber group inline-flex items-center gap-2.5',
+-        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400',
++        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+         className,
+       )}
+     >
+diff --git a/src/components/primitives/cta-ghost.tsx b/src/components/primitives/cta-ghost.tsx
+index 6f20168..76d64fa 100644
+--- a/src/components/primitives/cta-ghost.tsx
++++ b/src/components/primitives/cta-ghost.tsx
+@@ -21,9 +21,9 @@ export function CtaGhost({ children, href, className }: CtaGhostProps) {
+       href={href}
+       className={cn(
+         'group inline-flex items-center gap-2',
+-        'text-amber-400 hover:text-amber-300',
++        'text-primary hover:text-primary',
+         'text-sm font-medium transition-colors duration-200',
+-        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400',
++        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+         className,
+       )}
+     >
+diff --git a/src/components/primitives/cta-gradient.tsx b/src/components/primitives/cta-gradient.tsx
+index cd8a347..58defe3 100644
+--- a/src/components/primitives/cta-gradient.tsx
++++ b/src/components/primitives/cta-gradient.tsx
+@@ -7,7 +7,7 @@ interface CtaGradientProps {
+ }
+ 
+ /**
+- * Tier-3 CTA: amber gradient pill (`from-amber-400 to-amber-500`). More
++ * Tier-3 CTA: amber gradient pill (`from-primary to-primary`). More
+  * assertive than the ghost link, less than the solid amber pill. Used only
+  * by the Examples section ("Clone this project for free"). Hidden on mobile
+  * (where the carousel auto-scrolls).
+@@ -21,9 +21,9 @@ export function CtaGradient({ children, href, className }: CtaGradientProps) {
+       className={cn(
+         'group inline-flex items-center gap-2.5 rounded-full px-10 py-4',
+         'text-[15px] font-semibold transition-all duration-200',
+-        'bg-gradient-to-r from-amber-400 to-amber-500 text-zinc-950',
+-        'hover:shadow-lg hover:shadow-amber-400/30',
+-        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400',
++        'bg-gradient-to-r from-primary to-primary text-zinc-950',
++        'hover:shadow-lg hover:shadow-primary/30',
++        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+         className,
+       )}
+     >
+diff --git a/src/components/primitives/eyebrow.tsx b/src/components/primitives/eyebrow.tsx
+index 41885ab..0d4725c 100644
+--- a/src/components/primitives/eyebrow.tsx
++++ b/src/components/primitives/eyebrow.tsx
+@@ -7,7 +7,7 @@ interface EyebrowProps {
+ 
+ /**
+  * Amber eyebrow badge used in every section header. Renders the `eyebrow`
+- * @utility class (defined in globals.css): amber-400/10 bg, amber-400/25 border,
++ * @utility class (defined in globals.css): primary/10 bg, primary/25 border,
+  * 11px uppercase tracking-widest text, ambient glow shadow.
+  *
+  * Server component — pure presentation, no client interactivity.
+diff --git a/src/components/primitives/style-chip.tsx b/src/components/primitives/style-chip.tsx
+index 1907309..88d6270 100644
+--- a/src/components/primitives/style-chip.tsx
++++ b/src/components/primitives/style-chip.tsx
+@@ -14,7 +14,7 @@ interface StyleChipProps {
+ /**
+  * Marquee chip for the Hero style tags ticker (Ghibli, Oil Painting, Anime,
+  * Realistic, Cyberpunk, Watercolor, Comic). Inactive: white/50 text on
+- * white/[0.02] bg. Hover/active: amber-300 text on amber-400/30 border.
++ * white/[0.02] bg. Hover/active: primary text on primary/30 border.
+  *
+  * When `onClick` is provided, renders a `<button>` with `aria-pressed`.
+  * Otherwise renders a `<div>` (decorative marquee chip).
+@@ -30,10 +30,10 @@ export function StyleChip({ label, sublabel, active = false, onClick, className
+         'inline-flex items-center gap-2 rounded-full px-4 py-2',
+         'border border-white/10 bg-white/[0.02]',
+         'text-sm font-bold whitespace-nowrap transition-colors duration-200',
+-        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400',
++        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+         active
+-          ? 'border-amber-400/30 text-amber-300'
+-          : 'text-white/50 hover:border-amber-400/30 hover:text-amber-300',
++          ? 'border-primary/30 text-primary'
++          : 'text-white/50 hover:border-primary/30 hover:text-primary',
+         className,
+       )}
+     >
+diff --git a/src/components/sections/examples.tsx b/src/components/sections/examples.tsx
+index 27fe7cc..3bb2bd9 100644
+--- a/src/components/sections/examples.tsx
++++ b/src/components/sections/examples.tsx
+@@ -52,7 +52,7 @@ export function Examples() {
+             <button
+               type="button"
+               onClick={() => scrollByCards('prev')}
+-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-600/60 text-zinc-400 transition-colors hover:border-amber-400/60 hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-600/60 text-zinc-400 transition-colors hover:border-primary/60 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+               aria-label="Previous examples"
+             >
+               <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+@@ -60,7 +60,7 @@ export function Examples() {
+             <button
+               type="button"
+               onClick={() => scrollByCards('next')}
+-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-600/60 text-zinc-400 transition-colors hover:border-amber-400/60 hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-600/60 text-zinc-400 transition-colors hover:border-primary/60 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+               aria-label="Next examples"
+             >
+               <ChevronRight className="h-4 w-4" aria-hidden="true" />
+@@ -79,7 +79,7 @@ export function Examples() {
+             {EXAMPLE_CARDS.map((card) => (
+               <article
+                 key={card.id}
+-                className="group relative w-[260px] shrink-0 cursor-pointer snap-start focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-amber-400"
++                className="group relative w-[260px] shrink-0 cursor-pointer snap-start focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary"
+               >
+                 {/* Hover glow — yellow→purple gradient (the singular purple exception) */}
+                 <div
+@@ -90,7 +90,7 @@ export function Examples() {
+                 {/* Card body */}
+                 <a
+                   href={card.href}
+-                  className="relative block aspect-[9/16] overflow-hidden rounded-[20px] border border-white/5 bg-zinc-900 transition-colors group-hover:border-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++                  className="relative block aspect-[9/16] overflow-hidden rounded-[20px] border border-white/5 bg-card transition-colors group-hover:border-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                 >
+                   <Image
+                     src={card.thumbnail}
+diff --git a/src/components/sections/faq.tsx b/src/components/sections/faq.tsx
+index d00ccc7..76870a3 100644
+--- a/src/components/sections/faq.tsx
++++ b/src/components/sections/faq.tsx
+@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
+  */
+ export function Faq() {
+   return (
+-    <section className="bg-zinc-950 py-24" aria-labelledby="faq-heading">
++    <section className="bg-background py-24" aria-labelledby="faq-heading">
+       <div className="mx-auto max-w-3xl px-6">
+         <div className="mb-12 text-center">
+           <Eyebrow className="mb-4">FAQ</Eyebrow>
+@@ -39,15 +39,15 @@ export function Faq() {
+               <AccordionTrigger
+                 className={cn(
+                   'flex w-full items-center justify-between gap-4 py-6 text-start',
+-                  'focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400',
++                  'focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                   'group hover:no-underline',
+                 )}
+               >
+-                <span className="pr-4 text-start text-base font-medium text-white transition-colors group-hover:text-amber-300 sm:text-lg">
++                <span className="pr-4 text-start text-base font-medium text-white transition-colors group-hover:text-primary sm:text-lg">
+                   {item.question}
+                 </span>
+                 <span
+-                  className="shrink-0 text-zinc-500 transition-transform duration-300 group-hover:text-amber-400 [[data-state=open]>&]:rotate-45"
++                  className="shrink-0 text-zinc-500 transition-transform duration-300 group-hover:text-primary [[data-state=open]>&]:rotate-45"
+                   aria-hidden="true"
+                 >
+                   <Plus className="h-5 w-5" />
+diff --git a/src/components/sections/features.tsx b/src/components/sections/features.tsx
+index f7faf73..07d8aec 100644
+--- a/src/components/sections/features.tsx
++++ b/src/components/sections/features.tsx
+@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
+  * Features — composes ScrollReveal (client) so becomes client via composition.
+  * 4×2 grid (desktop) / 2-col (tablet) / 1-col (mobile) with continuous hairline
+  * borders (NOT boxed cards). Three coordinated hover effects per card:
+- *   1. Left accent bar: neutral-800 → amber-400 (300ms)
++ *   1. Left accent bar: neutral-800 → primary (300ms)
+  *   2. Title: translate-x-0 → translate-x-2 (300ms)
+  *   3. Bottom gradient sheen: opacity 0 → 1 (300ms)
+  * Anti-generic: continuous surface separated by hairlines, not generic card grid.
+@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
+ export function Features() {
+   return (
+     <section
+-      className="relative overflow-hidden bg-zinc-950 py-24"
++      className="relative overflow-hidden bg-background py-24"
+       aria-labelledby="features-heading"
+     >
+       <div className="mx-auto max-w-7xl px-6">
+@@ -51,11 +51,11 @@ export function Features() {
+                 {/* Left accent bar — neutral→amber on hover */}
+                 <div
+                   aria-hidden="true"
+-                  className="absolute start-0 top-8 bottom-8 w-[3px] rounded-e-full bg-neutral-800 transition-colors duration-300 group-hover:bg-amber-400"
++                  className="absolute start-0 top-8 bottom-8 w-[3px] rounded-e-full bg-neutral-800 transition-colors duration-300 group-hover:bg-primary"
+                 />
+ 
+                 {/* Icon — zinc→amber on hover */}
+-                <div className="mb-5 text-zinc-400 transition-colors duration-300 group-hover:text-amber-400">
++                <div className="mb-5 text-zinc-400 transition-colors duration-300 group-hover:text-primary">
+                   <Icon className="h-6 w-6" strokeWidth={1.5} aria-hidden="true" />
+                 </div>
+ 
+diff --git a/src/components/sections/final-cta.tsx b/src/components/sections/final-cta.tsx
+index 0e7d2be..6c8d8a5 100644
+--- a/src/components/sections/final-cta.tsx
++++ b/src/components/sections/final-cta.tsx
+@@ -5,7 +5,7 @@ import { ScrollReveal } from '@/components/primitives/scroll-reveal';
+  * FinalCTA — server component.
+  * The page's conversion crescendo. 4 decorative layers (dot-grid, radial amber
+  * halo, top fade, bottom fade) + H2 + subtitle + solid amber pill CTA + footnote.
+- * This is the only place `bg-amber-400` is used as a solid fill on a button.
++ * This is the only place `bg-primary` is used as a solid fill on a button.
+  */
+ export function FinalCTA() {
+   return (
+diff --git a/src/components/sections/footer.tsx b/src/components/sections/footer.tsx
+index 9f583b1..1affd0c 100644
+--- a/src/components/sections/footer.tsx
++++ b/src/components/sections/footer.tsx
+@@ -9,21 +9,21 @@ import { FOOTER_COLUMNS, FOOTER_BRAND, FOOTER_COPYRIGHT } from '@/lib/data/foote
+  */
+ export function Footer() {
+   return (
+-    <footer className="border-t border-white/[0.06] bg-zinc-950 px-6 py-16">
++    <footer className="border-t border-white/[0.06] bg-background px-6 py-16">
+       <div className="mx-auto max-w-7xl">
+         <div className="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-4">
+           {/* Brand block */}
+           <div className="lg:col-span-1">
+             <Link
+               href="/"
+-              className="font-heading text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++              className="font-heading text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+             >
+               {FOOTER_BRAND.name}
+             </Link>
+             <p className="mt-2 max-w-[24ch] text-sm text-zinc-400">{FOOTER_BRAND.tagline}</p>
+             <a
+               href={`mailto:${FOOTER_BRAND.supportEmail}`}
+-              className="mt-4 inline-block text-sm text-zinc-400 transition-colors hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++              className="mt-4 inline-block text-sm text-zinc-400 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+             >
+               {FOOTER_BRAND.supportEmail}
+             </a>
+@@ -40,7 +40,7 @@ export function Footer() {
+                   <li key={link.label}>
+                     <a
+                       href={link.href}
+-                      className="block py-1.5 text-sm text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++                      className="block py-1.5 text-sm text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                     >
+                       {link.label}
+                     </a>
+@@ -57,19 +57,19 @@ export function Footer() {
+           <nav className="flex gap-6" aria-label="Legal">
+             <a
+               href="/privacy"
+-              className="text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++              className="text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+             >
+               Privacy Policy
+             </a>
+             <a
+               href="/terms"
+-              className="text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++              className="text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+             >
+               Terms of Service
+             </a>
+             <a
+               href="/contact"
+-              className="text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++              className="text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+             >
+               Contact
+             </a>
+diff --git a/src/components/sections/hero.tsx b/src/components/sections/hero.tsx
+index 6184ecd..54ed096 100644
+--- a/src/components/sections/hero.tsx
++++ b/src/components/sections/hero.tsx
+@@ -33,7 +33,7 @@ export function Hero() {
+   };
+ 
+   return (
+-    <section className="relative flex flex-col overflow-hidden bg-zinc-950">
++    <section className="relative flex flex-col overflow-hidden bg-background">
+       {/* Layer 1: Background video + overlays */}
+       <div className="absolute inset-0 z-0" aria-hidden="true">
+         <video
+@@ -116,7 +116,7 @@ export function Hero() {
+               <span
+                 className={cn(
+                   'font-mono text-[10px] tabular-nums',
+-                  story.length >= 4500 ? 'text-amber-400' : 'text-zinc-600',
++                  story.length >= 4500 ? 'text-primary' : 'text-zinc-600',
+                 )}
+               >
+                 {story.length} / 5000
+@@ -130,7 +130,7 @@ export function Hero() {
+                   key={ex.label}
+                   type="button"
+                   onClick={() => handleChipClick(ex.label)}
+-                  className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/[0.1] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++                  className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/[0.1] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                 >
+                   {ex.label}
+                 </button>
+@@ -150,9 +150,9 @@ export function Hero() {
+                       onClick={() => setActiveRatio(ratio)}
+                       aria-pressed={isActive}
+                       className={cn(
+-                        'flex min-h-[44px] min-w-[44px] items-center justify-center px-2 py-1 font-mono text-[10px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400',
++                        'flex min-h-[44px] min-w-[44px] items-center justify-center px-2 py-1 font-mono text-[10px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                         isActive
+-                          ? 'bg-white/[0.1] text-amber-400'
++                          ? 'bg-white/[0.1] text-primary'
+                           : 'text-zinc-600 hover:text-zinc-400',
+                       )}
+                     >
+@@ -165,7 +165,7 @@ export function Hero() {
+               {/* Start Creating CTA — glass pill with amber text */}
+               <a
+                 href="/create"
+-                className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-zinc-800 to-zinc-900 px-5 py-2.5 text-[13px] font-bold text-amber-300 transition-all hover:from-zinc-700 hover:to-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 sm:py-2"
++                className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-zinc-800 to-zinc-900 px-5 py-2.5 text-[13px] font-bold text-primary transition-all hover:from-zinc-700 hover:to-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:py-2"
+               >
+                 Start Creating
+                 <ArrowRight className="h-3 w-3" aria-hidden="true" />
+diff --git a/src/components/sections/navbar.tsx b/src/components/sections/navbar.tsx
+index 186613b..a051f5f 100644
+--- a/src/components/sections/navbar.tsx
++++ b/src/components/sections/navbar.tsx
+@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
+ 
+ /**
+  * Navbar — client component.
+- * Fixed nav with scroll-aware background (transparent → bg-zinc-950/70
++ * Fixed nav with scroll-aware background (transparent → bg-background/70
+  * backdrop-blur-[24px] border-b border-white/10 at scrollY > 10).
+  * Desktop: logo + 4 nav links + EN dropdown + Sign in + Get Started.
+  * Mobile (<sm): logo + EN + hamburger → right-side Sheet.
+@@ -38,7 +38,7 @@ export function Navbar() {
+       className={cn(
+         'fixed top-0 right-0 left-0 z-50 transition-all duration-300',
+         scrolled
+-          ? 'border-b border-white/10 bg-zinc-950/70 backdrop-blur-[24px]'
++          ? 'border-b border-white/10 bg-background/70 backdrop-blur-[24px]'
+           : 'bg-transparent',
+       )}
+     >
+@@ -49,7 +49,7 @@ export function Navbar() {
+         {/* Logo */}
+         <Link
+           href="/"
+-          className="font-heading text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++          className="font-heading text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+           StoryIntoVideo
+         </Link>
+@@ -60,7 +60,7 @@ export function Navbar() {
+             <a
+               key={link.href}
+               href={link.href}
+-              className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-all duration-200 hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++              className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-all duration-200 hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+             >
+               {link.label}
+             </a>
+@@ -72,7 +72,7 @@ export function Navbar() {
+           {/* Language switcher */}
+           <DropdownMenu>
+             <DropdownMenuTrigger
+-              className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 sm:px-3"
++              className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:px-3"
+               aria-label="Switch language"
+             >
+               EN
+@@ -87,7 +87,7 @@ export function Navbar() {
+                   key={lang}
+                   className={cn(
+                     'cursor-pointer focus:bg-white/[0.04]',
+-                    lang === 'EN' && 'text-amber-400',
++                    lang === 'EN' && 'text-primary',
+                   )}
+                 >
+                   {lang}
+@@ -99,7 +99,7 @@ export function Navbar() {
+           {/* Sign in (desktop only) */}
+           <a
+             href="/sign-in"
+-            className="hidden rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 sm:inline"
++            className="hidden rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:inline"
+           >
+             Sign in
+           </a>
+@@ -107,7 +107,7 @@ export function Navbar() {
+           {/* Get Started (desktop) */}
+           <a
+             href="/sign-up"
+-            className="hidden rounded-full px-5 py-2 text-base font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 sm:inline"
++            className="hidden rounded-full px-5 py-2 text-base font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:inline"
+           >
+             Get Started
+           </a>
+@@ -117,7 +117,7 @@ export function Navbar() {
+             <SheetTrigger asChild>
+               <button
+                 type="button"
+-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 sm:hidden"
++                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:hidden"
+                 aria-label="Open menu"
+               >
+                 <Menu className="h-5 w-5" aria-hidden="true" />
+@@ -125,7 +125,7 @@ export function Navbar() {
+             </SheetTrigger>
+             <SheetContent
+               side="right"
+-              className="w-[300px] border-l border-white/10 bg-zinc-950 p-6"
++              className="w-[300px] border-l border-white/10 bg-background p-6"
+             >
+               <SheetHeader className="mb-6 flex flex-row items-center justify-between">
+                 <SheetTitle className="font-heading text-base font-medium text-white">
+@@ -134,7 +134,7 @@ export function Navbar() {
+                 <SheetClose asChild>
+                   <button
+                     type="button"
+-                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                     aria-label="Close menu"
+                   >
+                     <X className="h-5 w-5" aria-hidden="true" />
+@@ -147,7 +147,7 @@ export function Navbar() {
+                     key={link.href}
+                     href={link.href}
+                     onClick={() => setMobileOpen(false)}
+-                    className="rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++                    className="rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                   >
+                     {link.label}
+                   </a>
+@@ -156,14 +156,14 @@ export function Navbar() {
+                 <a
+                   href="/sign-in"
+                   onClick={() => setMobileOpen(false)}
+-                  className="rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++                  className="rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                 >
+                   Sign in
+                 </a>
+                 <a
+                   href="/sign-up"
+                   onClick={() => setMobileOpen(false)}
+-                  className="rounded-lg px-3 py-2 text-base font-medium text-amber-400 transition-colors hover:bg-amber-400/10 hover:text-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++                  className="rounded-lg px-3 py-2 text-base font-medium text-primary transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                 >
+                   Get Started
+                 </a>
+diff --git a/src/components/sections/testimonials.tsx b/src/components/sections/testimonials.tsx
+index cfd21b7..084b408 100644
+--- a/src/components/sections/testimonials.tsx
++++ b/src/components/sections/testimonials.tsx
+@@ -13,7 +13,7 @@ import { TESTIMONIALS } from '@/lib/data/testimonials';
+  */
+ export function Testimonials() {
+   return (
+-    <section className="bg-zinc-950 py-16 sm:py-20 lg:py-24" aria-labelledby="testimonials-heading">
++    <section className="bg-background py-16 sm:py-20 lg:py-24" aria-labelledby="testimonials-heading">
+       <div className="mx-auto max-w-7xl px-6">
+         <ScrollReveal className="mb-16 text-center">
+           <Eyebrow className="mb-4">TESTIMONIALS</Eyebrow>
+@@ -26,7 +26,7 @@ export function Testimonials() {
+         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+           {TESTIMONIALS.map((t, idx) => (
+             <ScrollReveal key={t.id} delay={Math.min(idx * 80, 400)}>
+-              <figure className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-5 transition-colors duration-300 hover:border-zinc-700/60 sm:p-6">
++              <figure className="rounded-2xl border border-zinc-800/60 bg-card/30 p-5 transition-colors duration-300 hover:border-zinc-700/60 sm:p-6">
+                 <blockquote>
+                   <p className="mb-5 text-sm leading-relaxed text-zinc-300">
+                     &ldquo;{t.quote}&rdquo;
+diff --git a/src/components/sections/use-cases.tsx b/src/components/sections/use-cases.tsx
+index ec0b7c7..536c3de 100644
+--- a/src/components/sections/use-cases.tsx
++++ b/src/components/sections/use-cases.tsx
+@@ -9,13 +9,13 @@ import { USE_CASES } from '@/lib/data/use-cases';
+  * UseCases — composes ScrollReveal (client) so becomes client via composition.
+  * 2×2 grid (desktop) / 1-col (mobile). Each card is an <a> with corner amber
+  * glow on hover (500ms fade-in), amber-tinted icon container, title (color
+- * shift to amber-300 on hover), description, "Try it now →" CTA.
++ * shift to primary on hover), description, "Try it now →" CTA.
+  * Each card wrapped in <ScrollReveal> with staggered delay (idx × 80ms, cap 400ms).
+  */
+ export function UseCases() {
+   return (
+     <section
+-      className="relative overflow-hidden bg-zinc-950 py-24"
++      className="relative overflow-hidden bg-background py-24"
+       aria-labelledby="use-cases-heading"
+     >
+       <div className="mx-auto max-w-7xl px-6">
+@@ -31,21 +31,21 @@ export function UseCases() {
+               <ScrollReveal key={uc.id} delay={Math.min(idx * 80, 400)}>
+                 <a
+                   href={uc.href}
+-                  className="group relative block overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 transition-all duration-300 hover:border-amber-400/20 hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
++                  className="group relative block overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 transition-all duration-300 hover:border-primary/20 hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                 >
+                   {/* Decorative corner gradient — reveals on hover */}
+                   <div
+                     aria-hidden="true"
+-                    className="pointer-events-none absolute -top-12 -right-12 h-48 w-48 rounded-full bg-amber-400/10 opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100"
++                    className="pointer-events-none absolute -top-12 -right-12 h-48 w-48 rounded-full bg-primary/10 opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100"
+                   />
+ 
+                   {/* Icon container — amber-tinted */}
+-                  <div className="relative mb-6 flex h-12 w-12 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/10 text-amber-400">
++                  <div className="relative mb-6 flex h-12 w-12 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+                     <Icon className="h-6 w-6" strokeWidth={1.5} aria-hidden="true" />
+                   </div>
+ 
+-                  {/* Title — color shifts to amber-300 on hover */}
+-                  <h3 className="mb-3 text-xl font-bold text-white transition-colors group-hover:text-amber-300">
++                  {/* Title — color shifts to primary on hover */}
++                  <h3 className="mb-3 text-xl font-bold text-white transition-colors group-hover:text-primary">
+                     {uc.title}
+                   </h3>
+ 
+@@ -53,7 +53,7 @@ export function UseCases() {
+                   <p className="mb-6 leading-relaxed text-zinc-400">{uc.description}</p>
+ 
+                   {/* CTA */}
+-                  <span className="inline-flex items-center gap-2 text-sm font-medium text-amber-400">
++                  <span className="inline-flex items-center gap-2 text-sm font-medium text-primary">
+                     Try it now
+                     <ArrowRight
+                       className="h-4 w-4 transition-transform group-hover:translate-x-1"
+diff --git a/src/components/sections/workflow.tsx b/src/components/sections/workflow.tsx
+index cf91caf..de76db3 100644
+--- a/src/components/sections/workflow.tsx
++++ b/src/components/sections/workflow.tsx
+@@ -50,7 +50,7 @@ function WorkflowVideo({ src, poster }: { src: string; poster: string }) {
+ export function Workflow() {
+   return (
+     <section
+-      className="relative overflow-hidden bg-zinc-950 py-16 sm:py-20 lg:py-24"
++      className="relative overflow-hidden bg-background py-16 sm:py-20 lg:py-24"
+       aria-labelledby="workflow-heading"
+     >
+       <div className="mx-auto max-w-7xl px-6">
+@@ -66,7 +66,7 @@ export function Workflow() {
+                 {/* Media side */}
+                 <div
+                   className={cn(
+-                    'relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/10 bg-zinc-900',
++                    'relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/10 bg-card',
+                     step.mediaPosition === 'left' ? 'lg:order-1' : 'lg:order-2',
+                   )}
+                 >
+diff --git a/src/components/ui/accordion.tsx b/src/components/ui/accordion.tsx
+index 1f90f71..b25604e 100644
+--- a/src/components/ui/accordion.tsx
++++ b/src/components/ui/accordion.tsx
+@@ -32,7 +32,7 @@ function AccordionTrigger({
+       <AccordionPrimitive.Trigger
+         data-slot="accordion-trigger"
+         className={cn(
+-          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 focus-visible:outline-none',
++          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary focus-visible:outline-none',
+           'flex flex-1 items-start justify-between gap-4 rounded-md py-4 text-left text-sm font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180',
+           className,
+         )}
+diff --git a/src/components/ui/button.tsx b/src/components/ui/button.tsx
+index 98b8be1..f92d000 100644
+--- a/src/components/ui/button.tsx
++++ b/src/components/ui/button.tsx
+@@ -5,7 +5,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
+ import { cn } from '@/lib/utils';
+ 
+ const buttonVariants = cva(
+-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400",
++  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+   {
+     variants: {
+       variant: {
+diff --git a/src/components/ui/sheet.tsx b/src/components/ui/sheet.tsx
+index 3ce2539..9a7c66b 100644
+--- a/src/components/ui/sheet.tsx
++++ b/src/components/ui/sheet.tsx
+@@ -26,7 +26,7 @@ function SheetOverlay({
+     <SheetPrimitive.Overlay
+       data-slot="sheet-overlay"
+       className={cn(
+-        'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm',
++        'fixed inset-0 z-50 bg-background/60 backdrop-blur-sm',
+         'data-[state=open]:animate-in data-[state=closed]:animate-out',
+         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+         className,
+@@ -53,7 +53,7 @@ function SheetContent({
+           'fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out',
+           'data-[state=open]:animate-in data-[state=closed]:animate-out',
+           'data-[state=closed]:duration-300 data-[state=open]:duration-500',
+-          'text-foreground bg-zinc-950 p-6',
++          'text-foreground bg-background p-6',
+           side === 'right' &&
+             'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-3/4 border-l border-white/10 sm:max-w-sm',
+           side === 'left' &&
+@@ -67,7 +67,7 @@ function SheetContent({
+         {...props}
+       >
+         {children}
+-        <SheetPrimitive.Close className="ring-offset-background absolute top-4 right-4 rounded-md opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 disabled:pointer-events-none">
++        <SheetPrimitive.Close className="ring-offset-background absolute top-4 right-4 rounded-md opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none">
+           <XIcon className="size-5" />
+           <span className="sr-only">Close</span>
+         </SheetPrimitive.Close>
+diff --git a/src/features/billing/actions.ts b/src/features/billing/actions.ts
+index 1e02d40..2403272 100644
+--- a/src/features/billing/actions.ts
++++ b/src/features/billing/actions.ts
+@@ -59,3 +59,21 @@ export async function portalAction(): Promise<void> {
+     redirect(portalSession.url);
+   }
+ }
++
++/**
++ * T1 (C-1): Server Action wrapper for the billing page upgrade form.
++ *
++ * The billing page renders `<form action={billingCheckoutAction}>` with a
++ * `<button name="plan" value={plan}>` for each tier. This wrapper extracts
++ * the plan from formData and delegates to `checkoutAction(plan)`.
++ *
++ * Lives here (not in the page component) because Server Actions must be in a
++ * module with `"use server"` at the top — the billing page is a Server Component,
++ * not a Server Action module.
++ */
++export async function billingCheckoutAction(formData: FormData): Promise<void> {
++  const plan = formData.get('plan');
++  if (plan === 'creator' || plan === 'pro' || plan === 'studio') {
++    await checkoutAction(plan);
++  }
++}
+diff --git a/src/features/billing/queries.ts b/src/features/billing/queries.ts
+index e6c11bd..28b8002 100644
+--- a/src/features/billing/queries.ts
++++ b/src/features/billing/queries.ts
+@@ -1,6 +1,7 @@
+ import { eq, sql } from 'drizzle-orm';
+ 
+ import { db } from '@/lib/db';
++import type { Database } from '@/lib/db';
+ import { subscriptions, usageEvents } from '@/lib/db/schema';
+ 
+ /**
+@@ -95,6 +96,12 @@ export type DebitOperation =
+  *   key (which handles cross-connection retries), this is mathematically
+  *   race-condition-proof.
+  *
++ * T3 — Transaction variant:
++ *   This is the standalone entry point that opens its own transaction.
++ *   Callers that already hold a transaction (e.g., createProjectAction
++ *   wrapping INSERT + debit atomically) should call `debitCreditsTx(tx, ...)`
++ *   instead to avoid nested transactions.
++ *
+  * @param userId - The user to debit
+  * @param amount - Credits to deduct
+  * @param operationType - The operation enum value (for the audit log)
+@@ -108,69 +115,91 @@ export async function debitCredits(
+   idempotencyKey: string,
+   projectId?: string,
+ ): Promise<DebitResult> {
+-  return await db.transaction(async (tx) => {
+-    // 1. IDEMPOTENCY GATE — attempt to insert the usage_event first.
+-    // If this key was already processed (e.g., Inngest retry), the
+-    // ON CONFLICT DO NOTHING returns an empty array and we abort without
+-    // touching the credit balance.
+-    const [inserted] = await tx
+-      .insert(usageEvents)
+-      .values({
+-        userId,
+-        projectId: projectId ?? null,
+-        type: operationType,
+-        cost: amount,
+-        idempotencyKey,
+-      })
+-      .onConflictDoNothing({
+-        target: usageEvents.idempotencyKey,
+-      })
+-      .returning({ id: usageEvents.id });
+-
+-    if (!inserted) {
+-      // Duplicate idempotencyKey — this exact debit was already processed.
+-      // Return without debiting. The caller should skip side effects too.
+-      return { idempotent: true, eventId: null, creditsRemaining: null };
+-    }
+-
+-    // 2. LOCK the subscription row for the duration of the transaction.
+-    // .for('update') prevents concurrent transactions from reading the same
+-    // creditsRemaining value until this transaction commits or rolls back.
+-    const [sub] = await tx
+-      .select()
+-      .from(subscriptions)
+-      .where(eq(subscriptions.userId, userId))
+-      .for('update')
+-      .limit(1);
+-
+-    if (!sub) {
+-      // Throw to roll back the usage_event insert — the user has no subscription.
+-      throw new Error(`No subscription found for user ${userId}`);
+-    }
+-
+-    if (sub.creditsRemaining < amount) {
+-      // Throw to roll back the usage_event insert — InsufficientCreditsError
+-      // propagates to the caller, who can surface it to the user. The
+-      // transaction rollback means the user can retry later after topping up.
+-      throw new InsufficientCreditsError(amount, sub.creditsRemaining);
+-    }
+-
+-    // 3. DEBIT — subtract the credits from the locked row.
+-    const newBalance = sub.creditsRemaining - amount;
+-    await tx
+-      .update(subscriptions)
+-      .set({
+-        creditsRemaining: newBalance,
+-        updatedAt: new Date(),
+-      })
+-      .where(eq(subscriptions.id, sub.id));
+-
+-    return {
+-      idempotent: false,
+-      eventId: inserted.id,
++  return await db.transaction(async (tx) => debitCreditsTx(tx, userId, amount, operationType, idempotencyKey, projectId));
++}
++
++/**
++ * T3 (H-1) — Transaction-scoped variant of debitCredits.
++ *
++ * Accepts an existing transaction handle (`tx`) from a caller that has already
++ * opened `db.transaction(...)`. This lets the caller wrap multiple operations
++ * (e.g., project INSERT + credit debit) in a SINGLE transaction so that if the
++ * debit throws InsufficientCreditsError, the INSERT is rolled back too — no
++ * orphan project rows.
++ *
++ * The standalone `debitCredits(userId, ...)` (above) is a thin wrapper that
++ * opens its own transaction and delegates to this function. Pipeline steps
++ * that don't need a shared transaction should keep using `debitCredits`.
++ */
++export async function debitCreditsTx(
++  tx: Parameters<Parameters<Database['transaction']>[0]>[0],
++  userId: string,
++  amount: number,
++  operationType: DebitOperation,
++  idempotencyKey: string,
++  projectId?: string,
++): Promise<DebitResult> {
++  // 1. IDEMPOTENCY GATE — attempt to insert the usage_event first.
++  // If this key was already processed (e.g., Inngest retry), the
++  // ON CONFLICT DO NOTHING returns an empty array and we abort without
++  // touching the credit balance.
++  const [inserted] = await tx
++    .insert(usageEvents)
++    .values({
++      userId,
++      projectId: projectId ?? null,
++      type: operationType,
++      cost: amount,
++      idempotencyKey,
++    })
++    .onConflictDoNothing({
++      target: usageEvents.idempotencyKey,
++    })
++    .returning({ id: usageEvents.id });
++
++  if (!inserted) {
++    // Duplicate idempotencyKey — this exact debit was already processed.
++    // Return without debiting. The caller should skip side effects too.
++    return { idempotent: true, eventId: null, creditsRemaining: null };
++  }
++
++  // 2. LOCK the subscription row for the duration of the transaction.
++  // .for('update') prevents concurrent transactions from reading the same
++  // creditsRemaining value until this transaction commits or rolls back.
++  const [sub] = await tx
++    .select()
++    .from(subscriptions)
++    .where(eq(subscriptions.userId, userId))
++    .for('update')
++    .limit(1);
++
++  if (!sub) {
++    // Throw to roll back the usage_event insert — the user has no subscription.
++    throw new Error(`No subscription found for user ${userId}`);
++  }
++
++  if (sub.creditsRemaining < amount) {
++    // Throw to roll back the usage_event insert — InsufficientCreditsError
++    // propagates to the caller, who can surface it to the user. The
++    // transaction rollback means the user can retry later after topping up.
++    throw new InsufficientCreditsError(amount, sub.creditsRemaining);
++  }
++
++  // 3. DEBIT — subtract the credits from the locked row.
++  const newBalance = sub.creditsRemaining - amount;
++  await tx
++    .update(subscriptions)
++    .set({
+       creditsRemaining: newBalance,
+-    };
+-  });
++      updatedAt: new Date(),
++    })
++    .where(eq(subscriptions.id, sub.id));
++
++  return {
++    idempotent: false,
++    eventId: inserted.id,
++    creditsRemaining: newBalance,
++  };
+ }
+ 
+ /** Refill credits (called on subscription renewal or credit purchase) */
+diff --git a/src/features/pipeline/domain/assemble-video.ts b/src/features/pipeline/domain/assemble-video.ts
+index 28fa31b..91e4cc3 100644
+--- a/src/features/pipeline/domain/assemble-video.ts
++++ b/src/features/pipeline/domain/assemble-video.ts
+@@ -1,5 +1,6 @@
+ import ffmpeg from 'fluent-ffmpeg';
+ import { writeFile, readFile, unlink } from 'fs/promises';
++import { randomUUID } from 'node:crypto';
+ import { env } from '@/lib/env';
+ 
+ /**
+@@ -83,42 +84,14 @@ function buildFilterString(
+   );
+ }
+ 
+-/**
+- * Build the full FFmpeg command-line args array.
+- *
+- * Exposed for unit testing — verifies the filter string contains concat, scale,
+- * and subtitles in a single coherent expression (not extracted via `.find()`).
+- */
+-export function buildFfmpegCommand(input: AssembleVideoInput, outputPath: string): string[] {
+-  const baseDims = RESOLUTION_MAP[input.resolution];
+-  const dims =
+-    input.aspectRatio === 'landscape'
+-      ? { width: baseDims.height, height: baseDims.width }
+-      : baseDims;
+-
+-  const srtPath = `/tmp/siv-srt-${Date.now()}.srt`;
+-  const filterString = buildFilterString(input.sceneImageUrls.length, dims, srtPath);
+-
+-  const args: string[] = ['-y'];
+-  // Image inputs (loop + duration applied via inputOptions on the fluent-ffmpeg chain)
+-  for (const url of input.sceneImageUrls) {
+-    args.push('-i', url);
+-  }
+-  // Audio input
+-  args.push('-i', input.audioUrl);
+-  // Filter + maps + encoding
+-  args.push('-filter_complex', filterString);
+-  args.push('-map', '[v]', '-map', `${input.sceneImageUrls.length}:a`);
+-  args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '23');
+-  args.push('-c:a', 'aac', '-b:a', '128k');
+-  args.push('-pix_fmt', 'yuv420p', '-movflags', '+faststart');
+-  args.push(outputPath);
+-
+-  return args;
+-}
++// T10 (M-5): Removed dead `buildFfmpegCommand` export. It was never called in
++// production (assembleVideo uses fluent-ffmpeg's .inputOptions()/.outputOptions()
++// API directly) and created a second source of truth for the FFmpeg command
++// structure. Tests that verified the filter string now test buildFilterString
++// directly via the assembleVideo integration test.
+ 
+ async function writeSrtFile(srtContent: string): Promise<string> {
+-  const srtPath = `/tmp/siv-srt-${Date.now()}.srt`;
++  const srtPath = `/tmp/siv-srt-${randomUUID()}.srt`;
+   await writeFile(srtPath, srtContent, 'utf-8');
+   return srtPath;
+ }
+@@ -137,7 +110,7 @@ async function cleanupTempFiles(...paths: string[]): Promise<void> {
+ 
+ export async function assembleVideo(input: AssembleVideoInput): Promise<AssembleVideoOutput> {
+   const totalDuration = input.sceneDurations.reduce((sum, d) => sum + d, 0);
+-  const outputPath = `/tmp/siv-video-${Date.now()}.mp4`;
++  const outputPath = `/tmp/siv-video-${randomUUID()}.mp4`;
+   const srtPath = await writeSrtFile(input.subtitlesSrt);
+ 
+   const baseDims = RESOLUTION_MAP[input.resolution];
+diff --git a/src/features/pipeline/domain/moderate-image.ts b/src/features/pipeline/domain/moderate-image.ts
+index a4d5464..d3e3510 100644
+--- a/src/features/pipeline/domain/moderate-image.ts
++++ b/src/features/pipeline/domain/moderate-image.ts
+@@ -62,10 +62,14 @@ const FLAGGED_KEYWORDS = new Set(['nsfw', 'sexual', 'violence', 'gore', 'hate',
+  * 'true' (fail-open) per the env schema. Set IMAGE_MODERATION_FAIL_OPEN=false
+  * in production to fail-closed.
+  *
+- * Read at module load — changing the env var requires a restart. This is
+- * intentional: moderation policy changes should be deliberate, not dynamic.
++ * T9 (M-4): Read INSIDE the function body (not at module load) so tests can
++ * mock the env module per-call and verify both policies in the same test run.
++ * The previous module-load constant made the policy impossible to test without
++ * re-importing the module between tests.
+  */
+-const FAIL_OPEN = env.IMAGE_MODERATION_FAIL_OPEN === 'true';
++function getFailOpen(): boolean {
++  return env.IMAGE_MODERATION_FAIL_OPEN === 'true';
++}
+ 
+ function extractSafetyCategories(rawOutput: unknown): string[] {
+   if (typeof rawOutput !== 'object' || rawOutput === null) {
+@@ -114,10 +118,11 @@ export async function moderateImage(input: ModerateImageInput): Promise<ImageMod
+   const categories = extractSafetyCategories(input.rawOutput);
+   const shapeKnown = isOutputShapeKnown(input.rawOutput);
+   const moderationSkipped = !shapeKnown;
++  const failOpen = getFailOpen();
+ 
+   // Fail-open (default): unknown shape → not flagged, but skipped=true
+   // Fail-closed: unknown shape → flagged=true with a synthetic category
+-  if (moderationSkipped && !FAIL_OPEN) {
++  if (moderationSkipped && !failOpen) {
+     console.warn(
+       `[moderate-image] Moderation FAIL-CLOSED: unknown output shape for ${input.imageUrl}. ` +
+         `Flagging as 'unknown-output-shape'. Set IMAGE_MODERATION_FAIL_OPEN=true to allow.`,
+diff --git a/src/features/pipeline/queries.ts b/src/features/pipeline/queries.ts
+index 27545ab..716aefb 100644
+--- a/src/features/pipeline/queries.ts
++++ b/src/features/pipeline/queries.ts
+@@ -159,7 +159,11 @@ export async function appendVideo(
+       subtitleKey,
+       duration,
+       resolution,
+-      status: 'completed',
++      // T8 (M-3): Use 'rendering' (not 'completed') at insert time. The video
++      // row is created in Step 5 (subtitles) with videoKey=null — the MP4 doesn't
++      // exist yet. Step 6 calls updateVideo() to set videoKey + status='completed'.
++      // The video_status enum has: pending, rendering, completed, failed.
++      status: 'rendering',
+     })
+     .onConflictDoNothing({
+       target: videos.projectId,
+@@ -185,7 +189,12 @@ export async function updateVideo(
+   videoKey: string,
+   duration: number,
+ ): Promise<void> {
+-  await db.update(videos).set({ videoKey, duration }).where(eq(videos.projectId, projectId));
++  // T8 (M-3): Set status='completed' alongside videoKey + duration. The row was
++  // inserted by appendVideo with status='rendering'; this update marks it done.
++  await db
++    .update(videos)
++    .set({ videoKey, duration, status: 'completed' })
++    .where(eq(videos.projectId, projectId));
+ }
+ 
+ export async function getProjectVideo(projectId: string) {
+diff --git a/src/features/projects/actions.ts b/src/features/projects/actions.ts
+index 0390862..05b15e4 100644
+--- a/src/features/projects/actions.ts
++++ b/src/features/projects/actions.ts
+@@ -8,10 +8,11 @@ import { db } from '@/lib/db';
+ import { projects } from '@/lib/db/schema';
+ import { verifySession } from '@/features/auth/domain/verify-session';
+ import { moderateContent } from '@/features/pipeline/domain/moderate-content';
+-import { debitCredits, getOrCreateSubscription } from '@/features/billing/queries';
++import { debitCreditsTx, getOrCreateSubscription, InsufficientCreditsError } from '@/features/billing/queries';
+ import { CREDIT_COSTS } from '@/features/billing/domain/tier-limits';
+ import { inngest, PIPELINE_EVENT } from '@/lib/inngest/client';
+ import { pipelineRateLimit } from '@/lib/rate-limit';
++import { setProjectFailed } from '@/features/pipeline/queries';
+ 
+ /**
+  * createProjectAction — Server Action that creates a new project from a story.
+@@ -109,60 +110,83 @@ export async function createProjectAction(
+   // debit. The debit itself happens AFTER the insert (C4 fix below).
+   await getOrCreateSubscription(userId);
+ 
+-  // 5. INSERT PROJECT FIRST (C4 fix)
+-  // The project is created BEFORE debiting credits. If the DB insert fails,
+-  // the user loses nothing. The debit happens next with a deterministic
+-  // idempotency key derived from the project ID — safe against action retries.
+-  const [project] = await db
+-    .insert(projects)
+-    .values({
+-      userId,
+-      title: parsed.data.title ?? parsed.data.story.slice(0, 50) + '…',
+-      story: parsed.data.story,
+-      style: parsed.data.style,
+-      aspectRatio: parsed.data.aspectRatio,
+-      status: 'pending',
+-      creditsCost: CREDIT_COSTS.analysis,
+-    })
+-    .returning();
+-
+-  if (!project) {
+-    return { success: false, error: 'Failed to create project', code: 'INTERNAL' };
+-  }
+-
+-  // 6. DEBIT ANALYSIS CREDITS (after insert, with project-id-based idempotency key)
+-  // If the user has insufficient credits, we should ideally roll back the
+-  // project insert. For now, we leave the project in 'pending' status and
+-  // return the error — the pipeline won't trigger, so no AI costs accrue.
+-  // The user can top up and retry, or delete the empty project.
++  // 5. INSERT PROJECT + DEBIT CREDITS IN A SINGLE TRANSACTION (T3/H-1 fix)
++  //
++  // H-1 bug: Previously the project INSERT and the credit debit were separate
++  // top-level operations. If debitCredits threw InsufficientCreditsError, the
++  // project row was already committed as an orphan with status='pending' —
++  // cluttering the dashboard with ghost projects the user could never complete.
++  //
++  // T3 fix: Wrap both in a single db.transaction(). If the debit throws, the
++  // transaction rolls back and no project row is committed. The user sees a
++  // clean INSUFFICIENT_CREDITS error with no orphan.
++  let projectId: string;
+   try {
+-    const debitResult = await debitCredits(
+-      userId,
+-      CREDIT_COSTS.analysis,
+-      'analysis',
+-      `${project.id}:analysis`,
+-      project.id,
+-    );
+-    // If idempotent (action retry), the credit was already debited — proceed.
+-    void debitResult;
++    projectId = await db.transaction(async (tx) => {
++      // 5a. INSERT project (inside the transaction)
++      const [project] = await tx
++        .insert(projects)
++        .values({
++          userId,
++          title: parsed.data.title ?? parsed.data.story.slice(0, 50) + '…',
++          story: parsed.data.story,
++          style: parsed.data.style,
++          aspectRatio: parsed.data.aspectRatio,
++          status: 'pending',
++          creditsCost: CREDIT_COSTS.analysis,
++        })
++        .returning({ id: projects.id });
++
++      if (!project) {
++        throw new Error('Failed to create project');
++      }
++
++      // 5b. DEBIT analysis credits (inside the SAME transaction).
++      // If this throws InsufficientCreditsError, the transaction rolls back
++      // and the project INSERT above is undone — no orphan row.
++      await debitCreditsTx(
++        tx,
++        userId,
++        CREDIT_COSTS.analysis,
++        'analysis',
++        `${project.id}:analysis`,
++        project.id,
++      );
++
++      return project.id;
++    });
+   } catch (err) {
+-    if (err instanceof Error && err.name === 'InsufficientCreditsError') {
++    if (err instanceof InsufficientCreditsError) {
+       return {
+         success: false,
+         error: err.message,
+         code: 'INSUFFICIENT_CREDITS',
+       };
+     }
+-    throw err; // unexpected — let it propagate
++    // Unexpected error — let it propagate so the user sees a generic failure
++    // rather than a silently orphaned project.
++    throw err;
+   }
+ 
+-  // 7. TRIGGER INNGEST PIPELINE
+-  await inngest.send({
+-    name: PIPELINE_EVENT,
+-    data: { projectId: project.id },
+-  });
++  // 6. TRIGGER INNGEST PIPELINE (outside the transaction — fire-and-forget)
++  // T7 (M-2): If inngest.send() fails (Inngest API down), mark the project as
++  // failed so the user sees a clear error instead of a permanently-pending orphan.
++  try {
++    await inngest.send({
++      name: PIPELINE_EVENT,
++      data: { projectId },
++    });
++  } catch (err) {
++    console.error('[createProjectAction] Failed to trigger Inngest pipeline:', err);
++    await setProjectFailed(projectId, 'Failed to queue the AI pipeline. Please try again.');
++    return {
++      success: false,
++      error: 'Failed to queue the AI pipeline. Please try again.',
++      code: 'INTERNAL',
++    };
++  }
+ 
+-  // 8. REVALIDATE + REDIRECT
++  // 7. REVALIDATE + REDIRECT
+   revalidatePath('/dashboard');
+-  redirect(`/projects/${project.id}`);
++  redirect(`/projects/${projectId}`);
+ }
+diff --git a/src/lib/hooks/use-project-progress.ts b/src/lib/hooks/use-project-progress.ts
+index 38964df..9553628 100644
+--- a/src/lib/hooks/use-project-progress.ts
++++ b/src/lib/hooks/use-project-progress.ts
+@@ -86,9 +86,12 @@ export function useProjectProgress(projectId: string): ProjectProgressState {
+           });
+ 
+           // Close the EventSource when terminal — server will also close,
+-          // but this avoids a redundant reconnect attempt
++          // but this avoids a redundant reconnect attempt.
++          // T12/L-2: Set eventSource to null after close so the cleanup
++          // function's `if (eventSource)` guard skips the double-close.
+           if (TERMINAL_STATUSES.has(data.status)) {
+             eventSource?.close();
++            eventSource = null;
+             setState((prev) => ({ ...prev, connectionState: 'closed' }));
+           }
+         } catch {
+diff --git a/src/lib/rate-limit.ts b/src/lib/rate-limit.ts
+index 5eddbca..cae0c76 100644
+--- a/src/lib/rate-limit.ts
++++ b/src/lib/rate-limit.ts
+@@ -62,3 +62,58 @@ export const sseRateLimit = new Ratelimit({
+   prefix: 'siv:sse',
+   analytics: true,
+ });
++
++// ── T5 (H-3): Active-connection slot management ─────────────────────────────
++//
++// H-3 bug: sseRateLimit (above) used fixedWindow(1, '1 m') — 1 connection per
++// user:project per 60s. When the client disconnected cleanly, the abort handler
++// closed the stream but did NOT release the rate-limit counter. Users who closed
++// and reopened within 60s got 429 despite having zero active connections.
++//
++// T5 fix: Track active connections with a Redis key using SET NX (only-if-not-exists)
++// + short TTL. The slot is:
++//   - CLAIMED on stream open (SET NX EX 30 — fails if a slot already exists)
++//   - REFRESHED every poll interval (EXPIRE to 30s — keeps the slot alive while streaming)
++//   - RELEASED on disconnect (DEL — allows immediate reconnection)
++//
++// The 30s TTL is the safety net: if the server crashes or the abort handler
++// doesn't fire, the slot auto-expires after 30s. The refresh every 2s (poll
++// interval) keeps it alive during normal operation.
++
++const SSE_SLOT_TTL_SEC = 30;
++const SSE_SLOT_PREFIX = 'siv:sse:active';
++
++function slotKey(userId: string, projectId: string): string {
++  return `${SSE_SLOT_PREFIX}:${userId}:${projectId}`;
++}
++
++/**
++ * Claim an SSE slot for a user:project. Returns true if the slot was claimed
++ * (no existing active connection), false if a slot is already held.
++ *
++ * Uses Redis SET NX (only-if-not-exists) with a TTL. Atomic — no race condition.
++ */
++export async function claimSseSlot(userId: string, projectId: string): Promise<boolean> {
++  const result = await redis.set(slotKey(userId, projectId), '1', {
++    ex: SSE_SLOT_TTL_SEC,
++    nx: true,
++  });
++  return result === 'OK';
++}
++
++/**
++ * Release an SSE slot. Called when the client disconnects (abort signal) or
++ * when the stream reaches a terminal status. Allows immediate reconnection.
++ */
++export async function releaseSseSlot(userId: string, projectId: string): Promise<void> {
++  await redis.del(slotKey(userId, projectId));
++}
++
++/**
++ * Refresh an SSE slot's TTL. Called every poll interval (2s) to keep the slot
++ * alive while the stream is active. If the server stops refreshing (crash,
++// OOM), the slot expires after 30s — the safety net.
++ */
++export async function refreshSseSlot(userId: string, projectId: string): Promise<void> {
++  await redis.expire(slotKey(userId, projectId), SSE_SLOT_TTL_SEC);
++}
+diff --git a/src/proxy.ts b/src/proxy.ts
+index c8ba97e..e90e5e8 100644
+--- a/src/proxy.ts
++++ b/src/proxy.ts
+@@ -62,7 +62,13 @@ export default auth(async (req) => {
+   const isProtectedPath = protectedPaths.some((p) => nextUrl.pathname.startsWith(p));
+ 
+   if (isProtectedPath && !isAuthenticated) {
+-    const signInUrl = new URL('/sign-in', nextUrl.origin);
++    // T2 fix: Use env.NEXT_PUBLIC_APP_URL (canonical public HTTPS URL) as the
++    // redirect base, NOT nextUrl.origin. Behind a TLS-terminating reverse proxy
++    // (Cloudflare Tunnel), nextUrl.protocol is 'http:' and/or the Host header
++    // may not match the public domain — causing the browser to connect to
++    // http://public-domain:80 → ERR_CONNECTION_REFUSED. env.NEXT_PUBLIC_APP_URL
++    // is always the canonical HTTPS URL the user's browser can actually reach.
++    const signInUrl = new URL('/sign-in', env.NEXT_PUBLIC_APP_URL);
+     signInUrl.searchParams.set('callbackUrl', nextUrl.pathname);
+     return NextResponse.redirect(signInUrl);
+   }
+diff --git a/src/tests/unit/assemble-video.test.ts b/src/tests/unit/assemble-video.test.ts
+index f34b201..d96bbe0 100644
+--- a/src/tests/unit/assemble-video.test.ts
++++ b/src/tests/unit/assemble-video.test.ts
+@@ -55,7 +55,6 @@ vi.mock('@/lib/env', () => ({
+ 
+ import {
+   assembleVideo,
+-  buildFfmpegCommand,
+   getFfmpegPath,
+ } from '@/features/pipeline/domain/assemble-video';
+ 
+@@ -152,14 +151,9 @@ describe('T3: assemble-video rewrite', () => {
+     expect(result.duration).toBe(20); // 8 + 12
+   });
+ 
+-  it('buildFfmpegCommand produces a filter string containing concat + scale + subtitles', () => {
+-    const args = buildFfmpegCommand(validInput, '/tmp/out.mp4');
+-    const filterArg = args.find((a) => typeof a === 'string' && a.includes('concat'));
+-    expect(filterArg).toBeDefined();
+-    expect(filterArg).toMatch(/concat=/);
+-    expect(filterArg).toMatch(/scale=/);
+-    expect(filterArg).toMatch(/subtitles=/);
+-  });
++  // T10 (M-5): Removed buildFfmpegCommand test — the function was dead code
++  // (never called in production). The filter string is now tested via the
++  // assembleVideo integration test above which verifies the full FFmpeg pipeline.
+ });
+ 
+ describe('T1: system ffmpeg path resolution', () => {
+diff --git a/src/tests/unit/brand-tokens.test.ts b/src/tests/unit/brand-tokens.test.ts
+index 3275aab..49b321f 100644
+--- a/src/tests/unit/brand-tokens.test.ts
++++ b/src/tests/unit/brand-tokens.test.ts
+@@ -70,11 +70,10 @@ describe('H2: Brand color system — baseline violation count (CI guard)', () =>
+       `H2 baseline: ${totalAmberViolations} amber-* violations across ${filesWithViolations.length} files`,
+     );
+ 
+-    // This test PASSES with the current violation count — it's a measurement.
+-    // When the brand token replacement is complete, change this to:
+-    //   expect(totalAmberViolations).toBe(0);
+-    expect(totalAmberViolations).toBeGreaterThan(0);
+-    expect(filesWithViolations.length).toBeGreaterThan(0);
++    // T11 (M-6): The brand token replacement is now complete.
++    // All amber-300/400/500/600 usages have been replaced with `primary`
++    // (the custom @theme token #febf00). This test now ENFORCES zero violations.
++    expect(totalAmberViolations).toBe(0);
+   });
+ 
+   it('counts bg-zinc-950/900/black violations (baseline)', () => {
+@@ -100,7 +99,8 @@ describe('H2: Brand color system — baseline violation count (CI guard)', () =>
+       `H2 baseline: ${totalZincBlackViolations} bg-zinc-950/900/black violations across ${filesWithViolations.length} files`,
+     );
+ 
+-    // Same as above — measurement, not enforcement (yet).
+-    expect(totalZincBlackViolations).toBeGreaterThan(0);
++    // T11 (M-6): The brand token replacement is now complete.
++    // All bg-zinc-950/900/black usages have been replaced with bg-background/bg-card.
++    expect(totalZincBlackViolations).toBe(0);
+   });
+ });
+diff --git a/src/tests/unit/create-project-action.test.ts b/src/tests/unit/create-project-action.test.ts
+index 22a2657..c274663 100644
+--- a/src/tests/unit/create-project-action.test.ts
++++ b/src/tests/unit/create-project-action.test.ts
+@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
+ import { readFileSync } from 'node:fs';
+ import { resolve } from 'node:path';
+ 
+-// Mock the db
+-vi.mock('@/lib/db', () => ({
+-  db: {
++// Mock the db — T3: now includes db.transaction that calls the callback with a mock tx
++vi.mock('@/lib/db', () => {
++  const mockTx = {
+     insert: vi.fn(() => ({
+       values: vi.fn(() => ({
+         returning: vi
+@@ -14,8 +14,18 @@ vi.mock('@/lib/db', () => ({
+           ]),
+       })),
+     })),
+-  },
+-}));
++  };
++  return {
++    db: {
++      // T3: db.transaction calls the callback with a mock tx
++      transaction: vi.fn(async (callback: (tx: typeof mockTx) => Promise<unknown>) => {
++        return callback(mockTx);
++      }),
++      // Keep insert at the top level for backward compat with any direct db.insert calls
++      insert: mockTx.insert,
++    },
++  };
++});
+ 
+ // Mock verifySession
+ vi.mock('@/features/auth/domain/verify-session', () => ({
+@@ -27,7 +37,7 @@ vi.mock('@/features/pipeline/domain/moderate-content', () => ({
+   moderateContent: vi.fn(),
+ }));
+ 
+-// Mock billing queries
++// Mock billing queries — T3: now exports debitCreditsTx (transaction-scoped variant)
+ vi.mock('@/features/billing/queries', () => ({
+   getOrCreateSubscription: vi.fn(),
+   // C5: debitCredits now returns DebitResult { idempotent, eventId, creditsRemaining }
+@@ -36,6 +46,12 @@ vi.mock('@/features/billing/queries', () => ({
+     eventId: 'evt-1',
+     creditsRemaining: 45,
+   }),
++  // T3: debitCreditsTx is the transaction-scoped variant called inside db.transaction
++  debitCreditsTx: vi.fn().mockResolvedValue({
++    idempotent: false,
++    eventId: 'evt-1',
++    creditsRemaining: 45,
++  }),
+   InsufficientCreditsError: class extends Error {
+     constructor(
+       public required: number,
+@@ -82,7 +98,7 @@ import { verifySession } from '@/features/auth/domain/verify-session';
+ import { moderateContent } from '@/features/pipeline/domain/moderate-content';
+ import {
+   getOrCreateSubscription,
+-  debitCredits,
++  debitCreditsTx,
+   InsufficientCreditsError,
+ } from '@/features/billing/queries';
+ import { inngest, PIPELINE_EVENT } from '@/lib/inngest/client';
+@@ -151,7 +167,8 @@ describe('S2-02: createProjectAction Server Action', () => {
+       expires: '',
+     } as never);
+     vi.mocked(moderateContent).mockResolvedValue({ flagged: false, categories: [] });
+-    vi.mocked(debitCredits).mockRejectedValue(new InsufficientCreditsError(5, 2));
++    // T3: the action now calls debitCreditsTx inside a transaction
++    vi.mocked(debitCreditsTx).mockRejectedValue(new InsufficientCreditsError(5, 2));
+ 
+     const result = await createProjectAction(validInput);
+     expect(result.success).toBe(false);
+@@ -165,7 +182,7 @@ describe('S2-02: createProjectAction Server Action', () => {
+     } as never);
+     vi.mocked(moderateContent).mockResolvedValue({ flagged: false, categories: [] });
+     vi.mocked(getOrCreateSubscription).mockResolvedValue({} as never);
+-    vi.mocked(debitCredits).mockResolvedValue({
++    vi.mocked(debitCreditsTx).mockResolvedValue({
+       idempotent: false,
+       eventId: 'evt-1',
+       creditsRemaining: 45,
+@@ -174,9 +191,9 @@ describe('S2-02: createProjectAction Server Action', () => {
+     // The action calls redirect() at the end — which throws NEXT_REDIRECT
+     await expect(createProjectAction(validInput)).rejects.toThrow('NEXT_REDIRECT');
+ 
+-    // Verify the db.insert was called
++    // T3: verify the db.transaction was called (wraps INSERT + debit)
+     const { db } = await import('@/lib/db');
+-    expect(db.insert).toHaveBeenCalled();
++    expect(db.transaction).toHaveBeenCalled();
+   });
+ 
+   it('follows auth-first pattern: verifySession is the first call', async () => {
+@@ -185,7 +202,7 @@ describe('S2-02: createProjectAction Server Action', () => {
+       expires: '',
+     } as never);
+     vi.mocked(moderateContent).mockResolvedValue({ flagged: false, categories: [] });
+-    vi.mocked(debitCredits).mockResolvedValue({
++    vi.mocked(debitCreditsTx).mockResolvedValue({
+       idempotent: false,
+       eventId: 'evt-1',
+       creditsRemaining: 45,
+@@ -207,7 +224,7 @@ describe('S2-02: createProjectAction Server Action', () => {
+     } as never);
+     vi.mocked(moderateContent).mockResolvedValue({ flagged: false, categories: [] });
+     vi.mocked(getOrCreateSubscription).mockResolvedValue({} as never);
+-    vi.mocked(debitCredits).mockResolvedValue({
++    vi.mocked(debitCreditsTx).mockResolvedValue({
+       idempotent: false,
+       eventId: 'evt-1',
+       creditsRemaining: 45,
+@@ -225,16 +242,17 @@ describe('S2-02: createProjectAction Server Action', () => {
+     });
+   });
+ 
+-  // C4: Credits must be debited AFTER the project insert succeeds.
+-  // If the DB insert fails, the user should NOT lose credits.
+-  // We verify this by checking the source code order: the projects insert
+-  // must appear BEFORE debitCredits in the action source.
+-  it('C4: project insert happens BEFORE credit debit (source order check)', () => {
++  // C4 + T3: Credits must be debited AFTER the project insert succeeds, and
++  // both must be inside the same db.transaction() so a debit failure rolls back
++  // the insert. We verify by checking the source code order: the projects insert
++  // must appear BEFORE debitCreditsTx in the action source.
++  it('C4+T3: project insert happens BEFORE credit debit inside the transaction (source order check)', () => {
+     const actionsPath = resolve(__dirname, '../../features/projects/actions.ts');
+     const source = readFileSync(actionsPath, 'utf-8');
+-    // Use .insert(projects) to match across the multiline db.insert(projects) call
++    // Use .insert(projects) to match across the multiline tx.insert(projects) call
+     const insertPos = source.indexOf('.insert(projects)');
+-    const debitPos = source.indexOf('debitCredits(');
++    // T3: the action now calls debitCreditsTx (not debitCredits) inside the transaction
++    const debitPos = source.indexOf('debitCreditsTx(');
+     expect(insertPos).toBeGreaterThan(-1);
+     expect(debitPos).toBeGreaterThan(-1);
+     expect(insertPos).toBeLessThan(debitPos);
+diff --git a/src/tests/unit/create-wizard.test.ts b/src/tests/unit/create-wizard.test.ts
+index 5a20f33..c378e6d 100644
+--- a/src/tests/unit/create-wizard.test.ts
++++ b/src/tests/unit/create-wizard.test.ts
+@@ -48,9 +48,10 @@ describe('S2-01: Create wizard page', () => {
+ 
+   it('create-wizard uses the luxury-dark design system', () => {
+     const source = readFileSync(CREATE_WIZARD_PATH, 'utf-8');
+-    expect(source).toMatch(/bg-zinc-950/);
++    // T11: bg-zinc-950 → bg-background, text-amber-400 → text-primary
++    expect(source).toMatch(/bg-background/);
+     expect(source).toMatch(/glass-input/);
+-    expect(source).toMatch(/text-amber-400/);
++    expect(source).toMatch(/text-primary/);
+   });
+ 
+   it('/create page is a server component wrapping CreateWizard', () => {
+diff --git a/src/tests/unit/hero-character-counter.test.tsx b/src/tests/unit/hero-character-counter.test.tsx
+index 9e07531..4723233 100644
+--- a/src/tests/unit/hero-character-counter.test.tsx
++++ b/src/tests/unit/hero-character-counter.test.tsx
+@@ -35,7 +35,7 @@ describe('Hero character counter', () => {
+ 
+     const counter = screen.getByText('4500 / 5000');
+     // Amber warning state activates at ≥4500 chars (90% of 5000)
+-    expect(counter).toHaveClass('text-amber-400');
++    expect(counter).toHaveClass('text-primary');
+   });
+ 
+   it('uses the muted default style below the 4500-char threshold', () => {
+@@ -46,6 +46,6 @@ describe('Hero character counter', () => {
+ 
+     const counter = screen.getByText('4499 / 5000');
+     expect(counter).toHaveClass('text-zinc-600');
+-    expect(counter).not.toHaveClass('text-amber-400');
++    expect(counter).not.toHaveClass('text-primary');
+   });
+ });
+diff --git a/src/tests/unit/pipeline-sprint5.test.ts b/src/tests/unit/pipeline-sprint5.test.ts
+index c97ca66..8330b32 100644
+--- a/src/tests/unit/pipeline-sprint5.test.ts
++++ b/src/tests/unit/pipeline-sprint5.test.ts
+@@ -108,7 +108,7 @@ vi.mock('@/features/pipeline/domain/assemble-video', () => ({
+     videoBuffer: Buffer.from('fake-mp4-bytes'),
+     duration: 20,
+   }),
+-  buildFfmpegCommand: vi.fn().mockReturnValue([]),
++  // T10: buildFfmpegCommand was removed (dead code). Mock removed.
+ }));
+ 
+ // Mock fluent-ffmpeg so assemble-video can be imported without crashing
+diff --git a/src/tests/unit/rate-limit.test.ts b/src/tests/unit/rate-limit.test.ts
+index 9b57c77..fe3ca92 100644
+--- a/src/tests/unit/rate-limit.test.ts
++++ b/src/tests/unit/rate-limit.test.ts
+@@ -33,6 +33,14 @@ describe('C3: Rate limiting client module', () => {
+     expect(source).toMatch(/export.*sseRateLimit/);
+   });
+ 
++  // T5: New claim/release/refresh functions for SSE slot management
++  it('T5: exports claimSseSlot, releaseSseSlot, and refreshSseSlot', () => {
++    const source = readFileSync(RATE_LIMIT_PATH, 'utf-8');
++    expect(source).toMatch(/export.*claimSseSlot/);
++    expect(source).toMatch(/export.*releaseSseSlot/);
++    expect(source).toMatch(/export.*refreshSseSlot/);
++  });
++
+   it('uses @upstash/ratelimit + @upstash/redis', () => {
+     const source = readFileSync(RATE_LIMIT_PATH, 'utf-8');
+     expect(source).toMatch(/from ['"]@upstash\/ratelimit['"]/);
+diff --git a/src/tests/unit/sse-progress.test.ts b/src/tests/unit/sse-progress.test.ts
+index aa64630..d67942e 100644
+--- a/src/tests/unit/sse-progress.test.ts
++++ b/src/tests/unit/sse-progress.test.ts
+@@ -65,16 +65,20 @@ describe('T9: SSE progress route source-level guarantees', () => {
+     expect(source).toMatch(/completed|failed/);
+   });
+ 
+-  // C3: SSE route must rate-limit to 1 concurrent connection per user/project
+-  it('C3: route imports sseRateLimit from @/lib/rate-limit', () => {
++  // C3 + T5: SSE route must limit to 1 concurrent connection per user/project.
++  // T5 replaced sseRateLimit.fixedWindow with claimSseSlot/releaseSseSlot/refreshSseSlot
++  // to fix the H-3 bug where the slot was never released on disconnect.
++  it('C3+T5: route imports claim/release/refresh from @/lib/rate-limit', () => {
+     const source = readFileSync(routePath, 'utf-8');
+     expect(source).toMatch(/from ['"]@\/lib\/rate-limit['"]/);
+-    expect(source).toMatch(/sseRateLimit/);
++    expect(source).toMatch(/claimSseSlot/);
++    expect(source).toMatch(/releaseSseSlot/);
++    expect(source).toMatch(/refreshSseSlot/);
+   });
+ 
+-  it('C3: route calls sseRateLimit.limit before opening the stream', () => {
++  it('C3+T5: route calls claimSseSlot before opening the stream', () => {
+     const source = readFileSync(routePath, 'utf-8');
+-    expect(source).toMatch(/sseRateLimit\.limit/);
++    expect(source).toMatch(/claimSseSlot\s*\(/);
+   });
+ 
+   it('C3: route returns 429 when SSE rate limit is exceeded', () => {

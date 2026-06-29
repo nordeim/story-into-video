@@ -12,8 +12,8 @@ interface CtaAmberProps {
 
 /**
  * Tier-4 CTA: solid amber pill — the page's conversion crescendo. The only
- * place `bg-amber-400` is used as a solid fill on a button. Used only by
- * FinalCTA ("Start Creating — It's Free"). Hover brightens to amber-300,
+ * place `bg-primary` is used as a solid fill on a button. Used only by
+ * FinalCTA ("Start Creating — It's Free"). Hover brightens to primary,
  * adds glow shadow, and scales 1.02.
  *
  * Renders the `cta-amber` @utility class (defined in globals.css).
@@ -26,7 +26,7 @@ export function CtaAmber({ children, href, className, onClick }: CtaAmberProps) 
       onClick={onClick}
       className={cn(
         'cta-amber group inline-flex items-center gap-2.5',
-        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400',
+        'focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2',
         className,
       )}
     >

@@ -108,7 +108,7 @@ vi.mock('@/features/pipeline/domain/assemble-video', () => ({
     videoBuffer: Buffer.from('fake-mp4-bytes'),
     duration: 20,
   }),
-  buildFfmpegCommand: vi.fn().mockReturnValue([]),
+  // T10: buildFfmpegCommand was removed (dead code). Mock removed.
 }));
 
 // Mock fluent-ffmpeg so assemble-video can be imported without crashing

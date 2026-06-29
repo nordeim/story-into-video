@@ -6,7 +6,7 @@ import { getProject } from '@/features/projects/queries';
 import { db } from '@/lib/db';
 import { projects } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { sseRateLimit } from '@/lib/rate-limit';
+import { claimSseSlot, releaseSseSlot, refreshSseSlot } from '@/lib/rate-limit';
 
 /**
  * SSE progress stream — pushes project status updates to the client.
@@ -80,21 +80,26 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Capture userId as a non-optional string for use in closures below
+  // (TypeScript doesn't preserve session.user.id narrowing inside closures)
+  const userId: string = session.user.id;
+
   // 2. OWNER CHECK
   const { id: projectId } = await params;
-  const project = await getProject(projectId, session.user.id);
+  const project = await getProject(projectId, userId);
   if (!project) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  // 2b. C3: RATE LIMIT — 1 concurrent SSE connection per user/project.
-  // Prevents a single user from opening 100 SSE streams (each polling the DB
-  // every 2s = 200 queries/sec from one user). The limit uses a composite
-  // key of userId + projectId so a user can watch one project at a time.
-  // The fixed-window TTL is 60s — if the client disconnects without closing
-  // cleanly, the limit auto-expires.
-  const { success: sseRateLimitOk } = await sseRateLimit.limit(`${session.user.id}:${projectId}`);
-  if (!sseRateLimitOk) {
+  // 2b. T5 (H-3): Claim an SSE slot — 1 concurrent connection per user/project.
+  // Replaces the old sseRateLimit.fixedWindow which never released on disconnect.
+  // The slot is:
+  //   - CLAIMED here (SET NX EX 30 — fails if a slot already exists)
+  //   - REFRESHED every poll interval (2s) to keep it alive
+  //   - RELEASED on disconnect (abort handler below) for immediate reconnection
+  // The 30s TTL is the safety net if the server crashes or abort doesn't fire.
+  const slotClaimed = await claimSseSlot(userId, projectId);
+  if (!slotClaimed) {
     return NextResponse.json(
       { error: 'Too many concurrent connections. Close existing tabs and try again.' },
       { status: 429 },
@@ -119,6 +124,8 @@ export async function GET(
       // Poll until terminal or client disconnects
       const interval = setInterval(async () => {
         try {
+          // T5: Refresh the SSE slot TTL so it doesn't expire while streaming
+          await refreshSseSlot(userId, projectId);
           const current = await readProjectProgress(projectId);
           if (!current) {
             controller.close();
@@ -137,9 +144,11 @@ export async function GET(
         }
       }, POLL_INTERVAL_MS);
 
-      // Clean up interval when the client disconnects
+      // Clean up interval + release SSE slot when the client disconnects
       req.signal.addEventListener('abort', () => {
         clearInterval(interval);
+        // T5: Release the slot so the user can reconnect immediately
+        void releaseSseSlot(userId, projectId);
         controller.close();
       });
     },

@@ -9,15 +9,15 @@ export const metadata = {
 
 /**
  * Sign-up page — server component wrapping the AuthForm client component.
- * Uses the luxury-dark design system (bg-zinc-950, amber accents).
+ * Uses the luxury-dark design system (bg-background, amber accents).
  */
 export default function SignUpPage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-zinc-950 px-6 py-16">
+    <main className="bg-background flex min-h-screen flex-col items-center justify-center px-6 py-16">
       <div className="mb-8 text-center">
         <Link
           href="/"
-          className="font-heading text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+          className="font-heading focus-visible:outline-primary text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2"
         >
           StoryIntoVideo
         </Link>
@@ -33,7 +33,7 @@ export default function SignUpPage() {
         Already have an account?{' '}
         <Link
           href="/sign-in"
-          className="text-amber-400 hover:text-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+          className="text-primary hover:text-primary focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2"
         >
           Sign in
         </Link>

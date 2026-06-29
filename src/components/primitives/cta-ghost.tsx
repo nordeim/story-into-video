@@ -21,9 +21,9 @@ export function CtaGhost({ children, href, className }: CtaGhostProps) {
       href={href}
       className={cn(
         'group inline-flex items-center gap-2',
-        'text-amber-400 hover:text-amber-300',
+        'text-primary hover:text-primary',
         'text-sm font-medium transition-colors duration-200',
-        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400',
+        'focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2',
         className,
       )}
     >

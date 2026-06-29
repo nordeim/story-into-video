@@ -41,35 +41,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // H7 fix: Idempotency via ON CONFLICT (idempotency_key) DO NOTHING.
-  // The previous code used a TOCTOU-vulnerable SELECT-then-INSERT pattern on
-  // the metadata column (no UNIQUE index). Two concurrent webhooks for the
-  // same event.id would both pass the SELECT and both INSERT.
+  // T4 (H-2) fix: Idempotency INSERT happens AFTER side effects succeed.
   //
-  // The fix: attempt the INSERT first with onConflictDoNothing. If it returns
-  // no rows, this event was already processed — return early. Otherwise,
-  // process the event. The idempotencyKey column + UNIQUE index (added in
-  // Task 1.1) make this race-condition-proof at the DB level.
+  // H-2 bug: The idempotency INSERT previously happened BEFORE the event handler.
+  // If the handler threw (e.g., DB update failed for checkout.session.completed),
+  // the webhook returned 500 — Stripe retried — but the idempotency row was
+  // already committed, so the retry hit onConflictDoNothing and returned
+  // { duplicate: true } without re-processing. The subscription update was
+  // PERMANENTLY LOST.
   //
-  // We use event.id as the idempotencyKey — Stripe guarantees these are unique.
-  const [inserted] = await db
-    .insert(usageEvents)
-    .values({
-      // H7: userId is now nullable — webhook events don't map to a user
-      // until the checkout.session.completed handler runs. The system user
-      // UUID was a hack that violated the foreign key constraint.
-      userId: null,
-      type: 'stripe_webhook',
-      cost: 0,
-      idempotencyKey: event.id,
-      metadata: event.id,
-    })
-    .onConflictDoNothing({
-      target: usageEvents.idempotencyKey,
-    })
-    .returning({ id: usageEvents.id });
+  // T4 fix: Two-phase approach:
+  //   1. PRE-CHECK: SELECT usageEvents for event.id. If found, return { duplicate: true }.
+  //      (This is a TOCTOU race, but safe combined with step 3.)
+  //   2. RUN HANDLER: Execute the event-specific side effects.
+  //   3. CLAIM: INSERT the idempotency row with onConflictDoNothing AFTER side
+  //      effects succeed. If the handler throws, no row is inserted → Stripe
+  //      retries → handler runs again → succeeds → row inserted.
+  //
+  // No more permanently-lost subscription updates on transient handler failures.
+  const [existing] = await db
+    .select({ id: usageEvents.id })
+    .from(usageEvents)
+    .where(eq(usageEvents.idempotencyKey, event.id))
+    .limit(1);
 
-  if (!inserted) {
+  if (existing) {
     // Duplicate event.id — already processed. Return success without
     // re-running the side effects (subscription updates, etc.).
     return NextResponse.json({ received: true, duplicate: true });
@@ -139,6 +135,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         // Unhandled event type — log but don't error
         break;
     }
+
+    // T4: CLAIM — insert the idempotency row AFTER side effects succeed.
+    // If the handler threw above, we never reach this line → no row inserted →
+    // Stripe retries → handler runs again. If the INSERT hits onConflictDoNothing
+    // (concurrent worker won the race), that's fine — our side effects are idempotent.
+    await db
+      .insert(usageEvents)
+      .values({
+        // H7: userId is nullable — webhook events don't map to a user until
+        // the checkout.session.completed handler runs.
+        userId: null,
+        type: 'stripe_webhook',
+        cost: 0,
+        idempotencyKey: event.id,
+        metadata: event.id,
+      })
+      .onConflictDoNothing({
+        target: usageEvents.idempotencyKey,
+      });
 
     return NextResponse.json({ received: true });
   } catch (err) {

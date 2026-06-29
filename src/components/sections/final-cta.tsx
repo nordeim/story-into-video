@@ -5,7 +5,7 @@ import { ScrollReveal } from '@/components/primitives/scroll-reveal';
  * FinalCTA — server component.
  * The page's conversion crescendo. 4 decorative layers (dot-grid, radial amber
  * halo, top fade, bottom fade) + H2 + subtitle + solid amber pill CTA + footnote.
- * This is the only place `bg-amber-400` is used as a solid fill on a button.
+ * This is the only place `bg-primary` is used as a solid fill on a button.
  */
 export function FinalCTA() {
   return (

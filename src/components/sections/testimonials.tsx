@@ -13,7 +13,10 @@ import { TESTIMONIALS } from '@/lib/data/testimonials';
  */
 export function Testimonials() {
   return (
-    <section className="bg-zinc-950 py-16 sm:py-20 lg:py-24" aria-labelledby="testimonials-heading">
+    <section
+      className="bg-background py-16 sm:py-20 lg:py-24"
+      aria-labelledby="testimonials-heading"
+    >
       <div className="mx-auto max-w-7xl px-6">
         <ScrollReveal className="mb-16 text-center">
           <Eyebrow className="mb-4">TESTIMONIALS</Eyebrow>
@@ -26,7 +29,7 @@ export function Testimonials() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {TESTIMONIALS.map((t, idx) => (
             <ScrollReveal key={t.id} delay={Math.min(idx * 80, 400)}>
-              <figure className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-5 transition-colors duration-300 hover:border-zinc-700/60 sm:p-6">
+              <figure className="bg-card/30 rounded-2xl border border-zinc-800/60 p-5 transition-colors duration-300 hover:border-zinc-700/60 sm:p-6">
                 <blockquote>
                   <p className="mb-5 text-sm leading-relaxed text-zinc-300">
                     &ldquo;{t.quote}&rdquo;

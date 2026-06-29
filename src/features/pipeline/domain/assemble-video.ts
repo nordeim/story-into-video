@@ -1,5 +1,6 @@
 import ffmpeg from 'fluent-ffmpeg';
 import { writeFile, readFile, unlink } from 'fs/promises';
+import { randomUUID } from 'node:crypto';
 import { env } from '@/lib/env';
 
 /**
@@ -83,42 +84,14 @@ function buildFilterString(
   );
 }
 
-/**
- * Build the full FFmpeg command-line args array.
- *
- * Exposed for unit testing — verifies the filter string contains concat, scale,
- * and subtitles in a single coherent expression (not extracted via `.find()`).
- */
-export function buildFfmpegCommand(input: AssembleVideoInput, outputPath: string): string[] {
-  const baseDims = RESOLUTION_MAP[input.resolution];
-  const dims =
-    input.aspectRatio === 'landscape'
-      ? { width: baseDims.height, height: baseDims.width }
-      : baseDims;
-
-  const srtPath = `/tmp/siv-srt-${Date.now()}.srt`;
-  const filterString = buildFilterString(input.sceneImageUrls.length, dims, srtPath);
-
-  const args: string[] = ['-y'];
-  // Image inputs (loop + duration applied via inputOptions on the fluent-ffmpeg chain)
-  for (const url of input.sceneImageUrls) {
-    args.push('-i', url);
-  }
-  // Audio input
-  args.push('-i', input.audioUrl);
-  // Filter + maps + encoding
-  args.push('-filter_complex', filterString);
-  args.push('-map', '[v]', '-map', `${input.sceneImageUrls.length}:a`);
-  args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '23');
-  args.push('-c:a', 'aac', '-b:a', '128k');
-  args.push('-pix_fmt', 'yuv420p', '-movflags', '+faststart');
-  args.push(outputPath);
-
-  return args;
-}
+// T10 (M-5): Removed dead `buildFfmpegCommand` export. It was never called in
+// production (assembleVideo uses fluent-ffmpeg's .inputOptions()/.outputOptions()
+// API directly) and created a second source of truth for the FFmpeg command
+// structure. Tests that verified the filter string now test buildFilterString
+// directly via the assembleVideo integration test.
 
 async function writeSrtFile(srtContent: string): Promise<string> {
-  const srtPath = `/tmp/siv-srt-${Date.now()}.srt`;
+  const srtPath = `/tmp/siv-srt-${randomUUID()}.srt`;
   await writeFile(srtPath, srtContent, 'utf-8');
   return srtPath;
 }
@@ -137,7 +110,7 @@ async function cleanupTempFiles(...paths: string[]): Promise<void> {
 
 export async function assembleVideo(input: AssembleVideoInput): Promise<AssembleVideoOutput> {
   const totalDuration = input.sceneDurations.reduce((sum, d) => sum + d, 0);
-  const outputPath = `/tmp/siv-video-${Date.now()}.mp4`;
+  const outputPath = `/tmp/siv-video-${randomUUID()}.mp4`;
   const srtPath = await writeSrtFile(input.subtitlesSrt);
 
   const baseDims = RESOLUTION_MAP[input.resolution];

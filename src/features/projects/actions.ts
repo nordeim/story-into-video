@@ -8,10 +8,15 @@ import { db } from '@/lib/db';
 import { projects } from '@/lib/db/schema';
 import { verifySession } from '@/features/auth/domain/verify-session';
 import { moderateContent } from '@/features/pipeline/domain/moderate-content';
-import { debitCredits, getOrCreateSubscription } from '@/features/billing/queries';
+import {
+  debitCreditsTx,
+  getOrCreateSubscription,
+  InsufficientCreditsError,
+} from '@/features/billing/queries';
 import { CREDIT_COSTS } from '@/features/billing/domain/tier-limits';
 import { inngest, PIPELINE_EVENT } from '@/lib/inngest/client';
 import { pipelineRateLimit } from '@/lib/rate-limit';
+import { setProjectFailed } from '@/features/pipeline/queries';
 
 /**
  * createProjectAction — Server Action that creates a new project from a story.
@@ -109,60 +114,83 @@ export async function createProjectAction(
   // debit. The debit itself happens AFTER the insert (C4 fix below).
   await getOrCreateSubscription(userId);
 
-  // 5. INSERT PROJECT FIRST (C4 fix)
-  // The project is created BEFORE debiting credits. If the DB insert fails,
-  // the user loses nothing. The debit happens next with a deterministic
-  // idempotency key derived from the project ID — safe against action retries.
-  const [project] = await db
-    .insert(projects)
-    .values({
-      userId,
-      title: parsed.data.title ?? parsed.data.story.slice(0, 50) + '…',
-      story: parsed.data.story,
-      style: parsed.data.style,
-      aspectRatio: parsed.data.aspectRatio,
-      status: 'pending',
-      creditsCost: CREDIT_COSTS.analysis,
-    })
-    .returning();
-
-  if (!project) {
-    return { success: false, error: 'Failed to create project', code: 'INTERNAL' };
-  }
-
-  // 6. DEBIT ANALYSIS CREDITS (after insert, with project-id-based idempotency key)
-  // If the user has insufficient credits, we should ideally roll back the
-  // project insert. For now, we leave the project in 'pending' status and
-  // return the error — the pipeline won't trigger, so no AI costs accrue.
-  // The user can top up and retry, or delete the empty project.
+  // 5. INSERT PROJECT + DEBIT CREDITS IN A SINGLE TRANSACTION (T3/H-1 fix)
+  //
+  // H-1 bug: Previously the project INSERT and the credit debit were separate
+  // top-level operations. If debitCredits threw InsufficientCreditsError, the
+  // project row was already committed as an orphan with status='pending' —
+  // cluttering the dashboard with ghost projects the user could never complete.
+  //
+  // T3 fix: Wrap both in a single db.transaction(). If the debit throws, the
+  // transaction rolls back and no project row is committed. The user sees a
+  // clean INSUFFICIENT_CREDITS error with no orphan.
+  let projectId: string;
   try {
-    const debitResult = await debitCredits(
-      userId,
-      CREDIT_COSTS.analysis,
-      'analysis',
-      `${project.id}:analysis`,
-      project.id,
-    );
-    // If idempotent (action retry), the credit was already debited — proceed.
-    void debitResult;
+    projectId = await db.transaction(async (tx) => {
+      // 5a. INSERT project (inside the transaction)
+      const [project] = await tx
+        .insert(projects)
+        .values({
+          userId,
+          title: parsed.data.title ?? parsed.data.story.slice(0, 50) + '…',
+          story: parsed.data.story,
+          style: parsed.data.style,
+          aspectRatio: parsed.data.aspectRatio,
+          status: 'pending',
+          creditsCost: CREDIT_COSTS.analysis,
+        })
+        .returning({ id: projects.id });
+
+      if (!project) {
+        throw new Error('Failed to create project');
+      }
+
+      // 5b. DEBIT analysis credits (inside the SAME transaction).
+      // If this throws InsufficientCreditsError, the transaction rolls back
+      // and the project INSERT above is undone — no orphan row.
+      await debitCreditsTx(
+        tx,
+        userId,
+        CREDIT_COSTS.analysis,
+        'analysis',
+        `${project.id}:analysis`,
+        project.id,
+      );
+
+      return project.id;
+    });
   } catch (err) {
-    if (err instanceof Error && err.name === 'InsufficientCreditsError') {
+    if (err instanceof InsufficientCreditsError) {
       return {
         success: false,
         error: err.message,
         code: 'INSUFFICIENT_CREDITS',
       };
     }
-    throw err; // unexpected — let it propagate
+    // Unexpected error — let it propagate so the user sees a generic failure
+    // rather than a silently orphaned project.
+    throw err;
   }
 
-  // 7. TRIGGER INNGEST PIPELINE
-  await inngest.send({
-    name: PIPELINE_EVENT,
-    data: { projectId: project.id },
-  });
+  // 6. TRIGGER INNGEST PIPELINE (outside the transaction — fire-and-forget)
+  // T7 (M-2): If inngest.send() fails (Inngest API down), mark the project as
+  // failed so the user sees a clear error instead of a permanently-pending orphan.
+  try {
+    await inngest.send({
+      name: PIPELINE_EVENT,
+      data: { projectId },
+    });
+  } catch (err) {
+    console.error('[createProjectAction] Failed to trigger Inngest pipeline:', err);
+    await setProjectFailed(projectId, 'Failed to queue the AI pipeline. Please try again.');
+    return {
+      success: false,
+      error: 'Failed to queue the AI pipeline. Please try again.',
+      code: 'INTERNAL',
+    };
+  }
 
-  // 8. REVALIDATE + REDIRECT
+  // 7. REVALIDATE + REDIRECT
   revalidatePath('/dashboard');
-  redirect(`/projects/${project.id}`);
+  redirect(`/projects/${projectId}`);
 }

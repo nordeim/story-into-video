@@ -20,7 +20,7 @@ interface AuthFormProps {
  * calls next-auth's signIn() with the credentials provider. Redirects to
  * /dashboard on success, shows an error message on failure.
  *
- * Uses the luxury-dark design system: bg-zinc-950, amber accents, Geist Sans.
+ * Uses the luxury-dark design system: bg-background, amber accents, Geist Sans.
  */
 export function AuthForm({ mode, className }: AuthFormProps) {
   const router = useRouter();
@@ -93,7 +93,7 @@ export function AuthForm({ mode, className }: AuthFormProps) {
         type="button"
         onClick={handleGoogle}
         disabled={loading}
-        className="flex w-full items-center justify-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 disabled:opacity-50"
+        className="focus-visible:outline-primary flex w-full items-center justify-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
       >
         <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
           <path
@@ -136,7 +136,7 @@ export function AuthForm({ mode, className }: AuthFormProps) {
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
-            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/30 focus:outline-none"
+            className="focus:border-primary/50 focus:ring-primary/30 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 focus:ring-1 focus:outline-none"
             placeholder="you@example.com"
           />
         </div>
@@ -152,7 +152,7 @@ export function AuthForm({ mode, className }: AuthFormProps) {
             required
             minLength={8}
             autoComplete={isSignUp ? 'new-password' : 'current-password'}
-            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/30 focus:outline-none"
+            className="focus:border-primary/50 focus:ring-primary/30 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 focus:ring-1 focus:outline-none"
             placeholder="••••••••"
           />
         </div>
@@ -166,7 +166,7 @@ export function AuthForm({ mode, className }: AuthFormProps) {
         <button
           type="submit"
           disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 disabled:opacity-50"
+          className="bg-primary hover:bg-primary focus-visible:outline-primary flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold text-zinc-950 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
         >
           {loading ? 'Please wait…' : isSignUp ? 'Create account' : 'Sign in'}
           {!loading && <ArrowRight className="h-4 w-4" aria-hidden="true" />}

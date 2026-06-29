@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-zinc-950 px-6 py-16">
+    <main className="bg-background min-h-screen px-6 py-16">
       <article className="mx-auto max-w-3xl text-zinc-300">
         <h1 className="font-heading mb-2 text-4xl font-bold tracking-tight text-white">
           Privacy Policy
@@ -29,9 +29,9 @@ export default function PrivacyPage() {
             <h2 className="font-heading mb-3 text-xl font-bold text-white">1. Introduction</h2>
             <p className="text-sm">
               StoryIntoVideo (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) operates a
-              service that transforms user-submitted stories into AI-generated videos. This
-              Privacy Policy explains what data we collect, how we use it, and the choices you
-              have. By using our service, you agree to the practices described here.
+              service that transforms user-submitted stories into AI-generated videos. This Privacy
+              Policy explains what data we collect, how we use it, and the choices you have. By
+              using our service, you agree to the practices described here.
             </p>
           </section>
 
@@ -57,18 +57,30 @@ export default function PrivacyPage() {
             </p>
             <h3 className="mb-2 text-sm font-semibold text-zinc-200">2.4 Usage data</h3>
             <p className="text-sm">
-              We log usage events (credits debited, operation type, timestamp) for billing and
-              audit purposes. Webhook events from Stripe are also logged for idempotency.
+              We log usage events (credits debited, operation type, timestamp) for billing and audit
+              purposes. Webhook events from Stripe are also logged for idempotency.
             </p>
           </section>
 
           <section>
-            <h2 className="font-heading mb-3 text-xl font-bold text-white">3. How We Use Your Data</h2>
+            <h2 className="font-heading mb-3 text-xl font-bold text-white">
+              3. How We Use Your Data
+            </h2>
             <ul className="ml-6 list-disc space-y-2 text-sm">
-              <li>To provide the core service: analyze your story, generate characters/scenes/voiceover, and assemble a final video.</li>
-              <li>To enforce content moderation policies (stories and generated images are checked against OpenAI&apos;s Moderation API and Replicate&apos;s safety filters).</li>
-              <li>To meter usage against your subscription plan and process billing through Stripe.</li>
-              <li>To send transactional emails (welcome, password reset, billing receipts) via Resend.</li>
+              <li>
+                To provide the core service: analyze your story, generate
+                characters/scenes/voiceover, and assemble a final video.
+              </li>
+              <li>
+                To enforce content moderation policies (stories and generated images are checked
+                against OpenAI&apos;s Moderation API and Replicate&apos;s safety filters).
+              </li>
+              <li>
+                To meter usage against your subscription plan and process billing through Stripe.
+              </li>
+              <li>
+                To send transactional emails (welcome, password reset, billing receipts) via Resend.
+              </li>
               <li>To diagnose bugs and abuse. We do not sell your data to third parties.</li>
             </ul>
           </section>
@@ -76,12 +88,12 @@ export default function PrivacyPage() {
           <section>
             <h2 className="font-heading mb-3 text-xl font-bold text-white">4. Data Retention</h2>
             <p className="text-sm">
-              We retain your account data and generated media for as long as your account is
-              active. You may delete your account at any time, which triggers a CASCADE deletion
-              of all your projects, characters, scenes, voiceovers, videos, and usage events from
-              our database. R2-stored media files are deleted within 30 days of account deletion.
-              Stripe customer records are retained per Stripe&apos;s own policies — contact Stripe
-              directly to delete your billing history.
+              We retain your account data and generated media for as long as your account is active.
+              You may delete your account at any time, which triggers a CASCADE deletion of all your
+              projects, characters, scenes, voiceovers, videos, and usage events from our database.
+              R2-stored media files are deleted within 30 days of account deletion. Stripe customer
+              records are retained per Stripe&apos;s own policies — contact Stripe directly to
+              delete your billing history.
             </p>
           </section>
 
@@ -110,8 +122,8 @@ export default function PrivacyPage() {
               </li>
             </ul>
             <p className="mt-3 text-sm">
-              We do not use your data to train AI models. The providers above may use API inputs
-              per their own policies — review each provider&apos;s terms if this matters to you.
+              We do not use your data to train AI models. The providers above may use API inputs per
+              their own policies — review each provider&apos;s terms if this matters to you.
             </p>
           </section>
 
@@ -121,15 +133,28 @@ export default function PrivacyPage() {
               Depending on your jurisdiction (GDPR, CCPA, and similar laws), you have the right to:
             </p>
             <ul className="ml-6 list-disc space-y-2 text-sm">
-              <li><strong>Access</strong> — request a copy of your personal data.</li>
-              <li><strong>Rectification</strong> — correct inaccurate data.</li>
-              <li><strong>Erasure</strong> — request deletion of your account and associated data.</li>
-              <li><strong>Portability</strong> — receive your data in a machine-readable format.</li>
-              <li><strong>Objection</strong> — object to certain processing activities.</li>
+              <li>
+                <strong>Access</strong> — request a copy of your personal data.
+              </li>
+              <li>
+                <strong>Rectification</strong> — correct inaccurate data.
+              </li>
+              <li>
+                <strong>Erasure</strong> — request deletion of your account and associated data.
+              </li>
+              <li>
+                <strong>Portability</strong> — receive your data in a machine-readable format.
+              </li>
+              <li>
+                <strong>Objection</strong> — object to certain processing activities.
+              </li>
             </ul>
             <p className="mt-3 text-sm">
-              To exercise these rights, contact us at <a href="mailto:privacy@storyintovideo.com" className="text-amber-400 underline">privacy@storyintovideo.com</a>.
-              We respond within 30 days.
+              To exercise these rights, contact us at{' '}
+              <a href="mailto:privacy@storyintovideo.com" className="text-primary underline">
+                privacy@storyintovideo.com
+              </a>
+              . We respond within 30 days.
             </p>
           </section>
 
@@ -147,7 +172,9 @@ export default function PrivacyPage() {
             <h2 className="font-heading mb-3 text-xl font-bold text-white">8. Contact</h2>
             <p className="text-sm">
               Questions about this policy? Email{' '}
-              <a href="mailto:privacy@storyintovideo.com" className="text-amber-400 underline">privacy@storyintovideo.com</a>{' '}
+              <a href="mailto:privacy@storyintovideo.com" className="text-primary underline">
+                privacy@storyintovideo.com
+              </a>{' '}
               and we&apos;ll respond within 5 business days.
             </p>
           </section>
