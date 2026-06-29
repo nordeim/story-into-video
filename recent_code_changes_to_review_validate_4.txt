@@ -1,0 +1,1385 @@
+diff --git a/src/app/(app)/billing/page.tsx b/src/app/(app)/billing/page.tsx
+index 3bff596..2851764 100644
+--- a/src/app/(app)/billing/page.tsx
++++ b/src/app/(app)/billing/page.tsx
+@@ -58,7 +58,7 @@ export const metadata = {
+ 
+ export default function BillingPage() {
+   return (
+-    <main className="bg-background min-h-screen px-6 py-16">
++    <main className="min-h-screen bg-background px-6 py-16">
+       <div className="mx-auto max-w-5xl">
+         <div className="mb-12 text-center">
+           <h1 className="font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl">
+@@ -81,7 +81,10 @@ export default function BillingPage() {
+                 <ul className="mt-6 space-y-2">
+                   {features.map((feature) => (
+                     <li key={feature} className="flex items-start gap-2 text-xs text-zinc-400">
+-                      <Check className="text-primary mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
++                      <Check
++                        className="mt-0.5 h-3 w-3 shrink-0 text-primary"
++                        aria-hidden="true"
++                      />
+                       {feature}
+                     </li>
+                   ))}
+@@ -94,7 +97,7 @@ export default function BillingPage() {
+                       type="submit"
+                       name="plan"
+                       value={plan}
+-                      className="bg-primary hover:bg-primary focus-visible:outline-primary w-full rounded-full px-4 py-2 text-sm font-bold text-zinc-950 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
++                      className="w-full rounded-full bg-primary px-4 py-2 text-sm font-bold text-zinc-950 transition-colors hover:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                     >
+                       Upgrade to {plan}
+                     </button>
+@@ -108,7 +111,7 @@ export default function BillingPage() {
+         <div className="mt-12 text-center">
+           <Link
+             href="/dashboard"
+-            className="hover:text-primary focus-visible:outline-primary text-sm text-zinc-400 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
++            className="text-sm text-zinc-400 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+           >
+             ← Back to dashboard
+           </Link>
+diff --git a/src/app/(app)/dashboard/page.tsx b/src/app/(app)/dashboard/page.tsx
+index af39c19..7face85 100644
+--- a/src/app/(app)/dashboard/page.tsx
++++ b/src/app/(app)/dashboard/page.tsx
+@@ -64,9 +64,9 @@ async function ProjectList() {
+         <a
+           key={project.id}
+           href={`/projects/${project.id}`}
+-          className="group hover:border-primary/20 focus-visible:outline-primary rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2"
++          className="group rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-colors hover:border-primary/20 hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+-          <h3 className="font-heading group-hover:text-primary mb-2 text-lg font-bold text-white">
++          <h3 className="font-heading mb-2 text-lg font-bold text-white group-hover:text-primary">
+             {project.title}
+           </h3>
+           <p className="text-xs text-zinc-500">
+@@ -83,7 +83,7 @@ async function ProjectList() {
+ 
+ export default function DashboardPage() {
+   return (
+-    <main className="bg-background min-h-screen px-6 py-16">
++    <main className="min-h-screen bg-background px-6 py-16">
+       <div className="mx-auto max-w-7xl">
+         <div className="mb-12 flex items-center justify-between">
+           <div>
+@@ -94,7 +94,7 @@ export default function DashboardPage() {
+           </div>
+           <a
+             href="/create"
+-            className="bg-primary hover:bg-primary focus-visible:outline-primary inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold text-zinc-950 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
++            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+           >
+             New Project
+           </a>
+diff --git a/src/app/(app)/projects/[id]/page.tsx b/src/app/(app)/projects/[id]/page.tsx
+index 0e198d7..e616e3c 100644
+--- a/src/app/(app)/projects/[id]/page.tsx
++++ b/src/app/(app)/projects/[id]/page.tsx
+@@ -28,11 +28,11 @@ async function ProjectDetail({ projectId }: { projectId: string }) {
+   if (!project) notFound();
+ 
+   return (
+-    <main className="bg-background min-h-screen px-6 py-16">
++    <main className="min-h-screen bg-background px-6 py-16">
+       <div className="mx-auto max-w-3xl">
+         <a
+           href="/dashboard"
+-          className="hover:text-primary focus-visible:outline-primary mb-6 inline-block text-sm text-zinc-400 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
++          className="mb-6 inline-block text-sm text-zinc-400 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+           ← Back to dashboard
+         </a>
+@@ -86,7 +86,7 @@ async function ProjectDetail({ projectId }: { projectId: string }) {
+ 
+ function ProjectDetailSkeleton() {
+   return (
+-    <div className="bg-background min-h-screen px-6 py-16">
++    <div className="min-h-screen bg-background px-6 py-16">
+       <div className="mx-auto max-w-3xl">
+         <div className="h-8 w-32 animate-pulse rounded bg-white/[0.04]" />
+         <div className="mt-6 h-10 w-3/4 animate-pulse rounded bg-white/[0.04]" />
+diff --git a/src/app/(auth)/sign-in/page.tsx b/src/app/(auth)/sign-in/page.tsx
+index 40088ce..1a79702 100644
+--- a/src/app/(auth)/sign-in/page.tsx
++++ b/src/app/(auth)/sign-in/page.tsx
+@@ -13,11 +13,11 @@ export const metadata = {
+  */
+ export default function SignInPage() {
+   return (
+-    <main className="bg-background flex min-h-screen flex-col items-center justify-center px-6 py-16">
++    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-6 py-16">
+       <div className="mb-8 text-center">
+         <Link
+           href="/"
+-          className="font-heading focus-visible:outline-primary text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2"
++          className="font-heading text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+           StoryIntoVideo
+         </Link>
+@@ -33,7 +33,7 @@ export default function SignInPage() {
+         Don&apos;t have an account?{' '}
+         <Link
+           href="/sign-up"
+-          className="text-primary hover:text-primary focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2"
++          className="text-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+           Sign up
+         </Link>
+diff --git a/src/app/(auth)/sign-up/page.tsx b/src/app/(auth)/sign-up/page.tsx
+index 39af1b3..485d28f 100644
+--- a/src/app/(auth)/sign-up/page.tsx
++++ b/src/app/(auth)/sign-up/page.tsx
+@@ -13,11 +13,11 @@ export const metadata = {
+  */
+ export default function SignUpPage() {
+   return (
+-    <main className="bg-background flex min-h-screen flex-col items-center justify-center px-6 py-16">
++    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-6 py-16">
+       <div className="mb-8 text-center">
+         <Link
+           href="/"
+-          className="font-heading focus-visible:outline-primary text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2"
++          className="font-heading text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+           StoryIntoVideo
+         </Link>
+@@ -33,7 +33,7 @@ export default function SignUpPage() {
+         Already have an account?{' '}
+         <Link
+           href="/sign-in"
+-          className="text-primary hover:text-primary focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2"
++          className="text-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+           Sign in
+         </Link>
+diff --git a/src/app/(legal)/privacy/page.tsx b/src/app/(legal)/privacy/page.tsx
+index 731aa1f..43f20a2 100644
+--- a/src/app/(legal)/privacy/page.tsx
++++ b/src/app/(legal)/privacy/page.tsx
+@@ -17,7 +17,7 @@ export const metadata: Metadata = {
+ 
+ export default function PrivacyPage() {
+   return (
+-    <main className="bg-background min-h-screen px-6 py-16">
++    <main className="min-h-screen bg-background px-6 py-16">
+       <article className="mx-auto max-w-3xl text-zinc-300">
+         <h1 className="font-heading mb-2 text-4xl font-bold tracking-tight text-white">
+           Privacy Policy
+@@ -29,9 +29,9 @@ export default function PrivacyPage() {
+             <h2 className="font-heading mb-3 text-xl font-bold text-white">1. Introduction</h2>
+             <p className="text-sm">
+               StoryIntoVideo (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) operates a
+-              service that transforms user-submitted stories into AI-generated videos. This Privacy
+-              Policy explains what data we collect, how we use it, and the choices you have. By
+-              using our service, you agree to the practices described here.
++              service that transforms user-submitted stories into AI-generated videos. This
++              Privacy Policy explains what data we collect, how we use it, and the choices you
++              have. By using our service, you agree to the practices described here.
+             </p>
+           </section>
+ 
+@@ -57,30 +57,18 @@ export default function PrivacyPage() {
+             </p>
+             <h3 className="mb-2 text-sm font-semibold text-zinc-200">2.4 Usage data</h3>
+             <p className="text-sm">
+-              We log usage events (credits debited, operation type, timestamp) for billing and audit
+-              purposes. Webhook events from Stripe are also logged for idempotency.
++              We log usage events (credits debited, operation type, timestamp) for billing and
++              audit purposes. Webhook events from Stripe are also logged for idempotency.
+             </p>
+           </section>
+ 
+           <section>
+-            <h2 className="font-heading mb-3 text-xl font-bold text-white">
+-              3. How We Use Your Data
+-            </h2>
++            <h2 className="font-heading mb-3 text-xl font-bold text-white">3. How We Use Your Data</h2>
+             <ul className="ml-6 list-disc space-y-2 text-sm">
+-              <li>
+-                To provide the core service: analyze your story, generate
+-                characters/scenes/voiceover, and assemble a final video.
+-              </li>
+-              <li>
+-                To enforce content moderation policies (stories and generated images are checked
+-                against OpenAI&apos;s Moderation API and Replicate&apos;s safety filters).
+-              </li>
+-              <li>
+-                To meter usage against your subscription plan and process billing through Stripe.
+-              </li>
+-              <li>
+-                To send transactional emails (welcome, password reset, billing receipts) via Resend.
+-              </li>
++              <li>To provide the core service: analyze your story, generate characters/scenes/voiceover, and assemble a final video.</li>
++              <li>To enforce content moderation policies (stories and generated images are checked against OpenAI&apos;s Moderation API and Replicate&apos;s safety filters).</li>
++              <li>To meter usage against your subscription plan and process billing through Stripe.</li>
++              <li>To send transactional emails (welcome, password reset, billing receipts) via Resend.</li>
+               <li>To diagnose bugs and abuse. We do not sell your data to third parties.</li>
+             </ul>
+           </section>
+@@ -88,12 +76,12 @@ export default function PrivacyPage() {
+           <section>
+             <h2 className="font-heading mb-3 text-xl font-bold text-white">4. Data Retention</h2>
+             <p className="text-sm">
+-              We retain your account data and generated media for as long as your account is active.
+-              You may delete your account at any time, which triggers a CASCADE deletion of all your
+-              projects, characters, scenes, voiceovers, videos, and usage events from our database.
+-              R2-stored media files are deleted within 30 days of account deletion. Stripe customer
+-              records are retained per Stripe&apos;s own policies — contact Stripe directly to
+-              delete your billing history.
++              We retain your account data and generated media for as long as your account is
++              active. You may delete your account at any time, which triggers a CASCADE deletion
++              of all your projects, characters, scenes, voiceovers, videos, and usage events from
++              our database. R2-stored media files are deleted within 30 days of account deletion.
++              Stripe customer records are retained per Stripe&apos;s own policies — contact Stripe
++              directly to delete your billing history.
+             </p>
+           </section>
+ 
+@@ -122,8 +110,8 @@ export default function PrivacyPage() {
+               </li>
+             </ul>
+             <p className="mt-3 text-sm">
+-              We do not use your data to train AI models. The providers above may use API inputs per
+-              their own policies — review each provider&apos;s terms if this matters to you.
++              We do not use your data to train AI models. The providers above may use API inputs
++              per their own policies — review each provider&apos;s terms if this matters to you.
+             </p>
+           </section>
+ 
+@@ -133,28 +121,15 @@ export default function PrivacyPage() {
+               Depending on your jurisdiction (GDPR, CCPA, and similar laws), you have the right to:
+             </p>
+             <ul className="ml-6 list-disc space-y-2 text-sm">
+-              <li>
+-                <strong>Access</strong> — request a copy of your personal data.
+-              </li>
+-              <li>
+-                <strong>Rectification</strong> — correct inaccurate data.
+-              </li>
+-              <li>
+-                <strong>Erasure</strong> — request deletion of your account and associated data.
+-              </li>
+-              <li>
+-                <strong>Portability</strong> — receive your data in a machine-readable format.
+-              </li>
+-              <li>
+-                <strong>Objection</strong> — object to certain processing activities.
+-              </li>
++              <li><strong>Access</strong> — request a copy of your personal data.</li>
++              <li><strong>Rectification</strong> — correct inaccurate data.</li>
++              <li><strong>Erasure</strong> — request deletion of your account and associated data.</li>
++              <li><strong>Portability</strong> — receive your data in a machine-readable format.</li>
++              <li><strong>Objection</strong> — object to certain processing activities.</li>
+             </ul>
+             <p className="mt-3 text-sm">
+-              To exercise these rights, contact us at{' '}
+-              <a href="mailto:privacy@storyintovideo.com" className="text-primary underline">
+-                privacy@storyintovideo.com
+-              </a>
+-              . We respond within 30 days.
++              To exercise these rights, contact us at <a href="mailto:privacy@storyintovideo.com" className="text-primary underline">privacy@storyintovideo.com</a>.
++              We respond within 30 days.
+             </p>
+           </section>
+ 
+@@ -172,9 +147,7 @@ export default function PrivacyPage() {
+             <h2 className="font-heading mb-3 text-xl font-bold text-white">8. Contact</h2>
+             <p className="text-sm">
+               Questions about this policy? Email{' '}
+-              <a href="mailto:privacy@storyintovideo.com" className="text-primary underline">
+-                privacy@storyintovideo.com
+-              </a>{' '}
++              <a href="mailto:privacy@storyintovideo.com" className="text-primary underline">privacy@storyintovideo.com</a>{' '}
+               and we&apos;ll respond within 5 business days.
+             </p>
+           </section>
+diff --git a/src/app/(legal)/terms/page.tsx b/src/app/(legal)/terms/page.tsx
+index dc4ab9c..ee00674 100644
+--- a/src/app/(legal)/terms/page.tsx
++++ b/src/app/(legal)/terms/page.tsx
+@@ -18,7 +18,7 @@ export const metadata: Metadata = {
+ 
+ export default function TermsPage() {
+   return (
+-    <main className="bg-background min-h-screen px-6 py-16">
++    <main className="min-h-screen bg-background px-6 py-16">
+       <article className="mx-auto max-w-3xl text-zinc-300">
+         <h1 className="font-heading mb-2 text-4xl font-bold tracking-tight text-white">
+           Terms of Service
+@@ -27,40 +27,29 @@ export default function TermsPage() {
+ 
+         <div className="space-y-8 leading-relaxed">
+           <section>
+-            <h2 className="font-heading mb-3 text-xl font-bold text-white">
+-              1. Acceptance of Terms
+-            </h2>
++            <h2 className="font-heading mb-3 text-xl font-bold text-white">1. Acceptance of Terms</h2>
+             <p className="text-sm">
+-              By creating an account or using the StoryIntoVideo service (&ldquo;the
+-              Service&rdquo;), you agree to be bound by these Terms of Service and our Privacy
+-              Policy. If you do not agree, do not use the Service. You must be at least 13 years old
+-              (or the age of digital consent in your jurisdiction) to use the Service.
++              By creating an account or using the StoryIntoVideo service (&ldquo;the Service&rdquo;),
++              you agree to be bound by these Terms of Service and our Privacy Policy. If you do not
++              agree, do not use the Service. You must be at least 13 years old (or the age of
++              digital consent in your jurisdiction) to use the Service.
+             </p>
+           </section>
+ 
+           <section>
+-            <h2 className="font-heading mb-3 text-xl font-bold text-white">
+-              2. Use of the Service
+-            </h2>
++            <h2 className="font-heading mb-3 text-xl font-bold text-white">2. Use of the Service</h2>
+             <h3 className="mb-2 text-sm font-semibold text-zinc-200">2.1 Permitted use</h3>
+             <p className="mb-3 text-sm">
+               You may use the Service to generate videos from stories you own or have the right to
+               use. You agree to comply with all applicable laws and not to:
+             </p>
+             <ul className="ml-6 list-disc space-y-2 text-sm">
+-              <li>
+-                Submit content that is illegal, infringing, harassing, or that you do not have
+-                rights to.
+-              </li>
++              <li>Submit content that is illegal, infringing, harassing, or that you do not have rights to.</li>
+               <li>Attempt to reverse-engineer, scrape, or overload the Service.</li>
+               <li>Resell or sublicense access to the Service without our written permission.</li>
+-              <li>
+-                Use the Service to generate content that impersonates real people without consent.
+-              </li>
++              <li>Use the Service to generate content that impersonates real people without consent.</li>
+             </ul>
+-            <h3 className="mt-4 mb-2 text-sm font-semibold text-zinc-200">
+-              2.2 Content moderation
+-            </h3>
++            <h3 className="mb-2 mt-4 text-sm font-semibold text-zinc-200">2.2 Content moderation</h3>
+             <p className="text-sm">
+               All story inputs are screened by OpenAI&apos;s Moderation API before processing. All
+               AI-generated images are screened by Replicate&apos;s safety filters. Flagged content
+@@ -87,20 +76,18 @@ export default function TermsPage() {
+           </section>
+ 
+           <section>
+-            <h2 className="font-heading mb-3 text-xl font-bold text-white">
+-              4. AI-Generated Content Ownership
+-            </h2>
++            <h2 className="font-heading mb-3 text-xl font-bold text-white">4. AI-Generated Content Ownership</h2>
+             <p className="mb-3 text-sm">
+               &ldquo;Generated Content&rdquo; means the characters, scenes, voiceover audio,
+               subtitles, and final videos produced by the pipeline from your User Content.
+             </p>
+             <p className="mb-3 text-sm">
+-              To the extent permitted by applicable law, you own the Generated Content produced from
+-              your User Content. You may use it for personal or commercial purposes subject to these
+-              Terms. Note that AI-generated content may be subject to limitations on intellectual
+-              property protection in some jurisdictions (e.g., the U.S. Copyright Office&apos;s
+-              guidance on AI-generated works). We make no representation that Generated Content is
+-              copyrightable in your jurisdiction.
++              To the extent permitted by applicable law, you own the Generated Content produced
++              from your User Content. You may use it for personal or commercial purposes subject to
++              these Terms. Note that AI-generated content may be subject to limitations on
++              intellectual property protection in some jurisdictions (e.g., the U.S. Copyright
++              Office&apos;s guidance on AI-generated works). We make no representation that
++              Generated Content is copyrightable in your jurisdiction.
+             </p>
+             <p className="text-sm">
+               You acknowledge that AI-generated content may be imperfect, biased, or factually
+@@ -110,56 +97,50 @@ export default function TermsPage() {
+           </section>
+ 
+           <section>
+-            <h2 className="font-heading mb-3 text-xl font-bold text-white">
+-              5. Intellectual Property
+-            </h2>
++            <h2 className="font-heading mb-3 text-xl font-bold text-white">5. Intellectual Property</h2>
+             <p className="text-sm">
+               The Service, including its software, design, marketing copy, and documentation, is
+               owned by StoryIntoVideo and protected by copyright, trademark, and other laws. These
+-              Terms do not grant you any right to use our trademarks, logos, or brand assets. The AI
+-              models used (OpenAI GPT-4o, Replicate SDXL, ElevenLabs TTS) are licensed from their
+-              respective providers — your use of Generated Content is subject to each
++              Terms do not grant you any right to use our trademarks, logos, or brand assets. The
++              AI models used (OpenAI GPT-4o, Replicate SDXL, ElevenLabs TTS) are licensed from
++              their respective providers — your use of Generated Content is subject to each
+               provider&apos;s output terms.
+             </p>
+           </section>
+ 
+           <section>
+-            <h2 className="font-heading mb-3 text-xl font-bold text-white">
+-              6. Credits and Billing
+-            </h2>
++            <h2 className="font-heading mb-3 text-xl font-bold text-white">6. Credits and Billing</h2>
+             <p className="text-sm">
+               The Service uses a prepaid credit model. Each AI operation debits credits from your
+               subscription: story analysis (5 credits), character generation (10/char), scene
+               generation (8/scene), voiceover (15), subtitle alignment (3), video assembly (30). A
+-              full pipeline run averages 131 credits. Free tier users receive 50 credits/month. Paid
+-              tiers (Creator, Pro, Studio) receive more — see the billing page for current pricing.
+-              Credits do not roll over month-to-month. Refunds are governed by Stripe&apos;s dispute
+-              process.
++              full pipeline run averages 131 credits. Free tier users receive 50 credits/month.
++              Paid tiers (Creator, Pro, Studio) receive more — see the billing page for current
++              pricing. Credits do not roll over month-to-month. Refunds are governed by Stripe&apos;s
++              dispute process.
+             </p>
+           </section>
+ 
+           <section>
+-            <h2 className="font-heading mb-3 text-xl font-bold text-white">
+-              7. Limitation of Liability
+-            </h2>
++            <h2 className="font-heading mb-3 text-xl font-bold text-white">7. Limitation of Liability</h2>
+             <p className="text-sm">
+               The Service is provided &ldquo;as is&rdquo; without warranties of any kind. To the
+-              maximum extent permitted by law, StoryIntoVideo shall not be liable for any indirect,
+-              incidental, special, consequential, or punitive damages, or any loss of profits or
+-              revenues, arising from your use of the Service. Our total liability for any claim
+-              arising from these Terms shall not exceed the amount you paid us in the 12 months
+-              preceding the claim.
++              maximum extent permitted by law, StoryIntoVideo shall not be liable for any
++              indirect, incidental, special, consequential, or punitive damages, or any loss of
++              profits or revenues, arising from your use of the Service. Our total liability for
++              any claim arising from these Terms shall not exceed the amount you paid us in the 12
++              months preceding the claim.
+             </p>
+           </section>
+ 
+           <section>
+             <h2 className="font-heading mb-3 text-xl font-bold text-white">8. Termination</h2>
+             <p className="text-sm">
+-              You may delete your account at any time, which immediately terminates these Terms with
+-              respect to your account. We may suspend or terminate your account if you violate these
+-              Terms, fail to pay applicable fees, or engage in abusive behavior. Upon termination,
+-              your right to use the Service ceases, and we may delete your User Content and
+-              Generated Content per our Privacy Policy&apos;s retention schedule.
++              You may delete your account at any time, which immediately terminates these Terms
++              with respect to your account. We may suspend or terminate your account if you
++              violate these Terms, fail to pay applicable fees, or engage in abusive behavior.
++              Upon termination, your right to use the Service ceases, and we may delete your User
++              Content and Generated Content per our Privacy Policy&apos;s retention schedule.
+             </p>
+           </section>
+ 
+@@ -173,9 +154,7 @@ export default function TermsPage() {
+           </section>
+ 
+           <section>
+-            <h2 className="font-heading mb-3 text-xl font-bold text-white">
+-              10. Changes to These Terms
+-            </h2>
++            <h2 className="font-heading mb-3 text-xl font-bold text-white">10. Changes to These Terms</h2>
+             <p className="text-sm">
+               We may update these Terms as our Service evolves. Material changes will be announced
+               via email to verified account holders at least 14 days before taking effect. Continued
+@@ -188,10 +167,7 @@ export default function TermsPage() {
+             <h2 className="font-heading mb-3 text-xl font-bold text-white">11. Contact</h2>
+             <p className="text-sm">
+               Questions about these Terms? Email{' '}
+-              <a href="mailto:legal@storyintovideo.com" className="text-primary underline">
+-                legal@storyintovideo.com
+-              </a>
+-              .
++              <a href="mailto:legal@storyintovideo.com" className="text-primary underline">legal@storyintovideo.com</a>.
+             </p>
+           </section>
+         </div>
+diff --git a/src/app/api/projects/[id]/download/route.ts b/src/app/api/projects/[id]/download/route.ts
+index 97846f8..c301272 100644
+--- a/src/app/api/projects/[id]/download/route.ts
++++ b/src/app/api/projects/[id]/download/route.ts
+@@ -60,11 +60,7 @@ export async function GET(
+     const errorName = err instanceof Error ? err.name : 'UnknownError';
+     const message = err instanceof Error ? err.message : String(err);
+ 
+-    if (
+-      errorName.includes('S3') ||
+-      errorName.includes('NoSuchKey') ||
+-      errorName.includes('NoSuchBucket')
+-    ) {
++    if (errorName.includes('S3') || errorName.includes('NoSuchKey') || errorName.includes('NoSuchBucket')) {
+       // R2/S3 service error — the bucket or key doesn't exist, or credentials are wrong.
+       console.error('[Download] R2/S3 service error:', errorName, message);
+       return NextResponse.json(
+@@ -73,11 +69,7 @@ export async function GET(
+       );
+     }
+ 
+-    if (
+-      errorName.includes('Timeout') ||
+-      errorName.includes('Networking') ||
+-      errorName.includes('Connection')
+-    ) {
++    if (errorName.includes('Timeout') || errorName.includes('Networking') || errorName.includes('Connection')) {
+       // Transient network error — the user can retry.
+       console.error('[Download] R2 network/timeout error:', errorName, message);
+       return NextResponse.json(
+diff --git a/src/app/layout.tsx b/src/app/layout.tsx
+index fba1fa5..d05af87 100644
+--- a/src/app/layout.tsx
++++ b/src/app/layout.tsx
+@@ -67,7 +67,7 @@ export default function RootLayout({
+       >
+         <a
+           href="#main"
+-          className="focus:bg-primary sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:px-4 focus:py-2 focus:font-medium focus:text-zinc-950 focus:shadow-lg"
++          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:font-medium focus:text-zinc-950 focus:shadow-lg"
+         >
+           Skip to content
+         </a>
+diff --git a/src/components/app/auth-form.tsx b/src/components/app/auth-form.tsx
+index 9b04768..dad549a 100644
+--- a/src/components/app/auth-form.tsx
++++ b/src/components/app/auth-form.tsx
+@@ -93,7 +93,7 @@ export function AuthForm({ mode, className }: AuthFormProps) {
+         type="button"
+         onClick={handleGoogle}
+         disabled={loading}
+-        className="focus-visible:outline-primary flex w-full items-center justify-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
++        className="flex w-full items-center justify-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+       >
+         <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+           <path
+@@ -136,7 +136,7 @@ export function AuthForm({ mode, className }: AuthFormProps) {
+             onChange={(e) => setEmail(e.target.value)}
+             required
+             autoComplete="email"
+-            className="focus:border-primary/50 focus:ring-primary/30 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 focus:ring-1 focus:outline-none"
++            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-primary/50 focus:ring-1 focus:ring-primary/30 focus:outline-none"
+             placeholder="you@example.com"
+           />
+         </div>
+@@ -152,7 +152,7 @@ export function AuthForm({ mode, className }: AuthFormProps) {
+             required
+             minLength={8}
+             autoComplete={isSignUp ? 'new-password' : 'current-password'}
+-            className="focus:border-primary/50 focus:ring-primary/30 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 focus:ring-1 focus:outline-none"
++            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-primary/50 focus:ring-1 focus:ring-primary/30 focus:outline-none"
+             placeholder="••••••••"
+           />
+         </div>
+@@ -166,7 +166,7 @@ export function AuthForm({ mode, className }: AuthFormProps) {
+         <button
+           type="submit"
+           disabled={loading}
+-          className="bg-primary hover:bg-primary focus-visible:outline-primary flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold text-zinc-950 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
++          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+         >
+           {loading ? 'Please wait…' : isSignUp ? 'Create account' : 'Sign in'}
+           {!loading && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
+diff --git a/src/components/app/create-wizard.tsx b/src/components/app/create-wizard.tsx
+index 5693f3e..e63c48a 100644
+--- a/src/components/app/create-wizard.tsx
++++ b/src/components/app/create-wizard.tsx
+@@ -74,7 +74,7 @@ export function CreateWizard() {
+   }
+ 
+   return (
+-    <main className="bg-background min-h-screen px-6 py-16">
++    <main className="min-h-screen bg-background px-6 py-16">
+       <div className="mx-auto max-w-2xl">
+         <div className="mb-8 text-center">
+           <span className="eyebrow mb-4">
+@@ -123,7 +123,7 @@ export function CreateWizard() {
+                   key={ex.label}
+                   type="button"
+                   onClick={() => handleChipClick(ex.label)}
+-                  className="focus-visible:outline-primary rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/[0.1] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
++                  className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/[0.1] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                 >
+                   {ex.label}
+                 </button>
+@@ -142,7 +142,7 @@ export function CreateWizard() {
+                       setStyle(chip.label.toLowerCase().replace(/\s+/g, '-') as typeof style)
+                     }
+                     className={cn(
+-                      'focus-visible:outline-primary rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2',
++                      'rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                       style === chip.label.toLowerCase().replace(/\s+/g, '-')
+                         ? 'border-primary/40 bg-primary/10 text-primary'
+                         : 'border-white/10 bg-white/[0.02] text-zinc-400 hover:text-white',
+@@ -166,9 +166,9 @@ export function CreateWizard() {
+                       onClick={() => setActiveRatio(ratio)}
+                       aria-pressed={isActive}
+                       className={cn(
+-                        'focus-visible:outline-primary flex min-h-[44px] min-w-[44px] items-center justify-center px-2 py-1 font-mono text-[10px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2',
++                        'flex min-h-[44px] min-w-[44px] items-center justify-center px-2 py-1 font-mono text-[10px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                         isActive
+-                          ? 'text-primary bg-white/[0.1]'
++                          ? 'bg-white/[0.1] text-primary'
+                           : 'text-zinc-600 hover:text-zinc-400',
+                       )}
+                     >
+@@ -181,7 +181,7 @@ export function CreateWizard() {
+               <button
+                 type="submit"
+                 disabled={!canSubmit}
+-                className="bg-primary hover:bg-primary focus-visible:outline-primary inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-bold text-zinc-950 transition-all focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
++                className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 text-[13px] font-bold text-zinc-950 transition-all hover:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+               >
+                 {submitting ? 'Generating…' : 'Generate Video'}
+                 {!submitting && <ArrowRight className="h-3 w-3" aria-hidden="true" />}
+diff --git a/src/components/app/empty-state.tsx b/src/components/app/empty-state.tsx
+index c68e52f..4846f54 100644
+--- a/src/components/app/empty-state.tsx
++++ b/src/components/app/empty-state.tsx
+@@ -33,7 +33,7 @@ export function EmptyState({
+       )}
+     >
+       {icon && (
+-        <div className="border-primary/20 bg-primary/10 text-primary mb-4 flex h-12 w-12 items-center justify-center rounded-full border">
++        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary">
+           {icon}
+         </div>
+       )}
+@@ -42,7 +42,7 @@ export function EmptyState({
+       {ctaLabel && ctaHref && (
+         <Link
+           href={ctaHref}
+-          className="bg-primary hover:bg-primary focus-visible:outline-primary inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold text-zinc-950 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
++          className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+           {ctaLabel}
+           <ArrowRight className="h-4 w-4" aria-hidden="true" />
+diff --git a/src/components/app/project-progress-panel.tsx b/src/components/app/project-progress-panel.tsx
+index 55d0986..28fc799 100644
+--- a/src/components/app/project-progress-panel.tsx
++++ b/src/components/app/project-progress-panel.tsx
+@@ -51,14 +51,16 @@ export function ProjectProgressPanel({
+     <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+       <h2 className="font-heading mb-3 text-lg font-bold text-white">Pipeline Status</h2>
+       <p className="text-sm text-zinc-400">
+-        {status === 'failed' && errorMessage ? `${label} ${errorMessage}` : label}
++        {status === 'failed' && errorMessage
++          ? `${label} ${errorMessage}`
++          : label}
+       </p>
+       {progressDetail && <p className="mt-2 text-xs text-zinc-500">{progressDetail}</p>}
+ 
+       {/* Progress bar */}
+       <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/[0.04]">
+         <div
+-          className="bg-primary h-full rounded-full transition-all duration-500"
++          className="h-full rounded-full bg-primary transition-all duration-500"
+           style={{ width: `${progressPercent}%` }}
+           role="progressbar"
+           aria-valuenow={progressPercent}
+@@ -69,13 +71,15 @@ export function ProjectProgressPanel({
+       <p className="mt-2 text-right text-xs text-zinc-500">{progressPercent}%</p>
+ 
+       {progress.connectionState === 'error' && (
+-        <p className="text-primary mt-2 text-xs">
++        <p className="mt-2 text-xs text-primary">
+           Live updates disconnected. Refresh the page to retry.
+         </p>
+       )}
+ 
+       {progress.connectionState === 'reconnecting' && (
+-        <p className="mt-2 text-xs text-zinc-500">Reconnecting to live updates…</p>
++        <p className="mt-2 text-xs text-zinc-500">
++          Reconnecting to live updates…
++        </p>
+       )}
+     </div>
+   );
+diff --git a/src/components/app/project-share-button.tsx b/src/components/app/project-share-button.tsx
+index 68105bd..c910f31 100644
+--- a/src/components/app/project-share-button.tsx
++++ b/src/components/app/project-share-button.tsx
+@@ -15,10 +15,7 @@ interface ProjectShareButtonProps {
+   title?: string;
+ }
+ 
+-export function ProjectShareButton({
+-  url,
+-  title = 'My StoryIntoVideo project',
+-}: ProjectShareButtonProps) {
++export function ProjectShareButton({ url, title = 'My StoryIntoVideo project' }: ProjectShareButtonProps) {
+   const [copied, setCopied] = useState(false);
+ 
+   async function handleShare() {
+@@ -47,10 +44,10 @@ export function ProjectShareButton({
+     <button
+       type="button"
+       onClick={handleShare}
+-      className="focus-visible:outline-primary inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2"
++      className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+       aria-label="Share project"
+     >
+-      {copied ? <Check className="text-primary h-4 w-4" /> : <Share2 className="h-4 w-4" />}
++      {copied ? <Check className="h-4 w-4 text-primary" /> : <Share2 className="h-4 w-4" />}
+       {copied ? 'Copied!' : 'Share'}
+     </button>
+   );
+diff --git a/src/components/primitives/cta-amber.tsx b/src/components/primitives/cta-amber.tsx
+index a733be4..d5299de 100644
+--- a/src/components/primitives/cta-amber.tsx
++++ b/src/components/primitives/cta-amber.tsx
+@@ -26,7 +26,7 @@ export function CtaAmber({ children, href, className, onClick }: CtaAmberProps)
+       onClick={onClick}
+       className={cn(
+         'cta-amber group inline-flex items-center gap-2.5',
+-        'focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2',
++        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+         className,
+       )}
+     >
+diff --git a/src/components/primitives/cta-ghost.tsx b/src/components/primitives/cta-ghost.tsx
+index c6859f1..76d64fa 100644
+--- a/src/components/primitives/cta-ghost.tsx
++++ b/src/components/primitives/cta-ghost.tsx
+@@ -23,7 +23,7 @@ export function CtaGhost({ children, href, className }: CtaGhostProps) {
+         'group inline-flex items-center gap-2',
+         'text-primary hover:text-primary',
+         'text-sm font-medium transition-colors duration-200',
+-        'focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2',
++        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+         className,
+       )}
+     >
+diff --git a/src/components/primitives/cta-gradient.tsx b/src/components/primitives/cta-gradient.tsx
+index f57a8d9..58defe3 100644
+--- a/src/components/primitives/cta-gradient.tsx
++++ b/src/components/primitives/cta-gradient.tsx
+@@ -21,9 +21,9 @@ export function CtaGradient({ children, href, className }: CtaGradientProps) {
+       className={cn(
+         'group inline-flex items-center gap-2.5 rounded-full px-10 py-4',
+         'text-[15px] font-semibold transition-all duration-200',
+-        'from-primary to-primary bg-gradient-to-r text-zinc-950',
+-        'hover:shadow-primary/30 hover:shadow-lg',
+-        'focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2',
++        'bg-gradient-to-r from-primary to-primary text-zinc-950',
++        'hover:shadow-lg hover:shadow-primary/30',
++        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+         className,
+       )}
+     >
+diff --git a/src/components/primitives/style-chip.tsx b/src/components/primitives/style-chip.tsx
+index 6c2985b..88d6270 100644
+--- a/src/components/primitives/style-chip.tsx
++++ b/src/components/primitives/style-chip.tsx
+@@ -30,10 +30,10 @@ export function StyleChip({ label, sublabel, active = false, onClick, className
+         'inline-flex items-center gap-2 rounded-full px-4 py-2',
+         'border border-white/10 bg-white/[0.02]',
+         'text-sm font-bold whitespace-nowrap transition-colors duration-200',
+-        'focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2',
++        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+         active
+           ? 'border-primary/30 text-primary'
+-          : 'hover:border-primary/30 hover:text-primary text-white/50',
++          : 'text-white/50 hover:border-primary/30 hover:text-primary',
+         className,
+       )}
+     >
+diff --git a/src/components/sections/examples.tsx b/src/components/sections/examples.tsx
+index 4212bb9..3bb2bd9 100644
+--- a/src/components/sections/examples.tsx
++++ b/src/components/sections/examples.tsx
+@@ -52,7 +52,7 @@ export function Examples() {
+             <button
+               type="button"
+               onClick={() => scrollByCards('prev')}
+-              className="hover:border-primary/60 hover:text-primary focus-visible:outline-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-600/60 text-zinc-400 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
++              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-600/60 text-zinc-400 transition-colors hover:border-primary/60 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+               aria-label="Previous examples"
+             >
+               <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+@@ -60,7 +60,7 @@ export function Examples() {
+             <button
+               type="button"
+               onClick={() => scrollByCards('next')}
+-              className="hover:border-primary/60 hover:text-primary focus-visible:outline-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-600/60 text-zinc-400 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
++              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-600/60 text-zinc-400 transition-colors hover:border-primary/60 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+               aria-label="Next examples"
+             >
+               <ChevronRight className="h-4 w-4" aria-hidden="true" />
+@@ -79,7 +79,7 @@ export function Examples() {
+             {EXAMPLE_CARDS.map((card) => (
+               <article
+                 key={card.id}
+-                className="group focus-within:outline-primary relative w-[260px] shrink-0 cursor-pointer snap-start focus-within:outline-2 focus-within:outline-offset-2"
++                className="group relative w-[260px] shrink-0 cursor-pointer snap-start focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary"
+               >
+                 {/* Hover glow — yellow→purple gradient (the singular purple exception) */}
+                 <div
+@@ -90,7 +90,7 @@ export function Examples() {
+                 {/* Card body */}
+                 <a
+                   href={card.href}
+-                  className="bg-card focus-visible:outline-primary relative block aspect-[9/16] overflow-hidden rounded-[20px] border border-white/5 transition-colors group-hover:border-white/10 focus-visible:outline-2 focus-visible:outline-offset-2"
++                  className="relative block aspect-[9/16] overflow-hidden rounded-[20px] border border-white/5 bg-card transition-colors group-hover:border-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                 >
+                   <Image
+                     src={card.thumbnail}
+diff --git a/src/components/sections/faq.tsx b/src/components/sections/faq.tsx
+index 49f811d..76870a3 100644
+--- a/src/components/sections/faq.tsx
++++ b/src/components/sections/faq.tsx
+@@ -39,15 +39,15 @@ export function Faq() {
+               <AccordionTrigger
+                 className={cn(
+                   'flex w-full items-center justify-between gap-4 py-6 text-start',
+-                  'focus-visible:outline-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2',
++                  'focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                   'group hover:no-underline',
+                 )}
+               >
+-                <span className="group-hover:text-primary pr-4 text-start text-base font-medium text-white transition-colors sm:text-lg">
++                <span className="pr-4 text-start text-base font-medium text-white transition-colors group-hover:text-primary sm:text-lg">
+                   {item.question}
+                 </span>
+                 <span
+-                  className="group-hover:text-primary shrink-0 text-zinc-500 transition-transform duration-300 [[data-state=open]>&]:rotate-45"
++                  className="shrink-0 text-zinc-500 transition-transform duration-300 group-hover:text-primary [[data-state=open]>&]:rotate-45"
+                   aria-hidden="true"
+                 >
+                   <Plus className="h-5 w-5" />
+diff --git a/src/components/sections/features.tsx b/src/components/sections/features.tsx
+index a7221de..07d8aec 100644
+--- a/src/components/sections/features.tsx
++++ b/src/components/sections/features.tsx
+@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
+ export function Features() {
+   return (
+     <section
+-      className="bg-background relative overflow-hidden py-24"
++      className="relative overflow-hidden bg-background py-24"
+       aria-labelledby="features-heading"
+     >
+       <div className="mx-auto max-w-7xl px-6">
+@@ -51,11 +51,11 @@ export function Features() {
+                 {/* Left accent bar — neutral→amber on hover */}
+                 <div
+                   aria-hidden="true"
+-                  className="group-hover:bg-primary absolute start-0 top-8 bottom-8 w-[3px] rounded-e-full bg-neutral-800 transition-colors duration-300"
++                  className="absolute start-0 top-8 bottom-8 w-[3px] rounded-e-full bg-neutral-800 transition-colors duration-300 group-hover:bg-primary"
+                 />
+ 
+                 {/* Icon — zinc→amber on hover */}
+-                <div className="group-hover:text-primary mb-5 text-zinc-400 transition-colors duration-300">
++                <div className="mb-5 text-zinc-400 transition-colors duration-300 group-hover:text-primary">
+                   <Icon className="h-6 w-6" strokeWidth={1.5} aria-hidden="true" />
+                 </div>
+ 
+diff --git a/src/components/sections/footer.tsx b/src/components/sections/footer.tsx
+index 3b4ec98..1affd0c 100644
+--- a/src/components/sections/footer.tsx
++++ b/src/components/sections/footer.tsx
+@@ -9,21 +9,21 @@ import { FOOTER_COLUMNS, FOOTER_BRAND, FOOTER_COPYRIGHT } from '@/lib/data/foote
+  */
+ export function Footer() {
+   return (
+-    <footer className="bg-background border-t border-white/[0.06] px-6 py-16">
++    <footer className="border-t border-white/[0.06] bg-background px-6 py-16">
+       <div className="mx-auto max-w-7xl">
+         <div className="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-4">
+           {/* Brand block */}
+           <div className="lg:col-span-1">
+             <Link
+               href="/"
+-              className="font-heading focus-visible:outline-primary text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2"
++              className="font-heading text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+             >
+               {FOOTER_BRAND.name}
+             </Link>
+             <p className="mt-2 max-w-[24ch] text-sm text-zinc-400">{FOOTER_BRAND.tagline}</p>
+             <a
+               href={`mailto:${FOOTER_BRAND.supportEmail}`}
+-              className="hover:text-primary focus-visible:outline-primary mt-4 inline-block text-sm text-zinc-400 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
++              className="mt-4 inline-block text-sm text-zinc-400 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+             >
+               {FOOTER_BRAND.supportEmail}
+             </a>
+@@ -40,7 +40,7 @@ export function Footer() {
+                   <li key={link.label}>
+                     <a
+                       href={link.href}
+-                      className="focus-visible:outline-primary block py-1.5 text-sm text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
++                      className="block py-1.5 text-sm text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                     >
+                       {link.label}
+                     </a>
+@@ -57,19 +57,19 @@ export function Footer() {
+           <nav className="flex gap-6" aria-label="Legal">
+             <a
+               href="/privacy"
+-              className="focus-visible:outline-primary text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
++              className="text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+             >
+               Privacy Policy
+             </a>
+             <a
+               href="/terms"
+-              className="focus-visible:outline-primary text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
++              className="text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+             >
+               Terms of Service
+             </a>
+             <a
+               href="/contact"
+-              className="focus-visible:outline-primary text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
++              className="text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+             >
+               Contact
+             </a>
+diff --git a/src/components/sections/hero.tsx b/src/components/sections/hero.tsx
+index 55de99e..54ed096 100644
+--- a/src/components/sections/hero.tsx
++++ b/src/components/sections/hero.tsx
+@@ -33,7 +33,7 @@ export function Hero() {
+   };
+ 
+   return (
+-    <section className="bg-background relative flex flex-col overflow-hidden">
++    <section className="relative flex flex-col overflow-hidden bg-background">
+       {/* Layer 1: Background video + overlays */}
+       <div className="absolute inset-0 z-0" aria-hidden="true">
+         <video
+@@ -130,7 +130,7 @@ export function Hero() {
+                   key={ex.label}
+                   type="button"
+                   onClick={() => handleChipClick(ex.label)}
+-                  className="focus-visible:outline-primary rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/[0.1] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
++                  className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/[0.1] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                 >
+                   {ex.label}
+                 </button>
+@@ -150,9 +150,9 @@ export function Hero() {
+                       onClick={() => setActiveRatio(ratio)}
+                       aria-pressed={isActive}
+                       className={cn(
+-                        'focus-visible:outline-primary flex min-h-[44px] min-w-[44px] items-center justify-center px-2 py-1 font-mono text-[10px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2',
++                        'flex min-h-[44px] min-w-[44px] items-center justify-center px-2 py-1 font-mono text-[10px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                         isActive
+-                          ? 'text-primary bg-white/[0.1]'
++                          ? 'bg-white/[0.1] text-primary'
+                           : 'text-zinc-600 hover:text-zinc-400',
+                       )}
+                     >
+@@ -165,7 +165,7 @@ export function Hero() {
+               {/* Start Creating CTA — glass pill with amber text */}
+               <a
+                 href="/create"
+-                className="text-primary focus-visible:outline-primary inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-zinc-800 to-zinc-900 px-5 py-2.5 text-[13px] font-bold transition-all hover:from-zinc-700 hover:to-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 sm:py-2"
++                className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-zinc-800 to-zinc-900 px-5 py-2.5 text-[13px] font-bold text-primary transition-all hover:from-zinc-700 hover:to-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:py-2"
+               >
+                 Start Creating
+                 <ArrowRight className="h-3 w-3" aria-hidden="true" />
+diff --git a/src/components/sections/navbar.tsx b/src/components/sections/navbar.tsx
+index 2cb29b3..a051f5f 100644
+--- a/src/components/sections/navbar.tsx
++++ b/src/components/sections/navbar.tsx
+@@ -38,7 +38,7 @@ export function Navbar() {
+       className={cn(
+         'fixed top-0 right-0 left-0 z-50 transition-all duration-300',
+         scrolled
+-          ? 'bg-background/70 border-b border-white/10 backdrop-blur-[24px]'
++          ? 'border-b border-white/10 bg-background/70 backdrop-blur-[24px]'
+           : 'bg-transparent',
+       )}
+     >
+@@ -49,7 +49,7 @@ export function Navbar() {
+         {/* Logo */}
+         <Link
+           href="/"
+-          className="font-heading focus-visible:outline-primary text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2"
++          className="font-heading text-base font-medium tracking-tight text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+         >
+           StoryIntoVideo
+         </Link>
+@@ -60,7 +60,7 @@ export function Navbar() {
+             <a
+               key={link.href}
+               href={link.href}
+-              className="focus-visible:outline-primary rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-all duration-200 hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
++              className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-all duration-200 hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+             >
+               {link.label}
+             </a>
+@@ -72,7 +72,7 @@ export function Navbar() {
+           {/* Language switcher */}
+           <DropdownMenu>
+             <DropdownMenuTrigger
+-              className="focus-visible:outline-primary flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 sm:px-3"
++              className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:px-3"
+               aria-label="Switch language"
+             >
+               EN
+@@ -99,7 +99,7 @@ export function Navbar() {
+           {/* Sign in (desktop only) */}
+           <a
+             href="/sign-in"
+-            className="focus-visible:outline-primary hidden rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 sm:inline"
++            className="hidden rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:inline"
+           >
+             Sign in
+           </a>
+@@ -107,7 +107,7 @@ export function Navbar() {
+           {/* Get Started (desktop) */}
+           <a
+             href="/sign-up"
+-            className="focus-visible:outline-primary hidden rounded-full px-5 py-2 text-base font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 sm:inline"
++            className="hidden rounded-full px-5 py-2 text-base font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:inline"
+           >
+             Get Started
+           </a>
+@@ -117,7 +117,7 @@ export function Navbar() {
+             <SheetTrigger asChild>
+               <button
+                 type="button"
+-                className="focus-visible:outline-primary inline-flex h-10 w-10 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 sm:hidden"
++                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:hidden"
+                 aria-label="Open menu"
+               >
+                 <Menu className="h-5 w-5" aria-hidden="true" />
+@@ -125,7 +125,7 @@ export function Navbar() {
+             </SheetTrigger>
+             <SheetContent
+               side="right"
+-              className="bg-background w-[300px] border-l border-white/10 p-6"
++              className="w-[300px] border-l border-white/10 bg-background p-6"
+             >
+               <SheetHeader className="mb-6 flex flex-row items-center justify-between">
+                 <SheetTitle className="font-heading text-base font-medium text-white">
+@@ -134,7 +134,7 @@ export function Navbar() {
+                 <SheetClose asChild>
+                   <button
+                     type="button"
+-                    className="focus-visible:outline-primary inline-flex h-10 w-10 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2"
++                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                     aria-label="Close menu"
+                   >
+                     <X className="h-5 w-5" aria-hidden="true" />
+@@ -147,7 +147,7 @@ export function Navbar() {
+                     key={link.href}
+                     href={link.href}
+                     onClick={() => setMobileOpen(false)}
+-                    className="focus-visible:outline-primary rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
++                    className="rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                   >
+                     {link.label}
+                   </a>
+@@ -156,14 +156,14 @@ export function Navbar() {
+                 <a
+                   href="/sign-in"
+                   onClick={() => setMobileOpen(false)}
+-                  className="focus-visible:outline-primary rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
++                  className="rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                 >
+                   Sign in
+                 </a>
+                 <a
+                   href="/sign-up"
+                   onClick={() => setMobileOpen(false)}
+-                  className="text-primary hover:bg-primary/10 hover:text-primary focus-visible:outline-primary rounded-lg px-3 py-2 text-base font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
++                  className="rounded-lg px-3 py-2 text-base font-medium text-primary transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                 >
+                   Get Started
+                 </a>
+diff --git a/src/components/sections/testimonials.tsx b/src/components/sections/testimonials.tsx
+index c335ba4..084b408 100644
+--- a/src/components/sections/testimonials.tsx
++++ b/src/components/sections/testimonials.tsx
+@@ -13,10 +13,7 @@ import { TESTIMONIALS } from '@/lib/data/testimonials';
+  */
+ export function Testimonials() {
+   return (
+-    <section
+-      className="bg-background py-16 sm:py-20 lg:py-24"
+-      aria-labelledby="testimonials-heading"
+-    >
++    <section className="bg-background py-16 sm:py-20 lg:py-24" aria-labelledby="testimonials-heading">
+       <div className="mx-auto max-w-7xl px-6">
+         <ScrollReveal className="mb-16 text-center">
+           <Eyebrow className="mb-4">TESTIMONIALS</Eyebrow>
+@@ -29,7 +26,7 @@ export function Testimonials() {
+         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+           {TESTIMONIALS.map((t, idx) => (
+             <ScrollReveal key={t.id} delay={Math.min(idx * 80, 400)}>
+-              <figure className="bg-card/30 rounded-2xl border border-zinc-800/60 p-5 transition-colors duration-300 hover:border-zinc-700/60 sm:p-6">
++              <figure className="rounded-2xl border border-zinc-800/60 bg-card/30 p-5 transition-colors duration-300 hover:border-zinc-700/60 sm:p-6">
+                 <blockquote>
+                   <p className="mb-5 text-sm leading-relaxed text-zinc-300">
+                     &ldquo;{t.quote}&rdquo;
+diff --git a/src/components/sections/use-cases.tsx b/src/components/sections/use-cases.tsx
+index 90eba8e..536c3de 100644
+--- a/src/components/sections/use-cases.tsx
++++ b/src/components/sections/use-cases.tsx
+@@ -15,7 +15,7 @@ import { USE_CASES } from '@/lib/data/use-cases';
+ export function UseCases() {
+   return (
+     <section
+-      className="bg-background relative overflow-hidden py-24"
++      className="relative overflow-hidden bg-background py-24"
+       aria-labelledby="use-cases-heading"
+     >
+       <div className="mx-auto max-w-7xl px-6">
+@@ -31,21 +31,21 @@ export function UseCases() {
+               <ScrollReveal key={uc.id} delay={Math.min(idx * 80, 400)}>
+                 <a
+                   href={uc.href}
+-                  className="group hover:border-primary/20 focus-visible:outline-primary relative block overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 transition-all duration-300 hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2"
++                  className="group relative block overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 transition-all duration-300 hover:border-primary/20 hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                 >
+                   {/* Decorative corner gradient — reveals on hover */}
+                   <div
+                     aria-hidden="true"
+-                    className="bg-primary/10 pointer-events-none absolute -top-12 -right-12 h-48 w-48 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100"
++                    className="pointer-events-none absolute -top-12 -right-12 h-48 w-48 rounded-full bg-primary/10 opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100"
+                   />
+ 
+                   {/* Icon container — amber-tinted */}
+-                  <div className="border-primary/20 bg-primary/10 text-primary relative mb-6 flex h-12 w-12 items-center justify-center rounded-xl border">
++                  <div className="relative mb-6 flex h-12 w-12 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+                     <Icon className="h-6 w-6" strokeWidth={1.5} aria-hidden="true" />
+                   </div>
+ 
+                   {/* Title — color shifts to primary on hover */}
+-                  <h3 className="group-hover:text-primary mb-3 text-xl font-bold text-white transition-colors">
++                  <h3 className="mb-3 text-xl font-bold text-white transition-colors group-hover:text-primary">
+                     {uc.title}
+                   </h3>
+ 
+@@ -53,7 +53,7 @@ export function UseCases() {
+                   <p className="mb-6 leading-relaxed text-zinc-400">{uc.description}</p>
+ 
+                   {/* CTA */}
+-                  <span className="text-primary inline-flex items-center gap-2 text-sm font-medium">
++                  <span className="inline-flex items-center gap-2 text-sm font-medium text-primary">
+                     Try it now
+                     <ArrowRight
+                       className="h-4 w-4 transition-transform group-hover:translate-x-1"
+diff --git a/src/components/sections/workflow.tsx b/src/components/sections/workflow.tsx
+index 8158dd2..de76db3 100644
+--- a/src/components/sections/workflow.tsx
++++ b/src/components/sections/workflow.tsx
+@@ -50,7 +50,7 @@ function WorkflowVideo({ src, poster }: { src: string; poster: string }) {
+ export function Workflow() {
+   return (
+     <section
+-      className="bg-background relative overflow-hidden py-16 sm:py-20 lg:py-24"
++      className="relative overflow-hidden bg-background py-16 sm:py-20 lg:py-24"
+       aria-labelledby="workflow-heading"
+     >
+       <div className="mx-auto max-w-7xl px-6">
+@@ -66,7 +66,7 @@ export function Workflow() {
+                 {/* Media side */}
+                 <div
+                   className={cn(
+-                    'bg-card relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/10',
++                    'relative aspect-[4/3] overflow-hidden rounded-2xl border border-white/10 bg-card',
+                     step.mediaPosition === 'left' ? 'lg:order-1' : 'lg:order-2',
+                   )}
+                 >
+diff --git a/src/components/ui/accordion.tsx b/src/components/ui/accordion.tsx
+index 0585eb3..b25604e 100644
+--- a/src/components/ui/accordion.tsx
++++ b/src/components/ui/accordion.tsx
+@@ -32,7 +32,7 @@ function AccordionTrigger({
+       <AccordionPrimitive.Trigger
+         data-slot="accordion-trigger"
+         className={cn(
+-          'focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-none',
++          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary focus-visible:outline-none',
+           'flex flex-1 items-start justify-between gap-4 rounded-md py-4 text-left text-sm font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180',
+           className,
+         )}
+diff --git a/src/components/ui/sheet.tsx b/src/components/ui/sheet.tsx
+index ccf8934..9a7c66b 100644
+--- a/src/components/ui/sheet.tsx
++++ b/src/components/ui/sheet.tsx
+@@ -26,7 +26,7 @@ function SheetOverlay({
+     <SheetPrimitive.Overlay
+       data-slot="sheet-overlay"
+       className={cn(
+-        'bg-background/60 fixed inset-0 z-50 backdrop-blur-sm',
++        'fixed inset-0 z-50 bg-background/60 backdrop-blur-sm',
+         'data-[state=open]:animate-in data-[state=closed]:animate-out',
+         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+         className,
+@@ -67,7 +67,7 @@ function SheetContent({
+         {...props}
+       >
+         {children}
+-        <SheetPrimitive.Close className="ring-offset-background focus-visible:outline-primary absolute top-4 right-4 rounded-md opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none">
++        <SheetPrimitive.Close className="ring-offset-background absolute top-4 right-4 rounded-md opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none">
+           <XIcon className="size-5" />
+           <span className="sr-only">Close</span>
+         </SheetPrimitive.Close>
+diff --git a/src/features/billing/queries.ts b/src/features/billing/queries.ts
+index 2dc7595..28b8002 100644
+--- a/src/features/billing/queries.ts
++++ b/src/features/billing/queries.ts
+@@ -115,9 +115,7 @@ export async function debitCredits(
+   idempotencyKey: string,
+   projectId?: string,
+ ): Promise<DebitResult> {
+-  return await db.transaction(async (tx) =>
+-    debitCreditsTx(tx, userId, amount, operationType, idempotencyKey, projectId),
+-  );
++  return await db.transaction(async (tx) => debitCreditsTx(tx, userId, amount, operationType, idempotencyKey, projectId));
+ }
+ 
+ /**
+diff --git a/src/features/projects/actions.ts b/src/features/projects/actions.ts
+index 55c78fd..05b15e4 100644
+--- a/src/features/projects/actions.ts
++++ b/src/features/projects/actions.ts
+@@ -8,11 +8,7 @@ import { db } from '@/lib/db';
+ import { projects } from '@/lib/db/schema';
+ import { verifySession } from '@/features/auth/domain/verify-session';
+ import { moderateContent } from '@/features/pipeline/domain/moderate-content';
+-import {
+-  debitCreditsTx,
+-  getOrCreateSubscription,
+-  InsufficientCreditsError,
+-} from '@/features/billing/queries';
++import { debitCreditsTx, getOrCreateSubscription, InsufficientCreditsError } from '@/features/billing/queries';
+ import { CREDIT_COSTS } from '@/features/billing/domain/tier-limits';
+ import { inngest, PIPELINE_EVENT } from '@/lib/inngest/client';
+ import { pipelineRateLimit } from '@/lib/rate-limit';
+diff --git a/src/tests/unit/assemble-video.test.ts b/src/tests/unit/assemble-video.test.ts
+index 9662e5f..d96bbe0 100644
+--- a/src/tests/unit/assemble-video.test.ts
++++ b/src/tests/unit/assemble-video.test.ts
+@@ -53,7 +53,10 @@ vi.mock('@/lib/env', () => ({
+   env: mockEnv,
+ }));
+ 
+-import { assembleVideo, getFfmpegPath } from '@/features/pipeline/domain/assemble-video';
++import {
++  assembleVideo,
++  getFfmpegPath,
++} from '@/features/pipeline/domain/assemble-video';
+ 
+ describe('T3: assemble-video rewrite', () => {
+   beforeEach(() => {
+diff --git a/src/tests/unit/billing-action-wiring.test.ts b/src/tests/unit/billing-action-wiring.test.ts
+index 6d8b6b0..b237a38 100644
+--- a/src/tests/unit/billing-action-wiring.test.ts
++++ b/src/tests/unit/billing-action-wiring.test.ts
+@@ -16,10 +16,19 @@ import { join } from 'node:path';
+  * This is a source-reading test (per project convention for server-only modules).
+  */
+ describe('T1: Billing page wires upgrade button to checkoutAction', () => {
+-  const billingPagePath = join(process.cwd(), 'src', 'app', '(app)', 'billing', 'page.tsx');
++  const billingPagePath = join(
++    process.cwd(),
++    'src',
++    'app',
++    '(app)',
++    'billing',
++    'page.tsx',
++  );
+   const source = readFileSync(billingPagePath, 'utf-8');
+   // Strip comments so docblocks don't trigger false positives
+-  const stripped = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
++  const stripped = source
++    .replace(/\/\*[\s\S]*?\*\//g, '')
++    .replace(/\/\/.*$/gm, '');
+ 
+   it('imports billingCheckoutAction from the billing feature', () => {
+     // T1: The billing page imports billingCheckoutAction (a Server Action wrapper
+diff --git a/src/tests/unit/create-project-action-orphan.test.ts b/src/tests/unit/create-project-action-orphan.test.ts
+index e344f94..600d67f 100644
+--- a/src/tests/unit/create-project-action-orphan.test.ts
++++ b/src/tests/unit/create-project-action-orphan.test.ts
+@@ -18,19 +18,27 @@ import { resolve } from 'node:path';
+ describe('T3: createProjectAction wraps INSERT + debit in a transaction', () => {
+   const actionsPath = resolve(process.cwd(), 'src', 'features', 'projects', 'actions.ts');
+   const source = readFileSync(actionsPath, 'utf-8');
+-  const stripped = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
++  const stripped = source
++    .replace(/\/\*[\s\S]*?\*\//g, '')
++    .replace(/\/\/.*$/gm, '');
+ 
+   const billingPath = resolve(process.cwd(), 'src', 'features', 'billing', 'queries.ts');
+   const billingSource = readFileSync(billingPath, 'utf-8');
+-  const billingStripped = billingSource.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
++  const billingStripped = billingSource
++    .replace(/\/\*[\s\S]*?\*\//g, '')
++    .replace(/\/\/.*$/gm, '');
+ 
+   it('billing/queries.ts exports a debitCreditsTx function that accepts a transaction handle', () => {
+-    expect(billingStripped).toMatch(/export\s+async\s+function\s+debitCreditsTx\s*\(/);
++    expect(billingStripped).toMatch(
++      /export\s+async\s+function\s+debitCreditsTx\s*\(/,
++    );
+   });
+ 
+   it('billing/queries.ts debitCreditsTx accepts a tx parameter as its first arg', () => {
+     // The tx param is the transaction handle from db.transaction(callback)
+-    expect(billingStripped).toMatch(/export\s+async\s+function\s+debitCreditsTx\s*\(\s*tx\s*:/);
++    expect(billingStripped).toMatch(
++      /export\s+async\s+function\s+debitCreditsTx\s*\(\s*tx\s*:/,
++    );
+   });
+ 
+   it('createProjectAction wraps the INSERT + debit in db.transaction()', () => {
+diff --git a/src/tests/unit/proxy-redirect-url.test.ts b/src/tests/unit/proxy-redirect-url.test.ts
+index ea0e2f6..e0e0796 100644
+--- a/src/tests/unit/proxy-redirect-url.test.ts
++++ b/src/tests/unit/proxy-redirect-url.test.ts
+@@ -22,7 +22,9 @@ import { join } from 'node:path';
+ describe('T2: Proxy redirect uses canonical public URL', () => {
+   const proxyPath = join(process.cwd(), 'src', 'proxy.ts');
+   const source = readFileSync(proxyPath, 'utf-8');
+-  const stripped = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
++  const stripped = source
++    .replace(/\/\*[\s\S]*?\*\//g, '')
++    .replace(/\/\/.*$/gm, '');
+ 
+   it('does NOT construct the signInUrl from nextUrl.origin', () => {
+     // The bug: new URL('/sign-in', nextUrl.origin)
+@@ -31,13 +33,13 @@ describe('T2: Proxy redirect uses canonical public URL', () => {
+ 
+   it('constructs the signInUrl from env.NEXT_PUBLIC_APP_URL', () => {
+     // The fix: new URL('/sign-in', env.NEXT_PUBLIC_APP_URL)
+-    expect(stripped).toMatch(/new\s+URL\(\s*['"]\/sign-in['"]\s*,\s*env\.NEXT_PUBLIC_APP_URL\s*\)/);
++    expect(stripped).toMatch(
++      /new\s+URL\(\s*['"]\/sign-in['"]\s*,\s*env\.NEXT_PUBLIC_APP_URL\s*\)/,
++    );
+   });
+ 
+   it('still passes nextUrl.pathname as the callbackUrl search param', () => {
+     // The callbackUrl must still reflect the path the user tried to visit
+-    expect(stripped).toMatch(
+-      /signInUrl\.searchParams\.set\(\s*['"]callbackUrl['"]\s*,\s*nextUrl\.pathname\s*\)/,
+-    );
++    expect(stripped).toMatch(/signInUrl\.searchParams\.set\(\s*['"]callbackUrl['"]\s*,\s*nextUrl\.pathname\s*\)/);
+   });
+ });
+diff --git a/src/tests/unit/sse-slot-release.test.ts b/src/tests/unit/sse-slot-release.test.ts
+index bfa7501..0b7aa5b 100644
+--- a/src/tests/unit/sse-slot-release.test.ts
++++ b/src/tests/unit/sse-slot-release.test.ts
+@@ -31,7 +31,9 @@ describe('T5: SSE rate limit uses claim/release/refresh pattern', () => {
+     'route.ts',
+   );
+   const source = readFileSync(progressPath, 'utf-8');
+-  const stripped = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
++  const stripped = source
++    .replace(/\/\*[\s\S]*?\*\//g, '')
++    .replace(/\/\/.*$/gm, '');
+ 
+   const rateLimitPath = join(process.cwd(), 'src', 'lib', 'rate-limit.ts');
+   const rateLimitSource = readFileSync(rateLimitPath, 'utf-8');
+diff --git a/src/tests/unit/stripe-webhook-idempotency.test.ts b/src/tests/unit/stripe-webhook-idempotency.test.ts
+index d130f04..ef13f84 100644
+--- a/src/tests/unit/stripe-webhook-idempotency.test.ts
++++ b/src/tests/unit/stripe-webhook-idempotency.test.ts
+@@ -21,7 +21,9 @@ import { join } from 'node:path';
+ describe('T4: Stripe webhook idempotency INSERT is AFTER side effects', () => {
+   const webhookPath = join(process.cwd(), 'src', 'app', 'api', 'stripe', 'webhook', 'route.ts');
+   const source = readFileSync(webhookPath, 'utf-8');
+-  const stripped = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
++  const stripped = source
++    .replace(/\/\*[\s\S]*?\*\//g, '')
++    .replace(/\/\/.*$/gm, '');
+ 
+   it('does NOT insert the idempotency row before the switch/event handler', () => {
+     // The bug: db.insert(usageEvents)...onConflictDoNothing appeared BEFORE the switch block.

@@ -18,7 +18,7 @@ The marketing page is preserved verbatim from the clone; the production app laye
 | Framework | Next.js 16 | App Router, hybrid rendering (static marketing + dynamic app) |
 | UI | React 19.2.3+ | Strict TypeScript, zero `any`. Pinned above CVE-2025-55182 (React2Shell RCE) — never downgrade below 19.2.3. |
 | Styling | Tailwind CSS v4 | CSS-first `@theme` block (no `tailwind.config.js`) |
-| Components | shadcn/ui (Radix) | 4 hand-written primitives + 8 app components |
+| Components | shadcn/ui (Radix) | 4 hand-written primitives + 7 app components |
 | Fonts | Geist Sans + Geist Mono + Outfit 820 | Self-hosted via `next/font` (no CDN) |
 | Auth | Auth.js v5 (NextAuth) | Google OAuth + Credentials, Drizzle adapter, JWT sessions |
 | Database | PostgreSQL (Neon) + Drizzle ORM | 11 tables, 8 enums, migration via `drizzle-kit` |
@@ -73,7 +73,7 @@ pnpm typecheck
 # Lint — must pass with zero warnings
 pnpm lint
 
-# Unit tests (Vitest) — 377 tests across 43 files
+# Unit tests (Vitest) — 396 tests across 48 files
 pnpm test
 
 # E2E tests (Playwright) — 48 tests, auto-starts dev server
@@ -92,7 +92,7 @@ pnpm build        # Production build (hybrid: static + dynamic)
 pnpm start        # Serve built output
 pnpm lint         # ESLint (flat config, next/core-web-vitals + typescript-eslint)
 pnpm typecheck    # tsc --noEmit (strict mode, noUncheckedIndexedAccess)
-pnpm test         # Vitest unit tests (jsdom env) — 377 tests across 43 files
+pnpm test         # Vitest unit tests (jsdom env) — 396 tests across 48 files
 pnpm test:e2e     # Playwright E2E tests (Chromium)
 pnpm format       # Prettier --write (auto-fix)
 pnpm format:check # Prettier --check (verify only)
@@ -137,14 +137,14 @@ Layer 4: src/lib/                 — Infrastructure: Drizzle, Auth.js, Inngest,
 | `/dashboard` | ƒ Dynamic | Project list (auth-protected, Suspense + empty state) |
 | `/create` | ○ Static | Project creation wizard (auth-protected) |
 | `/projects/[id]` | ƒ Dynamic | Project detail + live pipeline status (SSE, owner-checked) |
-| `/billing` | ○ Static | 4-tier plan table + upgrade CTAs |
+| `/billing` | ○ Static | 4-tier plan table + upgrade CTAs (T1: wired to `billingCheckoutAction` Server Action) |
 | `/privacy` | ○ Static | Privacy Policy (mandatory for launch) |
 | `/terms` | ○ Static | Terms of Service (mandatory for launch) |
 | `/api/auth/[...nextauth]` | ƒ Dynamic | Auth.js catch-all |
 | `/api/inngest` | ƒ Dynamic | Inngest webhook (6-step pipeline) |
 | `/api/stripe/webhook` | ƒ Dynamic | Stripe webhook (signature-verified, idempotent) |
 | `/api/projects/[id]/progress` | ƒ Dynamic | SSE progress stream (2s polling, owner-checked, rate-limited) |
-| `/api/projects/[id]/download` | ƒ Dynamic | Click-time R2 URL signing (H4 fix — fresh signed URL per request) |
+| `/api/projects/[id]/download` | ƒ Dynamic | Click-time R2 URL signing (H4 fix — fresh signed URL per request; **T6 fix: classifies R2 errors as 502/504/500**) |
 | `/api/health` | ƒ Dynamic | Health check (DB `SELECT 1` + FFmpeg `accessSync`, returns 503 if unhealthy — H9 fix) |
 | Middleware | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing`, `/projects` + Host header validation (H6) |
 
@@ -215,7 +215,7 @@ Step 6: Assemble video (FFmpeg → R2 putObject('videos') → appendVideo row)
 Final: Mark project status='completed', progressPercent=100
 ```
 
-Each step is a pure domain function in `src/features/pipeline/domain/` (no Next.js or DB runtime imports), debits credits via a Drizzle transaction with deterministic idempotency keys (**C5/C6 fix: ALL 6 steps now debit** — analysis=5, char=10/each, scene=8/each, voiceover=15, subtitle_alignment=3, video_assembly=30; total=131 for 3 chars + 6 scenes), and updates `project.status` + `progressDetail`. `debitCredits()` uses `ON CONFLICT (idempotency_key) DO NOTHING` + `.for('update')` row lock — race-condition-proof. `createProjectAction` inserts the project FIRST, then debits (C4 fix). Image moderation (Steps 2 & 3) parses Replicate's `safety_concept` / `api_safety_concept` fields (**H8 fix: defaults to fail-closed in production**). Rate limiting (C3) prevents abuse. Live progress is streamed to the project detail page via SSE at `/api/projects/[id]/progress`.
+Each step is a pure domain function in `src/features/pipeline/domain/` (no Next.js or DB runtime imports), debits credits via a Drizzle transaction with deterministic idempotency keys (**C5/C6 fix: ALL 6 steps now debit** — analysis=5, char=10/each, scene=8/each, voiceover=15, subtitle_alignment=3, video_assembly=30; total=131 for 3 chars + 6 scenes), and updates `project.status` + `progressDetail`. `debitCredits()` uses `ON CONFLICT (idempotency_key) DO NOTHING` + `.for('update')` row lock — race-condition-proof. **T3 fix: `createProjectAction` wraps the project INSERT + analysis debit in a single `db.transaction()` via the new `debitCreditsTx(tx, ...)` variant** — if the debit throws `InsufficientCreditsError`, the INSERT rolls back (no orphan project rows). **T7 fix: `inngest.send()` is wrapped in try/catch → `setProjectFailed()` on failure** (no pending-orphan when Inngest is unreachable). Image moderation (Steps 2 & 3) parses Replicate's `safety_concept` / `api_safety_concept` fields (**H8 fix: defaults to fail-closed in production**; **T9 fix: `getFailOpen()` reads per-call, testable without module re-import**). **T8 fix: `appendVideo` inserts with `status: 'rendering'`; `updateVideo` sets `status: 'completed'`** (no more contradictory completed+null-videoKey state). Rate limiting (C3) prevents abuse. Live progress is streamed to the project detail page via SSE at `/api/projects/[id]/progress` (**T5 fix: SSE uses `claimSseSlot`/`releaseSseSlot`/`refreshSseSlot` Redis slot pattern instead of fixed-window rate limit — releases on disconnect for immediate reconnection**).
 
 ## Design System
 
@@ -265,7 +265,7 @@ Scroll-reveal uses `IntersectionObserver` + a `data-revealed` attribute pattern.
 
 ### Accessibility
 
-- Focus rings: `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400`
+- Focus rings: `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary` (T11: was `outline-amber-400` — now uses the brand `--color-primary: #febf00` token)
 - Skip-to-content link at page top
 - Hero video: `aria-hidden="true"` (decorative, no audio)
 - `prefers-reduced-motion: reduce` globally disables all animation
@@ -297,7 +297,7 @@ src/
 │   ├── primitives/               # Marketing presentational (7 files)
 │   ├── sections/                 # Marketing page sections (10 files)
 │   ├── ui/                       # Hand-written shadcn (4: button, accordion, sheet, dropdown-menu)
-│   └── app/                      # App components (7 files)
+│   └── app/                      # App components (7 files — SignedDownloadWrapper DELETED in H4)
 │       ├── auth-form.tsx
 │       ├── create-wizard.tsx
 │       ├── empty-state.tsx
@@ -325,7 +325,7 @@ src/
 │   ├── hooks/                              # 4 hooks (use-scrolled, use-reveal, use-reduced-motion, use-project-progress)
 │   ├── fonts.ts · utils.ts
 ├── tests/
-│   ├── unit/                     # 43 files, 377 tests
+│   ├── unit/                     # 48 files, 396 tests
 │   ├── e2e/                      # 9 files, 48 tests
 │   └── setup.ts                  # jest-dom + test env vars
 ├── types/index.ts                # 12 marketing interfaces
@@ -397,7 +397,7 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 
 ### Unit Tests (Vitest)
 
-377 tests across 43 files, all GREEN:
+396 tests across 48 files, all GREEN:
 
 **Marketing layer (inherited from clone):**
 
@@ -409,7 +409,7 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 | `use-reduced-motion.test.ts` | 4 | matchMedia integration, change event handling |
 | `hero-chip-populate.test.tsx` | 5 | Chip → textarea seed population for all 4 chips + replace behavior |
 | `hero-ratio-toggle.test.tsx` | 3 | Ratio toggle single-selection enforcement (9:16 ↔ 16:9) |
-| `hero-character-counter.test.tsx` | 4 | Counter renders `0 / 500`, updates on type, amber warning at ≥450 chars |
+| `hero-character-counter.test.tsx` | 4 | Counter renders `0 / 5000`, updates on type, amber warning at ≥4500 chars (T11: `text-amber-400` → `text-primary`) |
 | `layout-hydration.test.tsx` | 5 | `suppressHydrationWarning` on `<body>`, skip-to-content, JSON-LD, children |
 | `metadata.test.ts` | 2 | Canonical URL (`alternates.canonical`) presence + clone-domain resolution |
 
@@ -427,7 +427,7 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 | `dashboard.test.ts` | 8 | Dashboard shell, Suspense, EmptyState, queries.ts boundary |
 | `cta-routes.test.ts` | 11 | All 14 marketing CTAs wired to real routes |
 | `create-wizard.test.ts` | 9 | Create page, textarea, style selector, ratio toggle, submit |
-| `create-project-action.test.ts` | 12 | Server Action (auth-first, Zod, moderation, credits, DB insert, **Inngest trigger**, C4 insert-before-debit, C3 rate-limiting) |
+| `create-project-action.test.ts` | 12 | Server Action (auth-first, Zod, moderation, credits, DB insert, **Inngest trigger**, **T3: INSERT + debit wrapped in `db.transaction()` via `debitCreditsTx`** (no orphan on InsufficientCreditsError), **T7: `inngest.send()` try/catch → `setProjectFailed()`**, C4 insert-before-debit, C3 rate-limiting) |
 | `analyze-story.test.ts` | 7 | GPT-4o story analysis + Moderation API (mocked OpenAI) |
 | `credit-metering.test.ts` | 12 | Tier limits, credit costs, `debitCredits` transaction (incl. C5 idempotency + `DebitResult`) |
 | `pipeline-sprint3.test.ts` | 10 | R2 storage, Replicate character/scene generation, IP-Adapter |
@@ -451,11 +451,22 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 | Test file | Tests | What it covers |
 |---|---|---|
 | `sign-up-action.test.ts` | 12 | C1: `signUpAction` server action — Zod validation, bcrypt hash (cost 12), user insert, subscription creation, auto sign-in, rate limiting |
-| `rate-limit.test.ts` | 7 | C3: Upstash Ratelimit — auth (10/15min/IP), pipeline (5/min/user), SSE (1/user/project), `RATE_LIMITED` error code |
-| `api-project-download.test.ts` | 12 | H4: `/api/projects/[id]/download` route — auth, owner check, R2 URL signing, error handling |
+| `rate-limit.test.ts` | 8 | C3: Upstash Ratelimit — auth (10/15min/IP), pipeline (5/min/user), SSE (1/user/project), `RATE_LIMITED` error code. **T5: also verifies `claimSseSlot`/`releaseSseSlot`/`refreshSseSlot` exports** |
+| `api-project-download.test.ts` | 12 | H4: `/api/projects/[id]/download` route — auth, owner check, R2 URL signing, error handling. **T6: error classification (502/504/500)** |
 | `billing-concurrency.test.ts` | 4 | H10: `.for('update')` row lock concurrency test — 10 parallel `debitCredits` calls, exactly-one semantics |
 | `pipeline-credits.test.ts` | 9 | C5/C6: All 6 pipeline steps debit credits with deterministic idempotency keys, `FULL_PIPELINE_COST = 131` formula verification |
 | `health.test.ts` | 6 | H9: `/api/health` route — DB `SELECT 1`, FFmpeg `fs.accessSync`, 200/503 status codes |
+
+**Audit v1 Remediation (T1–T12 — see `AUDIT_REPORT_v1.md` + `REMEDIATION_PLAN_v1.md`):**
+
+| Test file | Tests | What it covers |
+|---|---|---|
+| `billing-action-wiring.test.ts` | 4 | T1 (C-1): Billing page imports `billingCheckoutAction` Server Action (not broken POST to `/api/stripe/checkout`) |
+| `proxy-redirect-url.test.ts` | 3 | T2 (C-2): Proxy redirect uses `env.NEXT_PUBLIC_APP_URL` (not `nextUrl.origin` — fixes ERR_CONNECTION_REFUSED behind reverse proxy) |
+| `create-project-action-orphan.test.ts` | 4 | T3 (H-1): `createProjectAction` wraps INSERT + debit in `db.transaction()` via `debitCreditsTx` (no orphan project rows) |
+| `stripe-webhook-idempotency.test.ts` | 3 | T4 (H-2): Webhook idempotency INSERT happens AFTER side effects (not before) — prevents permanently-lost subscription updates on transient DB errors |
+| `sse-slot-release.test.ts` | 5 | T5 (H-3): SSE route uses `claimSseSlot`/`releaseSseSlot`/`refreshSseSlot` Redis slot pattern (replaces `sseRateLimit.fixedWindow` that never released on disconnect) |
+| `brand-tokens.test.ts` | 3 | T11 (M-6): Brand color system — **now ENFORCES 0 violations** (was baseline measurement). Replaced 122 `amber-*` + 27 `bg-zinc-950/900/black` across 45 files with `primary`/`background`/`card` tokens |
 
 **Remediation Sprint 2 (post-review hardening):**
 
@@ -537,7 +548,7 @@ A meticulous code review (documented in `design_critique.md`) identified 5 inacc
 
 ### What's Implemented vs. Outstanding
 
-**✅ Fully implemented (code layer — 377 unit tests + 48 E2E tests, all GREEN):**
+**✅ Fully implemented (code layer — 396 unit tests + 48 E2E tests, all GREEN):**
 
 *Authentication & Authorization:*
 - Auth.js v5 (Google OAuth + Credentials, Drizzle adapter, JWT sessions, `trustHost: true` for reverse-proxy — T2)
@@ -570,8 +581,9 @@ A meticulous code review (documented in `design_critique.md`) identified 5 inacc
 
 *Billing & Credits:*
 - Stripe (Checkout, Portal, webhook with signature verification)
-- **H7 fix: Stripe webhook idempotency** — replaced TOCTOU SELECT-then-INSERT with INSERT-first `ON CONFLICT (idempotency_key) DO NOTHING`. Uses `event.id` as the idempotency key. No more hardcoded system user UUID.
-- Credit metering (transactional `debitCredits` with `InsufficientCreditsError`, `DebitResult` return type)
+- **T1 fix: Billing page upgrade buttons wired to `billingCheckoutAction` Server Action** — `src/features/billing/actions.ts` exports `billingCheckoutAction(formData)` which extracts `plan` and delegates to `checkoutAction(plan)`. The previous `<form action="/api/stripe/checkout">` posted to a non-existent route (100% of paid conversions were blocked).
+- **H7 fix: Stripe webhook idempotency** — replaced TOCTOU SELECT-then-INSERT with INSERT-first `ON CONFLICT (idempotency_key) DO NOTHING`. Uses `event.id` as the idempotency key. No more hardcoded system user UUID. **T4 fix: idempotency INSERT moved to AFTER side effects succeed** (was before the event handler — if the handler threw, the row was committed and Stripe retries were silently swallowed, permanently losing subscription updates). Now uses a pre-check SELECT + post-side-effect INSERT.
+- Credit metering (transactional `debitCredits` with `InsufficientCreditsError`, `DebitResult` return type). **T3 fix: `debitCreditsTx(tx, ...)` variant accepts an existing transaction handle** — `createProjectAction` wraps INSERT + debit in a single `db.transaction()` so InsufficientCreditsError rolls back the INSERT (no orphan project rows).
 - `extractSubscriptionPeriodEnd()` pure helper for Stripe "Basil" API (2025-03-31) shape change
 - Billing page (4-tier plan table)
 
@@ -582,14 +594,14 @@ A meticulous code review (documented in `design_critique.md`) identified 5 inacc
 - **Client components never import `r2.ts` at module level** — env validation only runs in Node.js
 
 *SSE & Real-time:*
-- SSE progress stream (`/api/projects/[id]/progress` — 2s polling, owner-checked, **C3: rate-limited 1/user/project**, `maxDuration = 800`, client-side reconnect with exponential backoff)
-- `useProjectProgress` client hook + `ProjectProgressPanel` (live progress bar, reconnect UI state)
+- SSE progress stream (`/api/projects/[id]/progress` — 2s polling, owner-checked, **T5 fix: uses `claimSseSlot`/`releaseSseSlot`/`refreshSseSlot` Redis slot pattern (SET NX EX 30)** — replaces `sseRateLimit.fixedWindow(1, '1 m')` which never released on disconnect. Slot is claimed on open, refreshed every 2s poll, released on abort. Users can reconnect immediately after disconnect (no 60s lockout). `maxDuration = 800`, client-side reconnect with exponential backoff)
+- `useProjectProgress` client hook + `ProjectProgressPanel` (live progress bar, reconnect UI state). **T12 fix: double-close guard** — sets `eventSource = null` after `close()` in the terminal-status handler so the cleanup function's `if (eventSource)` guard skips the redundant close.
 
 *Infrastructure & Security:*
 - **H1 fix: `FFMPEG_PATH` in Zod env schema** — `assemble-video.ts` reads `env.FFMPEG_PATH` (not `process.env.*`). Added `z.string().optional().default('/usr/bin/ffmpeg')` to the schema.
 - **H9 fix: Robust health endpoint** — `/api/health` checks DB connectivity (`SELECT 1`) + FFmpeg accessibility (`fs.accessSync`). Returns 200 + `{ status, services: { database, ffmpeg } }` when healthy; 503 + `{ status: 'unhealthy', errors }` when not.
 - `getFfmpegPath()` helper — resolves FFmpeg binary from `env.FFMPEG_PATH`
-- Zod env validation (31 env vars, build-context fallback, AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch warning)
+- Zod env validation (30 env vars, build-context fallback, AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch warning)
 - Env-configurable Replicate model IDs with `owner/model:sha` format validation — T4
 - husky + lint-staged pre-commit hook (`.husky/pre-commit`)
 - GitHub Actions CI (`.github/workflows/ci.yml`) — lint + typecheck + test + build on every PR
@@ -598,11 +610,12 @@ A meticulous code review (documented in `design_critique.md`) identified 5 inacc
 *Design System & UX:*
 - **H3 fix: Style chip enum aligned with marketing marquee** — added `medieval` + `japanese-animation` to `visualStyleEnum` + Zod + `STYLE_PROMPTS` (migration `0004`). All 8 marketing chips now work.
 - **M2 fix: Hero story length 500→5000** — `maxLength={5000}`, counter `/ 5000`, amber threshold ≥4500 (matches server Zod schema `min(100).max(5000)`)
-- **H2 partial: Brand color CI guard** — `src/tests/unit/brand-tokens.test.ts` measures the baseline of `amber-*` + `bg-zinc-950` violations. Full replacement deferred.
+- **H2 + T11 fix: Brand color full replacement COMPLETE** — `sed` sweep across 45 files replaced `amber-300/400/500/600` → `primary`, `bg-zinc-950` → `bg-background`, `bg-zinc-900` → `bg-card`, `bg-black` → `bg-background`. `brand-tokens.test.ts` now **ENFORCES 0 violations** (was baseline measurement of 122 amber + 27 zinc/black violations). The custom `--color-primary: #febf00` token is now used everywhere; Tailwind's `amber-400` (#fbbf24) is fully eliminated.
+- **T12 fix: `layout.tsx` `metadataBase` uses `env.NEXT_PUBLIC_APP_URL`** (was hardcoded `storyintovideo-clone.example.com` placeholder — broke OG previews). `openGraph.url` also uses `env.NEXT_PUBLIC_APP_URL`.
 - Privacy Policy + Terms of Service pages (Server Components, AI-specific clauses)
 - All 14 marketing CTAs wired to real routes
 - CSS-only animations (13 keyframes, no Framer Motion/GSAP)
-- WCAG AAA color contrast (body text 12.6:1), focus rings, skip-to-content, reduced-motion override
+- WCAG AAA color contrast (body text 12.6:1), focus rings (`outline-primary`), skip-to-content, reduced-motion override
 
 **⚠️ Outstanding (requires external resources or not yet done):**
 
@@ -615,8 +628,7 @@ A meticulous code review (documented in `design_critique.md`) identified 5 inacc
 - **FFmpeg assembly validated end-to-end** — rewritten + unit-tested with mocked fluent-ffmpeg; needs real-world test with actual scene images + audio + SRT
 
 *High (degrades UX or introduces technical debt):*
-- **H2 — Brand color full replacement** — 75+ `amber-*` + 29+ `bg-zinc-950` violations remain across 22+ files. CI guard test (`brand-tokens.test.ts`) measures the baseline. Full replacement deferred to a design sprint.
-- **H5 — FFmpeg `/tmp` OOM risk** — `assemble-video.ts` writes to `/tmp` + reads into Buffer. For large 4K videos, this can OOM the function. Stream-to-R2 via `@aws-sdk/lib-storage` `Upload` class deferred (dep installed but refactor not done).
+- **H5 — FFmpeg `/tmp` OOM risk** — `assemble-video.ts` writes to `/tmp` + reads into Buffer (**T12: temp files now use `crypto.randomUUID()` instead of `Date.now()` to prevent collision**). For large 4K videos, this can OOM the function. Stream-to-R2 via `@aws-sdk/lib-storage` `Upload` class deferred (dep installed but refactor not done).
 - **M3 — Character image R2 upload** — `referenceImageKey` currently stores Replicate CDN URLs, not R2 keys. Uploading to R2 matches the docs' intent but requires pipeline Step 2 refactor.
 - **Monitoring** — Sentry, Vercel Analytics, Axiom not integrated (env var `SENTRY_DSN` in schema)
 - **E2E tests in CI** — Playwright E2E not yet in the GitHub Actions workflow (needs Postgres service container + browser binaries + seeded data)
@@ -626,6 +638,20 @@ A meticulous code review (documented in `design_critique.md`) identified 5 inacc
 - **Other content pages** — `/pricing`, `/blog`, `/contact` linked but not implemented
 - **PostCSS moderate vulnerability** (GHSA-qx2v-qp2m-jg93): `postcss <8.5.10` (transitive via `next`). Not exploitable. Will resolve when Next.js updates its lockfile.
 - **SSE on Vercel Hobby** — `maxDuration = 800` is the Pro/Enterprise GA ceiling. On Hobby, the cap is 300s; the client-side reconnect handles this gracefully with a brief "Reconnecting…" message.
+
+**✅ Recently closed (audit v1 remediation — T1–T12, see `AUDIT_REPORT_v1.md` + `REMEDIATION_PLAN_v1.md`):**
+- ~~Billing upgrade buttons POST to non-existent `/api/stripe/checkout` route~~ → Fixed (T1/C-1: `billingCheckoutAction` Server Action wired to `<form action={...}>`)
+- ~~All protected routes return ERR_CONNECTION_REFUSED for unauthenticated users~~ → Fixed (T2/C-2: proxy redirect uses `env.NEXT_PUBLIC_APP_URL` not `nextUrl.origin`)
+- ~~Orphan project rows on insufficient credits~~ → Fixed (T3/H-1: INSERT + debit wrapped in `db.transaction()` via `debitCreditsTx`)
+- ~~Stripe webhook idempotency INSERT-before-handler lost updates on transient DB errors~~ → Fixed (T4/H-2: INSERT moved to AFTER side effects + pre-check SELECT)
+- ~~SSE rate limit never released on disconnect (60s lockout)~~ → Fixed (T5/H-3: `claimSseSlot`/`releaseSseSlot`/`refreshSseSlot` Redis slot pattern)
+- ~~Download route generic 500 error for all R2 failures~~ → Fixed (T6/M-1: error classification 502/504/500)
+- ~~`inngest.send()` failure orphaned projects~~ → Fixed (T7/M-2: try/catch → `setProjectFailed()`)
+- ~~`appendVideo` set `status='completed'` before MP4 existed~~ → Fixed (T8/M-3: `status='rendering'` at insert, `updateVideo` sets `'completed'`)
+- ~~`FAIL_OPEN` read at module load (not testable per-call)~~ → Fixed (T9/M-4: `getFailOpen()` reads inside function body)
+- ~~Dead `buildFfmpegCommand` export (second source of truth)~~ → Fixed (T10/M-5: deleted)
+- ~~Brand color system bypassed 122+ times across 28 files~~ → Fixed (T11/M-6: `sed` sweep across 45 files → `primary`/`background`/`card` tokens; `brand-tokens.test.ts` enforces 0 violations)
+- ~~`useProjectProgress` double-close risk + `Date.now()` temp file collisions + hardcoded `metadataBase` placeholder~~ → Fixed (T12/L-2/L-3/L-4: `eventSource=null` guard, `crypto.randomUUID()`, `env.NEXT_PUBLIC_APP_URL`)
 
 **✅ Recently closed (remediation sprint 1 — pipeline wiring + UX + compliance):**
 - ~~Steps 4-6 not wired into Inngest~~ → Fixed
@@ -723,13 +749,22 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 | husky pre-commit hook doesn't run | `pnpm install` didn't run `prepare` script | Run `pnpm install`; ensure `.husky/pre-commit` is executable |
 | `putObject` throws `PayloadTooLargeError` | Body exceeds `MAX_PUT_OBJECT_BYTES` (500 MB) | Use multipart upload via `CreateMultipartUploadCommand` for larger files. The 500 MB cap is intentional — function memory is the real constraint, not R2's 5 GB limit. (T7) |
 | Replicate scene generation 404s | `REPLICATE_SDXL_IPADAPTER_MODEL` is the SDXL base placeholder (T4 default) | Set `REPLICATE_SDXL_IPADAPTER_MODEL` env var to a real `lucataco/sdxl-ipadapter:<sha>` hash from replicate.com/explorer |
+| Billing upgrade buttons return 404 | Form posted to non-existent `/api/stripe/checkout` route (C-1 bug, fixed in T1) | Fixed: billing page now uses `<form action={billingCheckoutAction}>` Server Action. If you see this, ensure `billingCheckoutAction` is imported from `@/features/billing/actions` (has `"use server"`). |
+| `/dashboard` returns `ERR_CONNECTION_REFUSED` for unauthenticated users | Proxy redirect used `nextUrl.origin` which resolves to `http://` behind TLS-terminating reverse proxy (C-2 bug, fixed in T2) | Fixed: proxy now uses `new URL('/sign-in', env.NEXT_PUBLIC_APP_URL)`. Verify `NEXT_PUBLIC_APP_URL` is set to the public HTTPS URL in `.env.local`. |
+| Dashboard shows ghost "pending" projects the user never completed | `createProjectAction` inserted the project before debiting credits; InsufficientCreditsError left an orphan row (H-1 bug, fixed in T3) | Fixed: INSERT + debit now wrapped in `db.transaction()` via `debitCreditsTx`. To clean up existing orphans: `DELETE FROM projects WHERE status = 'pending' AND progress_percent = 0;` |
+| Stripe webhook retries don't update the subscription after a transient DB error | Idempotency INSERT happened BEFORE the event handler; retries hit `onConflictDoNothing` and returned `{ duplicate: true }` without re-processing (H-2 bug, fixed in T4) | Fixed: idempotency INSERT now happens AFTER side effects succeed + pre-check SELECT. If you have affected events, delete the `usageEvents` rows with `type='stripe_webhook'` for those event IDs so Stripe retries can re-process. |
+| SSE returns 429 "Too many concurrent connections" after closing and reopening within 60s | `sseRateLimit.fixedWindow(1, '1 m')` never released the counter on disconnect (H-3 bug, fixed in T5) | Fixed: SSE now uses `claimSseSlot`/`releaseSseSlot`/`refreshSseSlot` Redis slot pattern (SET NX EX 30 + DEL on abort). Slot auto-expires after 30s if the server crashes. |
+| Download returns generic 500 for all R2 failures | Single catch block didn't distinguish error types (M-1 bug, fixed in T6) | Fixed: download route now classifies errors — S3/NoSuchKey/NoSuchBucket → 502, Timeout/Networking/Connection → 504, other → 500. Check server logs for the specific `errorName`. |
+| Project stuck in "pending" after Inngest outage | `inngest.send()` threw but the project row was already committed (M-2 bug, fixed in T7) | Fixed: `inngest.send()` is now wrapped in try/catch → `setProjectFailed()`. The project status will be 'failed' with an error message; the user can retry. |
+| `pnpm build` fails: "Functions cannot be passed directly to Client Components" | Server Action defined inline in a Server Component page (not in a `"use server"` module) (T1 lesson) | Move the Server Action to a module with `"use server"` at the top (e.g., `src/features/billing/actions.ts`). Import it into the page. |
+| `tsc` error: "Argument of type 'string \| undefined' is not assignable to parameter of type 'string'" inside a closure | TypeScript doesn't preserve `session.user.id` narrowing inside closures (T5 lesson) | Capture `const userId: string = session.user.id` BEFORE the closure so the type is narrowed. |
 
 ### Lessons Learned
 
 **Marketing layer (inherited):**
 1. **`suppressHydrationWarning` belongs on `<body>`, not just `<html>`** — Browser extensions like Grammarly inject attributes into `<body>` before React hydrates.
 2. **Workflow component needs `'use client'`** — Uses `useState` for poster→video fade-in choreography.
-3. **Test counts drift from plans** — The MEP planned 6 unit + 3 E2E; actual is now 377 unit + 48 E2E. Always verify against `pnpm test` output.
+3. **Test counts drift from plans** — The MEP planned 6 unit + 3 E2E; actual is now 396 unit + 48 E2E. Always verify against `pnpm test` output.
 4. **File structure evolves during implementation** — Update docs as you build.
 5. **Playwright requires browser binary installation** — `pnpm install` doesn't install browser binaries.
 
@@ -784,6 +819,21 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 47. **Content drift is silent** — the STYLE_CHIPS array drifted from 8 spec chips to 7 with different labels, and the Hero headline collapsed from 3-line to 2-line. Neither broke tests because no tests asserted the spec copy. Lesson: lock spec-mandated content with regression tests.
 48. **TDD on legacy code documents the contract** — the 29 new tests added during post-review hardening serve as living documentation of the intended behavior. The `extractSubscriptionPeriodEnd()` tests document the Basil API shape; the `style-chips.test.ts` tests document the spec label set; the `hero-headline.test.tsx` tests document the 3-line stack.
 
+**Audit v1 remediation (T1–T12):**
+49. **Server Action forms must live in a `"use server"` module** — the initial T1 fix put `billingCheckoutAction` inline in the billing page component (a Server Component). `pnpm build` failed with "Functions cannot be passed directly to Client Components". Server Actions must be in a module with `"use server"` at the top. Moved `billingCheckoutAction` to `src/features/billing/actions.ts` (already has `"use server"`). Build passed.
+50. **Behind a TLS-terminating reverse proxy, `nextUrl.origin` lies** — Cloudflare Tunnel terminates TLS, so `nextUrl.protocol` is `http:` and/or the Host header may not match the public domain. Constructing redirects with `new URL('/sign-in', nextUrl.origin)` sent the browser to `http://public-domain:80` → `ERR_CONNECTION_REFUSED`. Always use `new URL('/sign-in', env.NEXT_PUBLIC_APP_URL)` for redirects that must reach the user's browser. (T2)
+51. **Idempotency-key-too-early is a silent data-loss anti-pattern** — the Stripe webhook idempotency INSERT happened BEFORE the event handler. If the handler threw (transient DB error), the row was committed, and Stripe retries hit `onConflictDoNothing` returning `{ duplicate: true }` without re-processing. The subscription update was permanently lost. Fix: INSERT the idempotency row AFTER side effects succeed; use a pre-check SELECT for the common duplicate case. (T4)
+52. **Upstash `fixedWindow` rate limiters can't release on disconnect** — `sseRateLimit.fixedWindow(1, '1 m')` incremented a counter on connection open and let it expire after 60s. When the client disconnected cleanly, the counter was NOT decremented. Users who closed and reopened within 60s got 429 despite zero active connections. Fix: use Redis `SET NX EX` (atomic claim with TTL) + `DEL` on disconnect + `EXPIRE` on every poll interval. (T5)
+53. **Drizzle transactions can't be nested** — `debitCredits` opened its own transaction. To wrap INSERT + debit in a shared transaction (T3, so InsufficientCreditsError rolls back the INSERT), we needed a `debitCreditsTx(tx, ...)` variant that accepts an existing transaction handle. The standalone `debitCredits` is now a thin wrapper: `db.transaction((tx) => debitCreditsTx(tx, ...))`. Pipeline steps that don't need a shared transaction keep using `debitCredits`.
+54. **Source-reading tests must search for `.method()` not `db.method()`** — when verifying that `db.insert(usageEvents)` appears after a `switch` block, the source has `db
+  .insert(usageEvents)` across lines. `indexOf('db.insert(usageEvents)')` returns -1 (no contiguous match). Use `indexOf('.insert(usageEvents)')` instead. (T4 test)
+55. **TypeScript doesn't preserve `session.user.id` narrowing inside closures** — the SSE route's `req.signal.addEventListener('abort', () => releaseSseSlot(session.user.id, projectId))` failed typecheck because `session.user.id` is `string | undefined` inside the closure (even though we checked it earlier). Fix: capture `const userId: string = session.user.id` before the closure so the type is narrowed to `string`. (T5)
+56. **`appendVideo` setting `status='completed'` at insert time is a state-machine lie** — the video row is created in Step 5 (subtitles) with `videoKey=null`. Setting `status='completed'` at insert means any query between Step 5 and Step 6 sees `status='completed'` with `videoKey=null` — a contradictory state. Fix: use the existing `'rendering'` enum value at insert; `updateVideo` sets `'completed'` alongside `videoKey`. The `video_status` enum already had `pending, rendering, completed, failed` — no migration needed. (T8)
+57. **Module-load constants make env-configurable behavior untestable per-call** — `const FAIL_OPEN = env.IMAGE_MODERATION_FAIL_OPEN === 'true'` at module top level means tests can't verify both policies in the same run without re-importing the module. Fix: move the read into a `getFailOpen()` function called inside the function body. Tests can now mock `env` per-call. (T9)
+58. **Dead exported functions create a second source of truth** — `buildFfmpegCommand` was exported "for unit testing" but never called in production (the real `assembleVideo` uses fluent-ffmpeg's API directly). If someone updated one and not the other, the test passed but production broke. Fix: delete dead code. Tests should verify the real code path, not a parallel implementation. (T10)
+59. **Large mechanical sweeps need scripted `sed`, not manual edits** — the T11 brand-token replacement touched 45 files with 149 violations. Per `skills/code-simplification` §3 "Rule of 500": if a refactor touches >500 lines, use automation. Manual edits at that scale are error-prone and exhausting to review. Script saved at `/home/z/my-project/scripts/t11-brand-token-sweep.sh`. (T11)
+60. **`metadataBase` hardcoded to a placeholder breaks social sharing** — `new URL('https://storyintovideo-clone.example.com')` made OG image URLs resolve to a non-existent domain. Always use `env.NEXT_PUBLIC_APP_URL` so metadata URLs match the deployment. (T12/L-4)
+
 ### Recommendations
 
 1. **Run `pnpm exec playwright install` after fresh clone** — Required for E2E tests to work.
@@ -800,6 +850,7 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 12. **Bundle size monitoring** — `next/bundle-analyzer` to track against the <150KB JS / <30KB CSS budget.
 13. **Add E2E tests to CI** — the GitHub Actions workflow (T8) currently runs unit tests only. Adding Playwright E2E requires a Postgres service container + browser binaries + seeded data.
 14. **Set `IMAGE_MODERATION_FAIL_OPEN=false` for production** — fail-closed is the recommended setting once the model output shape is known and stable. (T5)
+15. **Deploy + verify the T1–T12 fixes on the live site** — the code changes are committed but the live deployment at `storyintovideo.jesspete.shop` still runs the old code. After deploy, verify: (a) `/dashboard` redirects to `/sign-in` for unauthenticated users (T2), (b) billing upgrade buttons redirect to Stripe Checkout (T1), (c) SSE progress allows immediate reconnection after close (T5).
 
 ### Document Hierarchy
 
@@ -815,6 +866,8 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 | `bundled_skills_to_use.md` | Skill routing reference |
 | `storyintovideo_deviation_report.md` | External gap analysis (live-site comparison — 26 claimed deviations) |
 | `deviation_report_validation.md` | Validation of the deviation report against codebase + PRD (only 1 genuine gap + 1 enhancement found) |
+| `AUDIT_REPORT_v1.md` | Audit v1 findings (2 Critical + 3 High + 6 Medium + 4 Low) — code review per `skills/code-review-and-audit` + `skills/vulnerability-scanner` |
+| `REMEDIATION_PLAN_v1.md` | 12-task TDD remediation plan (T1–T12) with RED/GREEN/REFACTOR steps, validation against codebase |
 
 ## Contributing
 
@@ -822,7 +875,7 @@ This project has a fixed marketing spec (`Project_Requirements_Document.md`) and
 
 1. `pnpm lint` — zero warnings
 2. `pnpm typecheck` — zero errors
-3. `pnpm test` — 377 unit tests pass
+3. `pnpm test` — 396 unit tests pass
 4. `pnpm test:e2e` — 48 E2E tests pass (requires Playwright browsers)
 5. `pnpm format:check` — all files use Prettier code style
 6. `pnpm build` — zero errors
