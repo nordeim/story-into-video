@@ -8,7 +8,7 @@
 - `README.md` (quick start + build state)
 - `CLAUDE.md` (comprehensive agent briefing)
 - `AGENTS.md` (compact agent instructions)
-**Last Updated:** 2026-06-28 (v1.1 — post sprint-3 alignment)
+**Last Updated:** 2026-06-29 (v1.2 — post-audit-v1 remediation alignment)
 **Audience:** Senior Engineers, Tech Leads, DevOps, and Onboarding Engineers
 **Rule:** Every architectural decision in this document traces to a specific rationale.
            Nothing is here "because it's popular."
@@ -17,6 +17,7 @@
 
 #### Revision Block
 
+- **v1.2 (2026-06-29):** `[ALIGN]` Post-audit-v1 alignment. Updated test counts (377→396, 43→48 files), corrected brand color status (H2/T11 now COMPLETE — 0 violations, was "75+ bypassed"), added T1–T12 audit remediation entries to Known Issues (12 items closed), refreshed Outstanding Tasks (5 new findings: navbar `<a>` vs `<Link>` violation, Privacy Policy promises unimplemented GDPR endpoints, missing `not-found.tsx`, env host-mismatch only warns, missing `/pricing`/`/blog`/`/contact` routes confirmed), updated §9.2 env var table (IMAGE_MODERATION_FAIL_OPEN default is now context-dependent per H8), and refreshed live-site validation findings (C-2 code fix confirmed deployed via `/api/health` returning full DB+FFmpeg check — remaining `localhost:3000` redirect on `/dashboard` is operational env-var misconfiguration, not a code bug).
 - **v1.1 (2026-06-28):** `[ALIGN]` Comprehensive alignment update after remediation sprint 3. Updated test counts (288→377, 36→43 files), env var count (28→30), removed `signed-download-wrapper.tsx` (DELETED in H4 fix), added `signUpAction`/`rate-limit.ts`/`api/projects/[id]/download` route, fixed Pattern 3 (LEFT JOIN), Pattern 4 (click-time signing), Pattern 5 (Inngest v4 `triggers` array), ADR-005 (click-time signing), ERD (idempotency_key, nullable userId, UNIQUE constraints), security section (H6 host header validation, C3 rate limiting, C5 idempotency), Known Issues (12 items closed in sprint 3), Key Files (removed wrapper, added new files), developer handbook commands (drizzle:generate/migrate/studio), and removed duplicate voiceovers ERD block.
 - **v1.0:** `[SYN, CA]` Initial PAD generation from codebase analysis + 7 remediation sprints of documented decisions.
 
@@ -83,7 +84,7 @@ Every version is pinned. Every choice has a rationale.
 | Video | FFmpeg (system binary) | — | `FFMPEG_PATH` env var; `@ffmpeg-installer/ffmpeg` incompatible with Turbopack |
 | Package Manager | pnpm | >=10.26.0 | `allowBuilds` syntax for native build script approval |
 | CI/CD | GitHub Actions | — | lint + typecheck + test + build on every PR |
-| Testing | Vitest (jsdom) + Playwright (Chromium) | vitest ^4.0 / playwright ^1.61 | 377 unit + 48 E2E, all GREEN |
+| Testing | Vitest (jsdom) + Playwright (Chromium) | vitest ^4.0 / playwright ^1.61 | 396 unit (48 files) + 48 E2E (9 specs), all GREEN |
 
 ### 1.3 Architecture Decision Records (ADRs)
 
@@ -857,8 +858,8 @@ Each step is **idempotent** (Inngest may retry). Steps update `project.status` +
 ### 8.3 Pre-PR / Pre-bash
 pnpm lint              # Zero warnings (ESLint flat config)
 pnpm typecheck         # Zero errors (tsc --noEmit, strict + noUncheckedIndexedAccess)
-pnpm test              # 377 unit tests pass
-pnpm test:e2e          # 48 E2E tests pass (requires Playwright browsers)
+pnpm test              # 396 unit tests pass (48 files)
+pnpm test:e2e          # 48 E2E tests pass (9 specs, requires Playwright browsers)
 pnpm format:check      # All files pass Prettier
 pnpm build            # Zero errors (hybrid: static + dynamic)
 ```
@@ -980,7 +981,7 @@ pnpm dev                        # Turbopack, port 3000
 | `pnpm start` | Serve built output |
 | `pnpm lint` | ESLint (flat config, zero warnings) |
 | `pnpm typecheck` | tsc --noEmit (strict + noUncheckedIndexedAccess) |
-| `pnpm test` | Vitest unit tests (377 tests, jsdom) |
+| `pnpm test` | Vitest unit tests (396 tests, 48 files, jsdom) |
 | `pnpm test:e2e` | Playwright E2E tests (48 tests, Chromium) |
 | `pnpm format` | Prettier auto-fix |
 | `pnpm format:check` | Prettier verify |
@@ -1026,7 +1027,7 @@ Prettier: single quotes, trailing commas, 100 char width, 2-space indent, `prett
 | **MEDIUM** | No cookie consent banner | GDPR/CCPA non-compliant | Open — Privacy/Terms pages exist |
 | **MEDIUM** | `/pricing`, `/blog`, `/contact` not implemented | Dead links from nav/footer | Open |
 | **MEDIUM** | PostCSS `<8.5.10` moderate vuln (GHSA-qx2v-qp2m-jg93) | Non-exploitable transitive | Monitored — resolved when Next.js updates |
-| **MEDIUM** | Brand color system bypassed 75+ times | Visual inconsistency | Open — CI guard test measures baseline; full replacement deferred to design sprint |
+| ~~**MEDIUM**~~ | ~~Brand color system bypassed 75+ times~~ | ~~Visual inconsistency~~ | ✅ Closed (T11/H2: `sed` sweep across 45 files → `primary`/`background`/`card` tokens; `brand-tokens.test.ts` now ENFORCES 0 violations) |
 | **LOW** | Visual regression testing is manual | Pixel drift undetected | Open — Playwright screenshot comparison planned |
 | **LOW** | SSE disconnects on Vercel Hobby (300s cap) | UX degradation on cheapest plan | Client reconnect handles gracefully |
 
@@ -1043,6 +1044,27 @@ Prettier: single quotes, trailing commas, 100 char width, 2-space indent, `prett
 - ~~`IMAGE_MODERATION_FAIL_OPEN` insecure default~~ → **Fixed** (H8: defaults to `'false'` in production)
 - ~~Health endpoint bare~~ → **Fixed** (H9: checks DB `SELECT 1` + FFmpeg `fs.accessSync`)
 - ~~Row lock untested~~ → **Fixed** (H10: `.for('update')` test-verified via concurrency test)
+
+**Recently closed (audit v1 remediation — T1–T12):**
+- ~~Billing form POST to non-existent `/api/stripe/checkout` route (C-1)~~ → **Fixed** (T1: `billingCheckoutAction` Server Action in `billing/actions.ts`)
+- ~~Protected routes return ERR_CONNECTION_REFUSED for unauthenticated users (C-2)~~ → **Code Fixed** (T2: proxy uses `env.NEXT_PUBLIC_APP_URL` not `nextUrl.origin`). ⚠️ **Live site still exhibits the symptom** — confirmed via `https://storyintovideo.jesspete.shop/dashboard` redirecting to `http://localhost:3000/sign-in`. Root cause: production `NEXT_PUBLIC_APP_URL` env var is set to `http://localhost:3000` (operational misconfiguration, NOT a code bug). The `/api/health` endpoint returns healthy DB+FFmpeg, proving the deployed code is current (H9 fix is sprint-3 era, post-T2).
+- ~~Orphan project rows on insufficient credits (H-1)~~ → **Fixed** (T3: `db.transaction()` via `debitCreditsTx`)
+- ~~Stripe webhook idempotency INSERT-before-handler (H-2)~~ → **Fixed** (T4: INSERT after side effects + pre-check SELECT)
+- ~~SSE rate limit never released on disconnect (H-3)~~ → **Fixed** (T5: `claimSseSlot`/`releaseSseSlot`/`refreshSseSlot` Redis slot pattern)
+- ~~Download route generic 500 (M-1)~~ → **Fixed** (T6: error classification 502/504/500)
+- ~~`inngest.send()` failure orphaned projects (M-2)~~ → **Fixed** (T7: try/catch → `setProjectFailed()`)
+- ~~`appendVideo` set `status='completed'` before MP4 existed (M-3)~~ → **Fixed** (T8: `status='rendering'` at insert)
+- ~~`FAIL_OPEN` read at module load (M-4)~~ → **Fixed** (T9: `getFailOpen()` reads per-call)
+- ~~Dead `buildFfmpegCommand` export (M-5)~~ → **Fixed** (T10: deleted)
+- ~~Brand color system bypassed 122+ times across 28 files (M-6)~~ → **Fixed** (T11: `sed` sweep across 45 files; `brand-tokens.test.ts` enforces 0 violations)
+- ~~`useProjectProgress` double-close + `Date.now()` temp file collisions + hardcoded `metadataBase` (L-2/L-3/L-4)~~ → **Fixed** (T12: `eventSource=null` guard, `crypto.randomUUID()`, `env.NEXT_PUBLIC_APP_URL`)
+
+**Newly identified outstanding issues (post-audit-v1 validation, 2026-06-29):**
+- **Privacy Policy publicly promises unimplemented GDPR endpoints** — `src/app/(legal)/privacy/page.tsx` §4 (Data Retention: "You may delete your account at any time, which triggers a CASCADE deletion…") and §6 (Your Rights: Erasure + Portability) promise features the code does not implement. No `DELETE /api/user` endpoint, no `GET /api/user/export` endpoint. This is a compliance P0 — the live legal page is making promises the code can't keep. Schema already has `onDelete: 'cascade'` on every FK from `users` so DB-level cascade is wired; only the API surface is missing.
+- **Navbar + dashboard + hero use raw `<a href>` instead of `next/link`** — `src/components/sections/navbar.tsx` (lines 60, 100, 108, 145, 156, 163), `src/app/(app)/dashboard/page.tsx` (lines 64, 95), `src/components/sections/hero.tsx` (line 167). Direct violation of CLAUDE.md "never use `<a>` for internal routes" rule. Causes full-page reloads on every nav click, degrading Lighthouse + UX.
+- **No custom `not-found.tsx` page** — Next.js default 404 inherits root layout metadata, making any unknown URL return 200 OK with the marketing page title. Bad for SEO, hides broken links. Confirmed on live site: `/pricing`, `/blog`, `/contact` all return 200 with `StoryIntoVideo - Turn Stories Into Videos with AI` title.
+- **Env host-mismatch warning is insufficient** — `src/lib/env/index.ts:217-226` only emits `console.warn` when `AUTH_URL` and `NEXT_PUBLIC_APP_URL` hosts differ. In production behind a reverse proxy, this warning was missed — causing the live `/dashboard` redirect to `http://localhost:3000`. Should be a thrown error in production (fail-fast at boot), or at minimum surfaced via `/api/health`.
+- **`/pricing`, `/blog`, `/contact` routes don't exist** — linked from `nav-links.ts` (lines 5-7) and `footer-links.ts` (line 33) but no route handlers exist. Next.js falls back to default 404 page (which inherits root layout metadata → confusing 200 OK with marketing title).
 
 ---
 
@@ -1102,4 +1124,4 @@ Prettier: single quotes, trailing commas, 100 char width, 2-space indent, `prett
 
 ---
 
-**End of Master PAD v1.0**
+**End of Master PAD v1.2**

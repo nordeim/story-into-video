@@ -18,7 +18,7 @@ please meticulously review @CLAUDE.md , @AGENTS.md and @README.md to have a deep
 
 ---
 
-Awesome meticulous review, analysis and planning. Please keep up the good work. now, please meticulously review and update @README.md , @CLAUDE.md and @AGENTS.md to align with the latest code changes, issues fixed, gotchas to look out for, troubleshooting tips, lessons learnt, outstanding issues and recommendations.
+Awesome meticulous review, analysis and planning. Please keep up the good work. now, please meticulously review and update @CLAUDE.md , @AGENTS.md , @README.md and @Project_Architecture_Document.md to align with the latest code changes, issues fixed, gotchas to look out for, troubleshooting tips, lessons learnt, outstanding issues and recommendations.
 
 ---
 

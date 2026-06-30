@@ -1,19 +1,11 @@
 # StoryIntoVideo — Complete Skill Reference
 
-> **Version:** 7.0.0 (Post-Audit-v1 Live-Site Validation — supersedes v1–v6)
+> **Version:** 6.0.0 (Post-Audit v1 Remediation T1–T12 — supersedes v1–v5)
 > **Date:** 2026-06-29
 > **Status:** Production-ready codebase. 396 unit tests + 48 E2E tests, all GREEN. Lint clean. Typecheck clean. Build succeeds.
 > **Maintainer:** Frontend Architect & Avant-Garde UI Designer
 
 This document is the **canonical skill file** for the StoryIntoVideo project. It distills every design decision, architectural pattern, gotcha, lesson learned, and validation checkpoint into a single reference that any coding agent can use to replicate, extend, or debug this codebase with fidelity.
-
-**v7.0.0 adds (over v6.0.0):**
-- Live-site behavioral validation methodology (Appendix: Live-Site Behavioral Testing)
-- 5 new post-audit-v1 findings from `agent-browser` testing on `https://storyintovideo.jesspete.shop/`
-- 5 new lessons learned (#56–60)
-- 5 new troubleshooting rows
-- Updated Recommendations + Outstanding Issues reflecting live-site state
-- Clarified C-2 status: code fix IS deployed; live-site symptom is operational env-var misconfiguration
 
 **Audit v1 Remediation (v6.0.0) closed 12 issues across 2 Critical + 3 High + 6 Medium + 3 Low:**
 - 🔴 C-1: Billing upgrade buttons wired to `billingCheckoutAction` Server Action (was broken POST to non-existent `/api/stripe/checkout`)
@@ -1154,26 +1146,6 @@ const stripped = source
 
 **Fix (T2):** Proxy now uses `new URL('/sign-in', env.NEXT_PUBLIC_APP_URL)`. Verify `NEXT_PUBLIC_APP_URL` is set to the public HTTPS URL in `.env.local`.
 
-**⚠️ Live-site update (2026-06-29):** The T2 code fix IS deployed (proven by `/api/health` returning the H9 DB+FFmpeg check). However, the live site at `storyintovideo.jesspete.shop` STILL exhibits the symptom — every auth-protected route redirects to `http://localhost:3000/sign-in` → `ERR_CONNECTION_REFUSED`. **Root cause: production `NEXT_PUBLIC_APP_URL` env var is set to `http://localhost:3000` instead of `https://storyintovideo.jesspete.shop`.** This is an operational misconfiguration, NOT a code bug. Fix: set the env var correctly on the production host and redeploy. The env module's host-mismatch warning (`src/lib/env/index.ts:217-226`) only emits `console.warn` — it was missed in server logs. Consider promoting it to a thrown error in production OR surfacing env misconfigurations via `/api/health`.
-
-### Live site `/pricing`, `/blog`, `/contact` return 200 OK with marketing page title
-
-**Cause:** No route handlers exist for these paths AND no custom `not-found.tsx` — Next.js default 404 inherits root layout metadata.
-
-**Fix:** Implement the routes (preferred) OR add `src/app/not-found.tsx` with proper 404 metadata + on-brand UX so dead links are visible to operators + SEO crawlers. Confirmed on live site via `agent-browser`: all three URLs return 200 with title `StoryIntoVideo - Turn Stories Into Videos with AI`.
-
-### Nav clicks cause full-page reloads (visible flash, Lighthouse regression)
-
-**Cause:** Navbar/dashboard/hero use raw `<a href>` instead of `<Link>` from `next/link` (violates the "never use `<a>` for internal routes" rule). 9 places: `navbar.tsx` (6), `dashboard/page.tsx` (2), `hero.tsx` (1).
-
-**Fix:** Replace all internal `<a href>` with `<Link href>` from `next/link`. The `cta-routes.test.ts` verifies href values but not the component type — add a source-reading assertion for `<Link` usage.
-
-### `/api/health` returns 200 healthy but auth-protected routes still broken
-
-**Cause:** The health check only validates DB + FFmpeg, NOT env var correctness. `NEXT_PUBLIC_APP_URL` misconfiguration goes undetected.
-
-**Fix (planned):** Extend `/api/health` to verify `AUTH_URL` and `NEXT_PUBLIC_APP_URL` hosts match, returning 503 if they differ. Operators monitoring `/api/health` will then catch env misconfigurations without reading server logs.
-
 ### Billing upgrade buttons return 404
 
 **Cause:** Form posted to non-existent `/api/stripe/checkout` route (C-1 bug).
@@ -1377,20 +1349,12 @@ husky + lint-staged automatically runs ESLint + Prettier on staged `.ts/.tsx` fi
 
 ### Deployment Checks
 
-- [ ] `NEXT_PUBLIC_APP_URL` set to the public HTTPS URL (NOT `http://localhost:3000`)
+- [ ] `NEXT_PUBLIC_APP_URL` set to the public HTTPS URL
 - [ ] `AUTH_URL` set to the same public URL
 - [ ] `REPLICATE_SDXL_IPADAPTER_MODEL` set to a real IP-Adapter hash
 - [ ] Database migrations applied (`pnpm drizzle:migrate`)
 - [ ] Stripe products configured (`PRICE_IDS` env vars)
 - [ ] All 30 env vars set in `.env.local` (27 required + 3 optional)
-
-### Post-Deploy Smoke Test (v7.0.0 addition — mandatory after every deploy)
-
-- [ ] `curl -s https://YOUR-DOMAIN/api/health | jq .status` returns `"healthy"`
-- [ ] `curl -sI https://YOUR-DOMAIN/dashboard | grep -i location` returns `Location: https://YOUR-DOMAIN/sign-in?callbackUrl=%2Fdashboard` (NOT `localhost:3000`)
-- [ ] `curl -s https://YOUR-DOMAIN/ | grep -c 'font-weight:820'` returns `1` (H1 hero headline renders)
-- [ ] `/sign-in`, `/sign-up`, `/privacy`, `/terms` all return 200 with route-specific titles
-- [ ] `/pricing`, `/blog`, `/contact` return 404 (or render content if implemented) — NOT 200 with marketing title
 
 ---
 
@@ -1465,14 +1429,6 @@ husky + lint-staged automatically runs ESLint + Prettier on staged `.ts/.tsx` fi
 53. **`Date.now()` temp file names collide under concurrency** — use `crypto.randomUUID()`. (T12/L-3)
 54. **`EventSource.close()` is idempotent but sloppy** — set `eventSource = null` after close to guard against double-close. (T12/L-2)
 55. **R2 error classification matters for operators** — 502/504/500 lets operators distinguish transient from permanent failures. (T6)
-
-### Post-Audit-v1 Live-Site Validation (2026-06-29)
-
-56. **`console.warn` is insufficient for env misconfigurations in production** — the AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch warning at `src/lib/env/index.ts:217-226` only emits `console.warn`. Behind a reverse proxy, server logs are easily missed. The live site at `storyintovideo.jesspete.shop` exhibited exactly this failure: `NEXT_PUBLIC_APP_URL=http://localhost:3000` caused every auth-protected route (`/dashboard`, `/create`, `/billing`, `/projects/[id]`, `/settings`) to redirect to `http://localhost:3000/sign-in` → `ERR_CONNECTION_REFUSED`. The T2 code fix was correctly deployed (proven by `/api/health` returning the H9 DB+FFmpeg check), but the env var was wrong. **Lesson: production env misconfigurations should fail fast (throw at module load) OR be surfaced via `/api/health` so monitoring catches them.**
-57. **Legal pages must not promise features the code doesn't implement** — the Privacy Policy at `src/app/(legal)/privacy/page.tsx` §4 publicly states "You may delete your account at any time, which triggers a CASCADE deletion of all your projects, characters, scenes, voiceovers, videos, and usage events from our database." and §6 lists GDPR rights to Erasure + Portability. No `DELETE /api/user` or `GET /api/user/export` endpoint exists. This is a compliance P0 — the public legal page is making promises the code can't keep. **Lesson: every right promised in legal copy must trace to a working endpoint.** The DB schema already has `onDelete: 'cascade'` on every FK from `users`, so the cascade is wired — only the API surface is missing.
-58. **`<a href>` vs `<Link>` drift is easy to miss in source-reading tests** — `src/components/sections/navbar.tsx`, `src/app/(app)/dashboard/page.tsx`, and `src/components/sections/hero.tsx` all use raw `<a href>` for internal routes, directly violating CLAUDE.md's "never use `<a>` for internal routes" rule. The existing `cta-routes.test.ts` verifies the href VALUES (e.g., `/sign-in`, `/create`) but not whether they're rendered as `<a>` or `<Link>`. **Lesson: source-reading tests should assert both the route AND the component type when the distinction matters for performance (full-page reload vs client-side navigation).**
-59. **Next.js default 404 inherits root layout metadata** — without a custom `src/app/not-found.tsx`, any unknown URL (e.g., `/pricing`, `/blog`, `/contact` — all linked from nav/footer) returns 200 OK with the marketing page title. This hides broken links from operators and is bad for SEO. **Lesson: always ship a custom `not-found.tsx` with proper metadata + on-brand UX.** Confirmed on live site: `https://storyintovideo.jesspete.shop/pricing` returns 200 with title `StoryIntoVideo - Turn Stories Into Videos with AI`.
-60. **Live-site behavioral testing catches what unit tests can't** — the `/dashboard` ERR_CONNECTION_REFUSED issue was only discoverable by hitting the live URL with a browser. Unit tests verify the proxy code uses `env.NEXT_PUBLIC_APP_URL` (correct), but can't catch the operational misconfiguration of that env var on the production server. **Lesson: add a smoke test that hits `/api/health` + `/dashboard` (expecting redirect to `/sign-in` on the SAME host) after every deploy.**
 
 ---
 
@@ -2361,100 +2317,4 @@ The engineering blueprint (`PRODUCTION_READINESS_PLAN.md`) defines 11 ADRs. The 
 
 ---
 
-*End of Skill Reference v7.0.0. For the complete remediation history, see `AUDIT_REPORT_v1.md` + `REMEDIATION_PLAN_v1.md` + `worklog.md`.*
-
----
-
-## Appendix: Post-Audit-v1 Live-Site Validation (2026-06-29)
-
-This appendix documents the live-site behavioral testing methodology used to validate the audit-v1 remediation against the actual deployment at `https://storyintovideo.jesspete.shop/`. It serves as a template for future post-deploy validations.
-
-### Methodology: `agent-browser` E2E on Live Site
-
-Use the `agent-browser` CLI to drive a headless Chromium against the live URL. This catches operational misconfigurations that unit tests (which run against the source code) cannot detect.
-
-```bash
-# Open the live site
-agent-browser open https://storyintovideo.jesspete.shop/
-agent-browser wait --load networkidle
-agent-browser get title   # verify metadata
-agent-browser snapshot -i # capture interactive elements
-
-# Test public routes (should return 200)
-for route in / /sign-in /sign-up /privacy /terms; do
-  agent-browser open "https://storyintovideo.jesspete.shop${route}"
-  agent-browser wait 2000
-  agent-browser get url   # verify no redirect
-  agent-browser get title # verify route-specific metadata
-done
-
-# Test protected routes (should 307 redirect to /sign-in on SAME host)
-for route in /dashboard /create /billing /projects/abc123 /settings; do
-  agent-browser open "https://storyintovideo.jesspete.shop${route}"
-  agent-browser network requests --filter "sign-in" # inspect redirect target
-done
-
-# Test API health endpoint
-agent-browser open https://storyintovideo.jesspete.shop/api/health
-agent-browser eval "document.body.innerText"  # verify JSON response
-```
-
-### Validated Findings (2026-06-29)
-
-| Test | Expected | Actual | Status |
-|---|---|---|---|
-| `GET /` marketing page | 10 sections render, H1 has 3-line `<br>` stack, Outfit 820 | All 10 sections render, H1 HTML is `Turn<br>Story Into Video<br>with AI Magic` with `style="font-weight:820"` | ✅ |
-| `GET /sign-in` | AuthForm with Google + email/password | Renders correctly | ✅ |
-| `GET /sign-up` | AuthForm in sign-up mode | Renders correctly | ✅ |
-| `GET /privacy` | Server Component, AI-specific clauses | Returns 200 with correct title | ✅ |
-| `GET /terms` | Server Component | Returns 200 with correct title | ✅ |
-| `GET /api/health` | 200 JSON `{status:'healthy', services:{database, ffmpeg}}` (H9) | `{"status":"healthy","timestamp":"2026-06-29T22:49:21.817Z","services":{"database":"healthy","ffmpeg":"healthy"}}` | ✅ H9 fix deployed |
-| `GET /dashboard` (unauth) | 307 redirect to `/sign-in?callbackUrl=%2Fdashboard` on canonical HTTPS host | **307 redirect to `http://localhost:3000/sign-in?callbackUrl=%2Fdashboard`** → browser `ERR_CONNECTION_REFUSED` | 🔴 Operational misconfig |
-| `GET /create` (unauth) | Same as above | Same `localhost:3000` redirect | 🔴 Operational misconfig |
-| `GET /billing` (unauth) | Same as above | Same `localhost:3000` redirect | 🔴 Operational misconfig |
-| `GET /projects/abc123` (unauth) | Same as above | Same `localhost:3000` redirect | 🔴 Operational misconfig |
-| `GET /settings` (unauth) | Same as above | Same `localhost:3000` redirect | 🔴 Operational misconfig |
-| `GET /pricing`, `/blog`, `/contact` | 404 (documented as "not yet implemented") | Returns 200 with marketing-page title (no custom `not-found.tsx`) | ⚠️ Documented gap |
-
-### Root-Cause Diagnosis: The `/dashboard` Failure
-
-Network inspection reveals the proxy emits this redirect:
-
-```
-307 Location: http://localhost:3000/sign-in?callbackUrl=%2Fdashboard
-```
-
-This is **NOT** the C-2 code bug (`nextUrl.origin`). The codebase at `src/proxy.ts:71` correctly uses `new URL('/sign-in', env.NEXT_PUBLIC_APP_URL)` and the URL-encoded `callbackUrl=%2F...` query param proves the T2 fix is deployed.
-
-**Root cause: operational misconfiguration of the `NEXT_PUBLIC_APP_URL` env var on the production server.** It's set to `http://localhost:3000` instead of `https://storyintovideo.jesspete.shop`.
-
-This is precisely the failure mode the env module's host-mismatch warning at `src/lib/env/index.ts:217-226` was designed to surface — but since it's a `console.warn` (not a throw), the app still boots and the warning likely went unnoticed in server logs.
-
-### The 5 New Findings (added to Outstanding Issues in v7.0.0)
-
-1. **Privacy Policy publicly promises unimplemented GDPR endpoints** (Critical) — §4 Data Retention + §6 Your Rights promise `DELETE /api/user` + `GET /api/user/export` that don't exist. Compliance P0.
-2. **Production env var misconfiguration goes silently undetected** (Critical) — `console.warn` is insufficient; needs fail-fast OR `/api/health` surface.
-3. **Navbar + dashboard + hero use raw `<a href>` instead of `next/link`** (High) — 9 places across 3 files. Violates "never use `<a>` for internal routes" rule.
-4. **No custom `not-found.tsx` page** (High) — default 404 inherits root layout metadata → 200 OK with marketing title on dead links.
-5. **`/pricing`, `/blog`, `/contact` routes don't exist** (Medium) — linked from nav/footer but no handlers; without `not-found.tsx` they return 200 OK.
-
-### Post-Deploy Smoke Test (add to CI/CD runbook)
-
-After every deploy, run this 30-second smoke test:
-
-```bash
-# 1. Health check (DB + FFmpeg)
-curl -s https://storyintovideo.jesspete.shop/api/health | jq .status
-# Expected: "healthy"
-
-# 2. Auth redirect check (must redirect to /sign-in on SAME host, NOT localhost)
-curl -sI https://storyintovideo.jesspete.shop/dashboard | grep -i location
-# Expected: Location: https://storyintovideo.jesspete.shop/sign-in?callbackUrl=%2Fdashboard
-# If it says localhost:3000, NEXT_PUBLIC_APP_URL is misconfigured
-
-# 3. Marketing page renders
-curl -s https://storyintovideo.jesspete.shop/ | grep -c 'font-weight:820'
-# Expected: 1 (the H1 hero headline)
-```
-
-If any check fails, roll back the deploy or fix the env var before announcing the release.
+*End of Skill Reference v6.0.0. For the complete remediation history, see `AUDIT_REPORT_v1.md` + `REMEDIATION_PLAN_v1.md` + `worklog.md`.*
