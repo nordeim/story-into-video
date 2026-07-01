@@ -1,33 +1,56 @@
+$ pnpm install
+Already up to date
+Done in 586ms using pnpm v11.9.0
+
+$ rm -rf .next/
+
 $ pnpm typecheck
 $ tsc --noEmit
-(venv) pete@pop-os:/home/project/story-into-video-prod
+
 $ pnpm lint
 $ eslint .
-(venv) pete@pop-os:/home/project/story-into-video-prod
-$ pnpm test:watch
-$ vitest
 
- DEV  v4.1.9 /home/project/story-into-video-prod
+$ pnpm test
+$ vitest run
 
- ✓ src/tests/unit/hero-ratio-toggle.test.tsx (3 tests) 525ms
-     ✓ starts with 9:16 active and 16:9 inactive  321ms
- ✓ src/tests/unit/hero-chip-populate.test.tsx (5 tests) 635ms
-     ✓ populates textarea with Time travel seed when chip clicked  343ms
- ✓ src/tests/unit/project-download.test.tsx (14 tests) 453ms
-     ✓ renders a download button (not a link) that triggers fetch on click  375ms
- ✓ src/tests/unit/hero-character-counter.test.tsx (4 tests) 451ms
- ✓ src/tests/unit/env.test.ts (32 tests) 340ms
- ✓ src/tests/unit/hero-headline.test.tsx (5 tests) 383ms
- ✓ src/tests/unit/sse-progress.test.ts (18 tests) 235ms
- ✓ src/tests/unit/use-reveal.test.tsx (7 tests) 104ms
+ RUN  v4.1.9 /home/project/story-into-video-prod
+
+ ✓ src/tests/unit/project-download.test.tsx (14 tests) 399ms
+     ✓ renders a download button (not a link) that triggers fetch on click  341ms
+ ✓ src/tests/unit/hero-ratio-toggle.test.tsx (3 tests) 496ms
+ ✓ src/tests/unit/hero-chip-populate.test.tsx (5 tests) 581ms
+     ✓ populates textarea with Time travel seed when chip clicked  331ms
+ ✓ src/tests/unit/env.test.ts (36 tests) 290ms
+ ✓ src/tests/unit/sse-progress.test.ts (18 tests) 173ms
+ ✓ src/tests/unit/use-reveal.test.tsx (7 tests) 77ms
+ ✓ src/tests/unit/use-reduced-motion.test.ts (4 tests) 62ms
+ ✓ src/tests/unit/assemble-video.test.ts (10 tests) 22ms
+ ✓ src/tests/unit/use-scrolled.test.ts (7 tests) 43ms
+ ✓ src/tests/unit/sprint4.test.ts (12 tests) 23ms
+ ✓ src/tests/unit/analyze-story.test.ts (7 tests) 21ms
+ ✓ src/tests/unit/pipeline-sprint5.test.ts (9 tests) 22ms
+ ✓ src/tests/unit/cn.test.ts (8 tests) 18ms
+ ✓ src/tests/unit/sign-up-action.test.ts (12 tests) 41ms
+ ✓ src/tests/unit/create-project-action.test.ts (12 tests) 22ms
 stdout | src/tests/unit/brand-tokens.test.ts > H2: Brand color system — baseline violation count (CI guard) > counts amber-* violations across component + app source (baseline)
 H2 baseline: 0 amber-* violations across 0 files
 
 stdout | src/tests/unit/brand-tokens.test.ts > H2: Brand color system — baseline violation count (CI guard) > counts bg-zinc-950/900/black violations (baseline)
 H2 baseline: 0 bg-zinc-950/900/black violations across 0 files
 
- ✓ src/tests/unit/brand-tokens.test.ts (3 tests) 18ms
- ✓ src/tests/unit/use-scrolled.test.ts (7 tests) 72ms
+ ✓ src/tests/unit/brand-tokens.test.ts (3 tests) 17ms
+ ✓ src/tests/unit/cta-routes.test.ts (29 tests) 14ms
+ ✓ src/tests/unit/content-pages.test.ts (18 tests) 14ms
+ ✓ src/tests/unit/billing-concurrency.test.ts (4 tests) 15ms
+ ✓ src/tests/unit/cookie-banner.test.tsx (8 tests) 381ms
+       ✓ renders banner text + Privacy Policy link + dismiss button after mount  336ms
+ ✓ src/tests/unit/hero-character-counter.test.tsx (4 tests) 410ms
+ ✓ src/tests/unit/hero-headline.test.tsx (5 tests) 358ms
+stderr | src/tests/unit/layout-hydration.test.tsx > RootLayout — hydration resilience > renders skip-to-content link targeting #main
+In HTML, <html> cannot be a child of <div>.
+This will cause a hydration error.
+
+ ✓ src/tests/unit/layout-hydration.test.tsx (5 tests) 106ms
 stderr | src/tests/unit/moderate-image.test.ts > T11: moderateImage domain function > returns flagged:false for unknown output shapes (fail-open default)
 [moderate-image] Moderation skipped: unknown output shape for https://r2.example.com/scene-3.png. Fail-open policy is active (IMAGE_MODERATION_FAIL_OPEN=true). Set IMAGE_MODERATION_FAIL_OPEN=false to fail-closed.
 
@@ -40,53 +63,41 @@ stderr | src/tests/unit/moderate-image.test.ts > T5: moderateImage env-configura
 stderr | src/tests/unit/moderate-image.test.ts > T5: moderateImage env-configurable fail-open policy > returns flagged:false for unknown shapes when IMAGE_MODERATION_FAIL_OPEN=true (default)
 [moderate-image] Moderation skipped: unknown output shape for https://r2.example.com/scene-7.png. Fail-open policy is active (IMAGE_MODERATION_FAIL_OPEN=true). Set IMAGE_MODERATION_FAIL_OPEN=false to fail-closed.
 
- ✓ src/tests/unit/moderate-image.test.ts (8 tests) 36ms
-stderr | src/tests/unit/layout-hydration.test.tsx > RootLayout — hydration resilience > renders skip-to-content link targeting #main
-In HTML, <html> cannot be a child of <div>.
-This will cause a hydration error.
-
- ✓ src/tests/unit/layout-hydration.test.tsx (5 tests) 84ms
- ✓ src/tests/unit/auth-config.test.ts (10 tests) 13ms
- ✓ src/tests/unit/use-reduced-motion.test.ts (4 tests) 43ms
- ✓ src/tests/unit/sprint4.test.ts (12 tests) 20ms
- ✓ src/tests/unit/analyze-story.test.ts (7 tests) 24ms
- ✓ src/tests/unit/sign-up-action.test.ts (12 tests) 20ms
- ✓ src/tests/unit/pipeline-queries.test.ts (10 tests) 19ms
- ✓ src/tests/unit/create-project-action-orphan.test.ts (4 tests) 6ms
- ✓ src/tests/unit/assemble-video.test.ts (10 tests) 30ms
- ✓ src/tests/unit/cn.test.ts (8 tests) 19ms
- ✓ src/tests/unit/rate-limit.test.ts (8 tests) 12ms
- ✓ src/tests/unit/credit-metering.test.ts (12 tests) 12ms
- ✓ src/tests/unit/cta-routes.test.ts (11 tests) 11ms
- ✓ src/tests/unit/pipeline-sprint5.test.ts (9 tests) 24ms
- ✓ src/tests/unit/create-project-action.test.ts (12 tests) 22ms
- ✓ src/tests/unit/pipeline-sprint3.test.ts (10 tests) 16ms
- ✓ src/tests/unit/r2-putobject.test.ts (6 tests) 17ms
- ✓ src/tests/unit/verify-session.test.ts (4 tests) 14ms
- ✓ src/tests/unit/schema.test.ts (14 tests) 22ms
- ✓ src/tests/unit/style-chips.test.ts (9 tests) 16ms
- ✓ src/tests/unit/billing-concurrency.test.ts (4 tests) 13ms
- ✓ src/tests/unit/api-project-download.test.ts (12 tests) 13ms
- ✓ src/tests/unit/legal-pages.test.ts (10 tests) 15ms
- ✓ src/tests/unit/replicate-models.test.ts (5 tests) 8ms
- ✓ src/tests/unit/auth-pages.test.ts (11 tests) 13ms
+ ✓ src/tests/unit/moderate-image.test.ts (8 tests) 57ms
+ ✓ src/tests/unit/pipeline-queries.test.ts (10 tests) 16ms
+ ✓ src/tests/unit/pipeline-sprint3.test.ts (10 tests) 15ms
+ ✓ src/tests/unit/style-chips.test.ts (9 tests) 13ms
+ ✓ src/tests/unit/r2-putobject.test.ts (6 tests) 14ms
+ ✓ src/tests/unit/api-project-download.test.ts (12 tests) 11ms
+ ✓ src/tests/unit/user-delete.test.ts (12 tests) 12ms
+ ✓ src/tests/unit/schema.test.ts (14 tests) 12ms
+ ✓ src/tests/unit/verify-session.test.ts (4 tests) 12ms
+ ✓ src/tests/unit/rate-limit.test.ts (8 tests) 8ms
+ ✓ src/tests/unit/credit-metering.test.ts (12 tests) 10ms
+ ✓ src/tests/unit/legal-pages.test.ts (10 tests) 11ms
+ ✓ src/tests/unit/auth-pages.test.ts (11 tests) 9ms
+ ✓ src/tests/unit/pipeline-credits.test.ts (9 tests) 9ms
  ✓ src/tests/unit/stripe-webhook.test.ts (12 tests) 10ms
+ ✓ src/tests/unit/user-export.test.ts (10 tests) 10ms
+ ✓ src/tests/unit/not-found-page.test.ts (8 tests) 9ms
+ ✓ src/tests/unit/create-wizard.test.ts (9 tests) 10ms
  ✓ src/tests/unit/proxy.test.ts (8 tests) 8ms
- ✓ src/tests/unit/create-wizard.test.ts (9 tests) 12ms
- ✓ src/tests/unit/pipeline-credits.test.ts (9 tests) 11ms
- ✓ src/tests/unit/stripe-webhook-idempotency.test.ts (3 tests) 8ms
- ✓ src/tests/unit/sse-slot-release.test.ts (5 tests) 11ms
- ✓ src/tests/unit/billing-action-wiring.test.ts (4 tests) 8ms
+ ✓ src/tests/unit/auth-config.test.ts (10 tests) 9ms
  ✓ src/tests/unit/dashboard.test.ts (8 tests) 10ms
- ✓ src/tests/unit/proxy-redirect-url.test.ts (3 tests) 7ms
- ✓ src/tests/unit/health.test.ts (6 tests) 7ms
- ✓ src/tests/unit/metadata.test.ts (2 tests) 6ms
+ ✓ src/tests/unit/health.test.ts (11 tests) 9ms
+ ✓ src/tests/unit/sse-slot-release.test.ts (5 tests) 7ms
  ✓ src/tests/unit/routing.test.ts (2 tests) 7ms
+ ✓ src/tests/unit/billing-action-wiring.test.ts (4 tests) 6ms
+ ✓ src/tests/unit/create-project-action-orphan.test.ts (4 tests) 6ms
+ ✓ src/tests/unit/replicate-models.test.ts (5 tests) 7ms
+ ✓ src/tests/unit/stripe-webhook-idempotency.test.ts (3 tests) 6ms
+ ✓ src/tests/unit/metadata.test.ts (2 tests) 5ms
+ ✓ src/tests/unit/proxy-redirect-url.test.ts (3 tests) 5ms
 
- Test Files  48 passed (48)
-      Tests  396 passed (396)
-   Start at  21:31:51
-   Duration  38.80s (transform 1.30s, setup 4.36s, import 8.20s, tests 3.86s, environment 49.11s)
+ Test Files  53 passed (53)
+      Tests  479 passed (479)
+   Start at  10:11:28
+   Duration  26.13s (transform 1.51s, setup 4.54s, import 8.99s, tests 3.94s, environment 49.27s)
 
 $ pnpm build
 $ next build
@@ -94,12 +105,12 @@ $ next build
 - Environments: .env.local, .env
 
   Creating an optimized production build ...
-✓ Compiled successfully in 16.1s
-✓ Finished TypeScript in 12.8s    
-  Collecting page data using 3 workers  ..[replicate] ⚠ REPLICATE_SDXL_IPADAPTER_MODEL is the SDXL base placeholder. Character consistency will NOT work — scenes will have inconsistent faces. Set REPLICATE_SDXL_IPADAPTER_MODEL to a real IP-Adapter model hash (e.g., lucataco/ip-adapter-faceid:<sha>) in your .env.local.
-✓ Collecting page data using 3 workers in 1183ms    
-✓ Generating static pages using 3 workers (10/10) in 686ms
-✓ Finalizing page optimization in 16ms    
+✓ Compiled successfully in 31.3s
+✓ Finished TypeScript in 10.5s
+  Collecting page data using 3 workers  ..[replicate] ⚠️ REPLICATE_SDXL_IPADAPTER_MODEL is the SDXL base placeholder. Character consistency will NOT work — scenes will have inconsistent face. Set REPLICATE_SDXL_IPADAPTER_MODEL to a real IP-Adapter model hash (e.g., lucataco/ip-adapter-faceid:<sha>) in your .env.local.
+✓ Collecting page data using 3 workers in 1154ms
+✓ Generating static pages using 3 workers (13/13) in 894ms
+✓ Finalizing page optimization in 5ms
 
 Route (app)
 ┌ ○ /
@@ -110,10 +121,15 @@ Route (app)
 ├ ƒ /api/projects/[id]/download
 ├ ƒ /api/projects/[id]/progress
 ├ ƒ /api/stripe/webhook
+├ ƒ /api/user
+├ ƒ /api/user/export
 ├ ○ /billing
+├ ○ /blog
+├ ○ /contact
 ├ ƒ /create
 ├ ƒ /dashboard
 ├ ○ /icon
+├ ○ /pricing
 ├ ○ /privacy
 ├ ƒ /projects/[id]
 ├ ○ /sign-in
@@ -126,27 +142,20 @@ Route (app)
 ○  (Static)   prerendered as static content
 ƒ  (Dynamic)  server-rendered on demand
 
-(venv) pete@pop-os:/home/project/story-into-video-prod
 $ pnpm dev
 $ next dev --turbopack
 ▲ Next.js 16.2.9 (Turbopack)
 - Local:         http://localhost:3000
 - Network:       http://192.168.2.132:3000
 - Environments: .env.local, .env
-✓ Ready in 511ms
+✓ Ready in 1198ms
+⚠ Slow filesystem detected. The benchmark took 259ms. If /home/project/story-into-video-prod/.next/dev is a network drive, consider moving it to a local folder.
+See more: https://nextjs.org/docs/app/guides/local-development
+○ Compiling proxy ...
 
 ○ Compiling / ...
- GET / 200 in 5.8s (next.js: 5.0s, application-code: 806ms)
- GET /sign-in 200 in 1453ms (next.js: 1287ms, application-code: 166ms)
- GET / 200 in 262ms (next.js: 6ms, application-code: 256ms)
- GET /icon?6e03113122ba4ea8 200 in 2.1s (next.js: 1776ms, application-code: 374ms)
- GET /api/auth/session 200 in 3.9s (next.js: 3.8s, application-code: 38ms)
- GET /api/auth/session 200 in 76ms (next.js: 67ms, application-code: 9ms)
- GET / 200 in 285ms (next.js: 39ms, application-code: 246ms)
- GET /icon?6e03113122ba4ea8 200 in 22ms (next.js: 3ms, application-code: 20ms)
- GET /api/auth/session 200 in 85ms (next.js: 69ms, application-code: 15ms)
- GET /api/auth/session 200 in 17ms (next.js: 7ms, application-code: 10ms)
- GET /sign-in 200 in 143ms (next.js: 4ms, application-code: 139ms)
- GET /icon?6e03113122ba4ea8 200 in 33ms (next.js: 3ms, application-code: 30ms)
- GET /api/auth/session 200 in 72ms (next.js: 64ms, application-code: 7ms)
- GET /api/auth/session 200 in 13ms (next.js: 3ms, application-code: 10ms)
+ GET / 200 in 12.6s (next.js: 11.8s, application-code: 767ms)
+ GET /sign-in 200 in 1364ms (next.js: 1253ms, application-code: 110ms)
+ GET / 200 in 281ms (next.js: 7ms, application-code: 274ms)
+ GET /sign-in 200 in 114ms (next.js: 5ms, application-code: 109ms)
+

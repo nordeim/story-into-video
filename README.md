@@ -64,6 +64,26 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) — the marketing page loads with dark background (`#020202`), Outfit font on H1, and Geist Sans on body text. Auth-protected routes (`/dashboard`, `/create`, `/billing`) redirect to `/sign-in` if unauthenticated. Public content pages `/pricing`, `/blog`, `/contact` (Sprint 3 T6) render as Server Components alongside the existing `/privacy` + `/terms`. A `CookieBanner` (Sprint 3 T8) is mounted in the root layout for GDPR/CCPA consent collection on every page.
 
+### Production Deployment Checklist (Action 2 + 3)
+
+Before any production deployment, ensure the following are set correctly in your production env:
+
+1. **Set the production host** (critical — T1 will throw if wrong):
+   ```bash
+   AUTH_URL=https://storyintovideo.jesspete.shop
+   NEXT_PUBLIC_APP_URL=https://storyintovideo.jesspete.shop
+   ```
+2. **Validate the env file** before deploying:
+   ```bash
+   ENV_FILE=.env.production node scripts/check-env.js
+   ```
+3. **Deploy and verify** using the post-deployment script:
+   ```bash
+   DEPLOYMENT_URL=https://storyintovideo.jesspete.shop node scripts/verify-deployment.js
+   ```
+
+> ⚠️ **If the app returns 502 after deploy**, T1 detected a host mismatch and threw at boot. Check the `AUTH_URL` and `NEXT_PUBLIC_APP_URL` values.
+
 ### Verification
 
 ```bash
@@ -82,6 +102,14 @@ pnpm test:e2e
 
 # Format check — all files use Prettier code style
 pnpm format:check
+
+# Pre-deployment env validation (catches host-mismatch that would break T1)
+# Run before any production deployment to verify env configuration
+node scripts/check-env.js
+
+# Post-deployment live site verification (Action 3 checklist)
+# Run after deploying to production to verify the deployment
+node scripts/verify-deployment.js
 ```
 
 ## Build & Quality Commands

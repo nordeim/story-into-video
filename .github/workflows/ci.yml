@@ -52,6 +52,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # T1-env safety gate (Action 3): verify env file doesn't have a
+      # localhost-vs-production mismatch that would cause T1 to throw at boot.
+      # SKIP_PLACEHOLDER_CHECK=true is set because CI uses dummy values for
+      # API keys — we only want to catch host mismatches here.
+      - name: Env validation (check-env.js)
+        run: SKIP_PLACEHOLDER_CHECK=true node scripts/check-env.js
+
       - name: Lint (eslint .)
         run: pnpm lint
 
