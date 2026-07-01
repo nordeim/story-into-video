@@ -35,7 +35,7 @@ Light tasks skip typesetting files entirely. Standard tasks load them on demand 
 1. **Emoji Check** - Scan user content for intentional emoji (decorative 📊🎯🔥, not OS-level emoji input). If found → **force Creative brief** regardless of document type. ReportLab renders emoji as □ squares; LaTeX drops them entirely.
 2. **CJK Check** - Chinese/Japanese/Korean content needs font coverage. Report brief must use `UniSong`/`UniHei` registered fonts; Creative brief must load Google Fonts Noto Sans SC with `font-display: swap`; Academic brief must use `\usepackage{ctex}`.
 3. **Size Check** - Non-standard page sizes (not A4/Letter/A3) → prefer Creative brief (Playwright handles any dimension). ReportLab can do custom sizes but pagination is manual.
-4. **Character Safety Check** - Before writing any content string, scan for Japanese kana (の、が、は etc.), unusual Unicode symbols, or non-CJK characters that may corrupt during encoding transit ( Especially when code is written via heredoc/base64/LLM output). Replace with plain Chinese equivalents: `の`→`之/的/缔`, `々`→omit or write full character. **If content must preserve Japanese, use only standard CJK Unified Ideographs (U+4E00-U+9FFF) and common kana; avoid rare/private-use codepoints.**
+4. **Character Safety Check** - Before writing any content string, scan for Japanese kana (の、が、は etc.), unusual Unicode symbols, or non-CJK characters that may corrupt during encoding transit (especially when code is written via heredoc/base64/LLM output). Replace with plain Chinese equivalents: `の`→`之/的/缔`, `々`→omit or write full character. If content must preserve Japanese, use only standard CJK Unified Ideographs (U+4E00-U+9FFF) and common kana; avoid rare/private-use codepoints.
 
 ---
 
@@ -185,11 +185,69 @@ These are referenced by multiple briefs. **Do not load upfront** - each brief te
 
 ## Content Rules
 
-- **Language**: Match user's query language. Chinese query → Chinese PDF.
+- **Language**: Match user's query language. Chinese query → Chinese PDF. All generated text (report body, PDF pages, plot/diagram titles, legends, labels) MUST be consistent with the user's input language — no language mixing.
 - **Page/word count**: Respect explicit constraints (±20%). Unspecified → completeness over brevity.
 - **Outline**: User-provided outlines are sacred. No reordering without asking.
 - **Citations**: No fabrication. Chinese → GB/T 7714, English → APA. Search to verify.
 - **Multi-part requests**: Generate ALL parts - never silently drop a component.
+- **Cover page language**: All text on the cover (title, subtitle, tags, author, footer) MUST match the user's prompt language. Chinese prompt → Chinese cover; English prompt → English cover. Mixing is forbidden.
+- **Charts and figures language**: Before generating any chart or figure, determine the user's language. Ensure that the title, legend, labels, and other textual elements are consistent with the user's language. If any element cannot use the user's language, explicitly explain the reason.
+
+### Content Depth and Richness Standards (Anti-Shallow Writing)
+
+**PROBLEM TO AVOID**: Shallow content with paragraphs containing only 1-2 sentences, or sections with minimal text under headings.
+
+#### Minimum Content Standards
+
+1. **Paragraph Depth**
+   - Each paragraph MUST contain at least 3-5 sentences
+   - Single-sentence paragraphs are FORBIDDEN (except for transitional statements)
+   - Each paragraph should develop ONE complete idea with supporting details
+
+2. **Section Completeness**
+   - Each section heading MUST be followed by substantial content (minimum 150-200 words)
+   - NEVER create a section with only 1-2 short sentences
+   - If a section cannot meet minimum length, merge it with related sections
+
+3. **Content Enrichment Techniques**
+   - Include specific examples, data points, or case studies
+   - Provide context and background information
+   - Explain the "why" and "how", not just the "what"
+   - Add comparisons, contrasts, or alternative perspectives where relevant
+   - Include implications, consequences, or recommendations
+
+#### Writing Quality Checklist
+
+Before finalizing ANY written document, verify:
+- [ ] No paragraph has fewer than 3 sentences
+- [ ] No section has fewer than 150 words of body content
+- [ ] Each main point is supported by examples or evidence
+- [ ] Technical terms are explained when first introduced
+- [ ] Transitions connect ideas between paragraphs and sections
+
+#### Content Expansion Strategies
+
+When writing feels thin, apply these techniques:
+
+**For Analysis/Reports:**
+- Add background context (history, current state, trends)
+- Include multiple perspectives or stakeholder views
+- Provide specific metrics, statistics, or quantitative data
+- Discuss limitations, challenges, or counterarguments
+- Offer actionable recommendations with rationale
+
+**For Explanatory Content:**
+- Use analogies to clarify complex concepts
+- Provide step-by-step breakdowns where applicable
+- Include real-world applications or use cases
+- Address common questions or misconceptions
+- Add visual descriptions or diagram explanations
+
+**FORBIDDEN PATTERNS:**
+- Section with heading followed by only 1-3 sentences
+- Bullet lists without explanatory context
+- Conclusions that merely restate the introduction
+- Sections that say "as mentioned above" without adding new value
 
 ### HTML Image Source Path Rules
 
