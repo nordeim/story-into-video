@@ -1184,6 +1184,82 @@ The `.github/workflows/ci.yml` workflow runs two jobs on every PR:
 
 27. **CI e2e needs Postgres service container** — `pg_isready` health check, `DATABASE_URL` pointing at `localhost:5432`, `drizzle:migrate` before `test:e2e` (T9).
 
+### Remediation Sprint 1 (Pipeline Wiring + UX)
+
+28. **`inngest.send()` must be wrapped in try/catch** — when Inngest is unreachable, `setProjectFailed()` prevents orphan `pending` projects (T7).
+
+29. **Image moderation via Replicate's safety output is preferred** — parsing `safety_concept` adds zero latency vs. a second OpenAI vision API call (ADR-011).
+
+30. **`putObject` for pipeline vs. `getSignedUploadUrl` for client uploads** — pipeline has Buffer in memory (direct PUT); client uploads use presigned URLs (M3).
+
+### Remediation Sprint 2 (Post-Review Hardening)
+
+31. **`trustHost: true` is mandatory for reverse-proxy deployments** — without it, Auth.js falls back to `AUTH_URL` which may be `localhost:3000` if the dev default leaked to production. This was a P0 production outage (T2).
+
+32. **Hardcoded third-party model IDs are an operational liability** — the placeholder `SDXL_IPADAPTER_MODEL` hash was a UUID-format string, not Replicate's 64-char hex SHA. Scene generation would have 404'd. Model IDs are now env-configurable with format validation (T4).
+
+33. **SSE needs both server-side and client-side resilience** — `maxDuration = 800` (corrected from 900) is the Vercel Pro/Enterprise GA ceiling under Fluid Compute; the previous value of 900 exceeded the GA limit (T6).
+
+34. **`putObject` needs a size guard** — `MAX_PUT_OBJECT_BYTES = 500 MB` + `PayloadTooLargeError`. R2's hard limit is 5 GB, but function memory is the real constraint (T7).
+
+35. **`pnpm-workspace.yaml` requires `packages:` field** — pnpm 9+ enforces this even for single-package repos. Fresh clones fail with `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION` (T0).
+
+### Remediation Sprint 3 (Revenue Integrity + Auth + Security + Design)
+
+36. **Sign-up was completely broken** — `AuthForm` called `signIn('credentials')` for BOTH sign-in and sign-up modes. The Credentials provider's `authorize()` only checks existing users — no user-creation logic existed. Fixed via `signUpAction` in `src/features/auth/actions.ts` (C1).
+
+37. **Steps 2 & 3 never debited credits (60% revenue leak)** — a 60% revenue leak. `FULL_PIPELINE_COST = 131` credits assumes all 6 steps debit, but only 4 did (5+15+3+30=53). Now all 6 steps call `debitCredits()` with per-entity idempotency keys (C6).
+
+38. **`FFMPEG_PATH` violated the "never `process.env.*`" rule** — `assemble-video.ts:20` read `process.env.FFMPEG_PATH` directly. Now goes through the Zod env schema (`env.FFMPEG_PATH`) (H1).
+
+39. **Brand color system fully replaced** — `sed` sweep across 45 files replaced `amber-300/400/500/600` → `primary`, `bg-zinc-950` → `bg-background`, `bg-zinc-900` → `bg-card`, `bg-black` → `bg-background`. `brand-tokens.test.ts` now ENFORCES 0 violations (H2 + T11).
+
+40. **Host Header Injection risk** — `trustHost: true` makes Auth.js trust `X-Forwarded-Host`. Without edge validation, an attacker behind a misconfigured reverse proxy can inject `evil.com` to steal magic-link tokens. `proxy.ts` now validates the Host header against a whitelist (H6).
+
+41. **Stripe webhook idempotency was a TOCTOU race** — the old SELECT-then-INSERT pattern on `metadata` (no UNIQUE index) allowed concurrent webhooks to both pass the check. Now uses INSERT-first `ON CONFLICT (idempotency_key) DO NOTHING` (H7).
+
+42. **Download button stale-tab 403** — `SignedDownloadWrapper` signed the R2 URL at SSR time, baking the 1h-expiry URL into the RSC payload. Users who left tabs open >1h got 403. Now: `ProjectDownloadButton` fetches `/api/projects/[id]/download` at click time → gets a fresh URL (H4).
+
+43. **Style chip enum mismatch (H3)** — clicking "Medieval" or "Japanese animation" set `style='medieval'` / `'japanese-animation'` which were NOT in the backend enum → Zod rejected the submission after the user typed a 100+ char story. Fixed by adding both values to `visualStyleEnum` + Zod + `STYLE_PROMPTS` (migration `0004`).
+
+44. **Health endpoint was bare** — returned `{ status: 'ok' }` unconditionally. Now checks DB (`SELECT 1`) + FFmpeg (`fs.accessSync`), returns 503 when unhealthy (H9).
+
+45. **Row lock untested** — `.for('update')` now test-verified via source-reading + concurrency test (H10).
+
+### Audit v1 (T1–T12)
+
+46. **Billing upgrade buttons POST to non-existent `/api/stripe/checkout` route** — fixed via `billingCheckoutAction` Server Action in `billing/actions.ts` (T1).
+
+47. **All protected routes return `ERR_CONNECTION_REFUSED`** — proxy redirect used `nextUrl.origin` which resolves to `http://` behind TLS-terminating reverse proxy. Fixed: proxy uses `new URL('/sign-in', env.NEXT_PUBLIC_APP_URL)` (T2).
+
+48. **Orphan project rows on insufficient credits** — `createProjectAction` inserted the project before debiting credits; InsufficientCreditsError left an orphan row. Fixed: INSERT + debit now wrapped in `db.transaction()` via `debitCreditsTx` (T3).
+
+49. **Stripe webhook idempotency INSERT-before-handler lost updates** — idempotency INSERT happened BEFORE the event handler; retries hit `onConflictDoNothing` and returned `{ duplicate: true }` without re-processing. Fixed: idempotency INSERT now happens AFTER side effects succeed + pre-check SELECT (T4).
+
+50. **SSE rate limit never released on disconnect** — `sseRateLimit.fixedWindow(1, '1 m')` never released the counter on disconnect. Fixed: SSE now uses `claimSseSlot`/`releaseSseSlot`/`refreshSseSlot` Redis slot pattern (SET NX EX 30 + DEL on abort) (T5).
+
+51. **Download route generic 500 for all R2 failures** — Single catch block didn't distinguish error types. Fixed: download route now classifies errors — S3/NoSuchKey/NoSuchBucket → 502, Timeout/Networking/Connection → 504, other → 500 (T6).
+
+52. **`inngest.send()` failure orphaned projects** — `inngest.send()` threw but the project row was already committed. Fixed: `inngest.send()` is now wrapped in try/catch → `setProjectFailed()` (T7).
+
+53. **`appendVideo` set `status='completed'` before MP4 existed** — Fixed: `status='rendering'` at insert, `updateVideo` sets `'completed'` (T8).
+
+54. **`FAIL_OPEN` read at module load, not testable per-call** — `getFailOpen()` now reads inside the function body (was module-load const) (T9).
+
+55. **Dead `buildFfmpegCommand` export** — deleted (T10).
+
+56. **Brand color system bypassed 122+ times across 28 files** — `sed` sweep across 45 files → `primary`/`background`/`card` tokens; `brand-tokens.test.ts` enforces 0 violations (T11).
+
+57. **`useProjectProgress` double-close risk + `Date.now()` temp file collisions + hardcoded `metadataBase` placeholder** — Fixed: `eventSource=null` guard, `crypto.randomUUID()`, `env.NEXT_PUBLIC_APP_URL` (T12).
+
+### Post-Audit-v1 Validation (2026-06-29)
+
+58. **`console.warn` is insufficient for env misconfigurations in production** — the AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch warning only emits `console.warn`. The live site exhibited the failure (redirect to `localhost:3000`). The T2 code fix WAS deployed (proven by `/api/health` returning the H9 check), but the env var was wrong. Lesson: production env misconfigurations should fail fast (throw at module load) OR be surfaced via `/api/health`. **RESOLVED in Sprint 3 T1+T2: env module now THROWS in production runtime; /api/health surfaces config errors.**
+
+59. **Legal pages must not promise features the code doesn't implement** — the Privacy Policy publicly states GDPR rights (Erasure + Portability) that don't exist. **RESOLVED in Sprint 3 T3+T4: both endpoints now exist.**
+
+60. **`<a href>` vs `<Link>` drift is easy to miss** — navbar, dashboard, and hero all used raw `<a href>` for internal routes. **RESOLVED in Sprint 3 T5: 9 files converted to `<Link>`.**
+
 ---
 
 ## 13. Pitfalls to Avoid
@@ -1778,6 +1854,189 @@ interface ProjectProgressState {
 }
 ```
 
+### Pipeline Domain Interfaces
+
+```typescript
+// src/features/pipeline/domain/assemble-video.ts
+export interface AssembleVideoInput {
+  sceneImageUrls: string[];
+  sceneDurations: number[];
+  audioUrl: string;
+  subtitlesSrt: string;
+  aspectRatio: 'portrait' | 'landscape';
+  resolution: '720p' | '1080p' | '4k';
+}
+
+export interface AssembleVideoOutput {
+  videoBuffer: Buffer;
+  duration: number;
+}
+
+// src/features/pipeline/domain/moderate-image.ts
+export interface ModerateImageInput {
+  imageUrl: string;
+  rawOutput: unknown;
+}
+
+export interface ImageModerationResult {
+  flagged: boolean;
+  categories: string[];
+  /** true when moderation could not run because the output shape was unknown. */
+  moderationSkipped: boolean;
+}
+```
+
+### Billing Interfaces
+
+```typescript
+// src/features/billing/queries.ts
+export class InsufficientCreditsError extends Error {
+  constructor(
+    public readonly required: number,
+    public readonly available: number,
+  ) {
+    super(`Insufficient credits: need ${required}, have ${available}.`);
+    this.name = 'InsufficientCreditsError';
+  }
+}
+
+export interface DebitResult {
+  /** true if this call was a no-op (duplicate idempotencyKey detected) */
+  idempotent: boolean;
+  /** The usage_event row id, or null if the debit was skipped */
+  eventId: string | null;
+  /** The user's credit balance after the debit (null if skipped) */
+  creditsRemaining: number | null;
+}
+
+export type DebitOperation =
+  | 'analysis'
+  | 'character_generation'
+  | 'scene_generation'
+  | 'voiceover'
+  | 'subtitle_alignment'
+  | 'video_assembly'
+  | 'moderation_check';
+
+// src/features/billing/domain/tier-limits.ts
+export type Plan = 'free' | 'creator' | 'pro' | 'studio';
+
+export interface TierLimit {
+  plan: Plan;
+  monthlyCredits: number;
+  maxResolution: '720p' | '1080p' | '4k';
+  maxVideoDurationSec: number;
+  watermark: boolean;
+  priorityQueue: boolean;
+}
+```
+
+### Auth Interfaces
+
+```typescript
+// src/features/auth/actions.ts
+export type SignUpResult =
+  | { success: true; userId: string }
+  | {
+      success: false;
+      error: string;
+      code: 'VALIDATION' | 'EMAIL_EXISTS' | 'INTERNAL' | 'RATE_LIMITED';
+    };
+
+// src/features/auth/domain/verify-session.ts
+interface VerifySessionOptions {
+  /** Where to send the user after sign-in (defaults to current route) */
+  redirectTo?: string;
+}
+
+// src/features/projects/actions.ts
+export type CreateProjectResult =
+  | { success: true; projectId: string }
+  | {
+      success: false;
+      error: string;
+      code:
+        | 'UNAUTHORIZED'
+        | 'VALIDATION'
+        | 'FLAGGED'
+        | 'INSUFFICIENT_CREDITS'
+        | 'INTERNAL'
+        | 'RATE_LIMITED';
+    };
+```
+
+### SSE / Progress Interfaces
+
+```typescript
+// src/app/api/projects/[id]/progress/route.ts
+interface ProgressEvent {
+  status: string;
+  progressPercent: number;
+  progressDetail: string | null;
+  errorMessage: string | null;
+}
+
+// src/lib/hooks/use-project-progress.ts
+export interface ProjectProgressState {
+  status: string | null;
+  progressPercent: number | null;
+  progressDetail: string | null;
+  errorMessage: string | null;
+  connectionState: 'connecting' | 'open' | 'closed' | 'error' | 'reconnecting';
+}
+```
+
+### Environment Interface (30 vars)
+
+```typescript
+// src/lib/env/index.ts (inferred from Zod schema)
+type EnvData = {
+  // Database (Neon)
+  DATABASE_URL: string;              // postgresql://... (pooled)
+  DATABASE_URL_UNPOOLED: string;     // postgresql://... (direct, for migrations)
+  // Auth (Auth.js v5)
+  AUTH_SECRET: string;               // ≥32 chars, not known-weak
+  AUTH_URL: string;                  // https://your-app.com
+  GOOGLE_CLIENT_ID?: string;         // both required to enable Google OAuth
+  GOOGLE_CLIENT_SECRET?: string;
+  // AI Providers
+  OPENAI_API_KEY: string;            // starts with 'sk-'
+  REPLICATE_API_TOKEN: string;       // starts with 'r8_'
+  ELEVENLABS_API_KEY: string;
+  REPLICATE_SDXL_MODEL: string;      // owner/model:sha format (has default)
+  REPLICATE_SDXL_IPADAPTER_MODEL: string; // owner/model:sha (placeholder default — set to real IP-Adapter!)
+  // Stripe
+  STRIPE_SECRET_KEY: string;         // starts with 'sk_'
+  STRIPE_WEBHOOK_SECRET: string;     // starts with 'whsec_'
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: string; // starts with 'pk_'
+  // Cloudflare R2
+  R2_ACCOUNT_ID: string;
+  R2_ACCESS_KEY_ID: string;
+  R2_SECRET_ACCESS_KEY: string;
+  R2_BUCKET_UPLOADS: string;
+  R2_BUCKET_GENERATED: string;
+  R2_BUCKET_VIDEOS: string;
+  // Inngest
+  INNGEST_EVENT_KEY: string;
+  INNGEST_SIGNING_KEY: string;
+  // Email (Resend)
+  RESEND_API_KEY: string;            // starts with 're_'
+  // Rate Limiting (Upstash)
+  UPSTASH_REDIS_REST_URL: string;
+  UPSTASH_REDIS_REST_TOKEN: string;
+  // Monitoring (Sentry)
+  SENTRY_DSN: string;
+  // Image Moderation (optional, default depends on NODE_ENV)
+  IMAGE_MODERATION_FAIL_OPEN: 'true' | 'false'; // default 'false' in production, 'true' in dev/test
+  // FFmpeg (optional, default '/usr/bin/ffmpeg')
+  FFMPEG_PATH: string;
+  // App
+  NEXT_PUBLIC_APP_URL: string;       // https://your-app.com
+  NODE_ENV: 'development' | 'production' | 'test';
+};
+// Total: 30 env vars (27 required + 3 optional)
+```
+
 ### Database Schema Types (Drizzle-generated)
 
 The 11 tables + 8 enums are defined in `src/lib/db/schema/`:
@@ -1799,6 +2058,112 @@ subscription_status: 'active' | 'trialing' | 'past_due' | 'canceled' | ...
 usage_event_type: 'analysis' | 'character_generation' | 'scene_generation' |
   'voiceover' | 'subtitle_alignment' | 'video_assembly' |
   'moderation_check' | 'stripe_webhook'
+```
+
+---
+
+## Appendix A: ADRs (Architecture Decision Records)
+
+The engineering blueprint (`PRODUCTION_READINESS_PLAN.md`) defines 11 ADRs. The 7 most-referenced:
+
+| ADR | Decision | Rationale |
+|---|---|---|
+| **ADR-001** | 5-Layer Architecture with Golden Rule | Isolates business logic from Next.js runtime + DB; enables testing domain functions without mocking Next.js |
+| **ADR-002** | Hybrid Rendering (Static Marketing + Dynamic App) | Static prerendering gives marketing ≥95 Lighthouse; dynamic app routes need auth + DB |
+| **ADR-003** | Stripe "Basil" API Period-End Extraction | Pure helper `extractSubscriptionPeriodEnd()` handles the 2025-03-31 shape change (`items.data[0].current_period_end`) |
+| **ADR-004** | Build-Context Env Fallback for Zod Schema | `parseEnv()` returns placeholders when `NEXT_PHASE=phase-production-build` — allows CI build without secrets |
+| **ADR-005** | Click-Time R2 URL Signing (H4 Fix) | Replace `SignedDownloadWrapper` with API route; client fetches fresh URL on click |
+| **ADR-006** | System FFmpeg Binary (Not npm Installer) | `@ffmpeg-installer/ffmpeg` uses dynamic `require()` incompatible with Turbopack |
+| **ADR-011** | Image Moderation on Every AI-Generated Image | `moderateImage()` parses Replicate safety output; env-configurable fail-open policy |
+
+---
+
+## Appendix B: The 6-Step AI Pipeline (Credit Costs)
+
+| Step | Service | Domain File | Credits | Idempotency Key |
+|---|---|---|---|---|
+| 0 — Moderate story | OpenAI Moderation | `moderate-content.ts` | 0 (gate) | — |
+| 1 — Analyze story | OpenAI GPT-4o (JSON mode) | `analyze-story.ts` | 5 | `${projectId}:analysis` |
+| 2 — Generate characters | Replicate SDXL → R2 | `generate-character.ts` + `moderate-image.ts` | 10 each | `${projectId}:character:${name}` |
+| 3 — Generate scenes | Replicate SDXL + IP-Adapter → R2 | `generate-scene.ts` + `moderate-image.ts` | 8 each | `${projectId}:scene:${order}` |
+| 4 — Voiceover | ElevenLabs TTS → R2 | `synthesize-voice.ts` | 15 | `${projectId}:voiceover` |
+| 5 — Subtitles | Whisper ASR → SRT → R2 | `align-subtitles.ts` | 3 | `${projectId}:subtitle_alignment` |
+| 6 — Assemble video | FFmpeg → R2 | `assemble-video.ts` | 30 | `${projectId}:video_assembly` |
+
+**Total cost (3 chars + 6 scenes): 131 credits** (= `FULL_PIPELINE_COST`)
+
+---
+
+## Appendix C: Post-Audit-v1 Live-Site Validation (2026-06-29)
+
+This appendix documents the live-site behavioral testing methodology used to validate the audit-v1 remediation against the actual deployment at `https://storyintovideo.jesspete.shop/`. It serves as a template for future post-deploy validations.
+
+### Methodology: `agent-browser` E2E on Live Site
+
+Use the `agent_browser` CLI to drive a headless Chromium against the live URL. This catches operational misconfigurations that unit tests (which run against the source code) cannot detect.
+
+```bash
+# 1. Health check (DB + FFmpeg)
+curl -s https://storyintovideo.jesspete.shop/api/health | jq .status
+# Expected: "healthy"
+
+# 2. Verify auth redirect target host matches the request host
+curl -sI https://storyintovideo.jesspete.shop/dashboard
+# Expected: HTTP/2 307 Location: https://storyintovideo.jesspete.shop/sign-in?callbackUrl=...
+# Forbidden: Location: http://localhost:3000/sign-in
+
+# 3. Test known routes exist
+for route in / /sign-in /sign-up /privacy /terms /pricing /blog /contact; do
+  curl -s -o /dev/null -w "%{http_code}" "https://storyintovideo.jesspete.shop${route}"
+done
+# Expected: all 200
+
+# 4. Test unknown route returns 404
+curl -s -o /dev/null -w "%{http_code}" https://storyintovideo.jesspete.shop/nonexistent
+# Expected: 404
+```
+
+### Validated Findings (2026-06-29)
+
+| Test | Expected | Actual | Status |
+|---|---|---|---|
+| `GET /` marketing page | 10 sections render | All 10 sections render, H1 has 3-line `<br>` stack with `style="font-weight:820"` | ✅ |
+| `GET /api/health` | 200 JSON `{status:'healthy', services:{database, ffmpeg}}` (H9) | `{"status":"healthy",...}` | ✅ H9 fix deployed |
+| `GET /dashboard` (unauth) | 307 redirect to `/sign-in` on canonical HTTPS host | **307 redirect to `http://localhost:3000/sign-in`** → `ERR_CONNECTION_REFUSED` | 🔴 Operational misconfig |
+| `GET /pricing`, `/blog`, `/contact` | 200 with proper metadata | Returns 200 with correct metadata | ✅ T6 fix deployed |
+| `GET /nonexistent` | 404 with custom `not-found.tsx` | Returns 404 with custom page | ✅ T7 fix deployed |
+
+### Root-Cause Diagnosis: The `/dashboard` Failure
+
+The proxy at `src/proxy.ts:71` correctly uses `new URL('/sign-in', env.NEXT_PUBLIC_APP_URL)` — the issue is that `NEXT_PUBLIC_APP_URL` was set to `http://localhost:3000` instead of `https://storyintovideo.jesspete.shop`. The code was right; the env vars were wrong. This is why T1 throws at boot in production — `console.warn` lets this bug survive into production.
+
+### Post-Deploy Smoke Test (add to CI/CD runbook)
+
+After every deploy, run this 30-second smoke test:
+
+```bash
+#!/bin/bash
+set -e
+
+HOST="https://storyintovideo.jesspete.shop"
+REDIRECT=$(curl -sI "$HOST/dashboard" | grep -i location | tr -d '\r')
+
+# 1. Verify auth redirect stays on same host
+if echo "$REDIRECT" | grep -q "localhost"; then
+  echo "FAIL: Redirects to localhost — env NEXT_PUBLIC_APP_URL is wrong"
+  exit 1
+fi
+
+# 2. Verify /api/health (H9)
+curl -s "$HOST/api/health" | jq '.status == "healthy" and .config.healthy' | grep true
+
+# 3. Verify known routes return 200
+for path in / /pricing /blog /contact /privacy /terms; do
+  code=$(curl -s -o /dev/null -w "%{http_code}" "$HOST$path")
+  [[ "$code" == "200" ]] || { echo "FAIL: $path returned $code"; exit 1; }
+done
+
+echo "Smoke test passed"
 ```
 
 ---
