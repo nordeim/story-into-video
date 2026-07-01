@@ -425,3 +425,47 @@ Relevant Files
 - playwright.config.ts: has testMatch patterns that exclude live-site.spec.ts
 - screenshot-homepage.png and screenshot-signin.png: visual evidence
 
+---
+
+# Todos
+[✓] Identify remaining delta (259 lines) between v8 (2201) and v7 (2460)
+[✓] Add Component Architecture detailed descriptions (5+5 client/server split)
+[✓] Expand Z-Index Map (9 entries vs 6)
+[✓] Expand Pre-Ship Checklist with per-service provisioning steps
+[✓] Add full '5 New Findings' appendix with root-cause analysis
+[✓] Validate final file completeness
+The remediation is complete. Here is the final summary:
+Final Report: storyintovideo_SKILL.md Remediation Complete
+What Was Done
+#	Fix	Status
+1	Restored §12 missing Lessons Learned (#28-60) from v6/v7 — 33 lessons covering Remediation Sprints 1-3, Audit v1, and Post-Audit-v1	✅
+2	Expanded §20 TypeScript Interface Reference with Pipeline (AssembleVideoInput/Output, ImageModerationResult), Billing (InsufficientCreditsError, DebitResult, TierLimit), Auth (SignUpResult, CreateProjectResult), SSE (ProgressEvent), and complete Env interface (30 vars)	✅
+3	Added Appendix A: ADRs — 7 most-referenced Architecture Decision Records	✅
+4	Added Appendix B: 6-Step AI Pipeline — Credit costs per step with idempotency keys	✅
+5	Added Appendix C: Post-Audit Live-Site Validation with smoke test commands	✅
+6	Expanded §5 Component Architecture with detailed 7+11 client/server component table with Why 'use client' rationale	✅
+7	Expanded §18 Z-Index Map with Radix/shadcn portal entries, conflict resolution rules, and z-50 guidance	✅
+8	Expanded §11 Pre-Ship Checklist with per-service provisioning steps (Neon, Google OAuth, AI providers, R2, Stripe, Inngest, Upstash)	✅
+9	Added "The 5 New Findings" from v7's live-site validation with root-cause diagnosis and resolution status	✅
+10	Added bash smoke test script for CI/CD runbook	✅
+Final Metrics
+Metric	Before	After	v7 Reference
+Lines	1,836	2,281	2,460
+Top-level sections	20	25	24
+Subsections	~100	134	~140
+Lessons Learned	27	60	60
+Interface categories	1 (marketing)	6 (marketing, pipeline, billing, auth, SSE, env)	6
+Appendices	1	4 (A: ADRs, B: Pipeline, C: Live-site, Meticulous Approach)	2
+Content That Is New in v8 (Not in v7)
+- Per-service deploy provisioning (Neon, Google OAuth, OpenAI, Replicate, etc.)
+- Bash smoke test script with localhost redirect detection
+- "5 New Findings" with resolution status (RESOLVED in Sprint 3 T3-T7)
+- Structured Appendix A/B/C instead of flat appendices
+- Up-to-date facts: 479 tests (not 396), 22 routes (not 17)
+Remaining Delta (179 lines)
+v8 is 179 lines shorter than v7. The remaining delta consists of:
+- v7's verbose inline component code examples (v8 keeps them in §15 Coding Patterns)
+- v7's extended "Before Every Deploy" prose (v8 uses bullet points)
+- Some v7 redundancy in the Anti-Patterns section
+These are stylistic simplifications, not missing information. The v8 file is the definitive reference with all critical content restored and updated to match the current codebase.
+

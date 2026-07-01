@@ -406,20 +406,52 @@ Layer 4: src/lib/                 — Infrastructure: Drizzle, Auth.js, Inngest,
 ### Server vs Client Component Decision Tree
 
 ```
-Does the component use useState, useEffect, event handlers, or browser APIs?
-  YES → 'use client' at the top of the file
-  NO  → Server Component (default, no directive needed)
+Does the component need:
+├── Browser APIs (window, document, localStorage)?
+│   └── YES → 'use client'
+├── React state (useState, useEffect, useRef)?
+│   └── YES → 'use client'
+├── Event handlers (onClick, onChange)?
+│   └── YES → 'use client'
+├── Browser-only hooks (useScrolled, useReveal, useReducedMotion, useProjectProgress)?
+│   └── YES → 'use client'
+└── None of the above?
+    └── Server Component (default — static HTML, better SEO, no JS bundle)
 ```
 
-**Client components in this codebase:**
-- Marketing: Navbar, Hero, Examples, Faq, Workflow, ScrollReveal
-- App: AuthForm, CreateWizard, Providers, ProjectProgressPanel, ProjectDownloadButton, ProjectShareButton, CookieBanner
+**Client components in this codebase (7 app + 6 marketing):**
 
-**Server components (default):**
-- Marketing: Features, Testimonials, UseCases, FinalCTA, Footer
-- App: Dashboard, Create page, Project detail page, Billing page
-- Legal: Privacy, Terms, Pricing, Blog, Contact
-- `not-found.tsx`
+| Component | Location | Why `'use client'` |
+|---|---|---|
+| **AuthForm** | `components/app/auth-form.tsx` | `useState` for form mode toggle, `signIn()` from next-auth |
+| **CreateWizard** | `app/(app)/create/page.tsx` | `useState` for form state, story textarea |
+| **Providers** | `components/app/providers.tsx` | React Context + `SessionProvider` from next-auth |
+| **ProjectProgressPanel** | `components/app/project-progress-panel.tsx` | `useProjectProgress` SSE hook |
+| **ProjectDownloadButton** | `components/app/project-download-button.tsx` | Click-time fetch to `/api/projects/[id]/download` |
+| **ProjectShareButton** | `components/app/project-share-button.tsx` | Web Share API + clipboard |
+| **CookieBanner** | `components/app/cookie-banner.tsx` | `useSyncExternalStore` for localStorage (T8) |
+| **Navbar** | `components/sections/navbar.tsx` | `useScrolled` + mobile Sheet toggle |
+| **Hero** | `components/sections/hero.tsx` | `useState` for story text, style chips, ratio toggles |
+| **Examples** | `components/sections/examples.tsx` | Carousel scroll controls |
+| **Faq** | `components/sections/faq.tsx` | Radix Accordion (client interactivity) |
+| **Workflow** | `components/sections/workflow.tsx` | `useState` for video loading choreography |
+| **ScrollReveal** | `components/primitives/scroll-reveal.tsx` | `useReveal` + `IntersectionObserver` |
+
+**Server components (default, no `'use client'` needed):**
+
+| Component | Location | Notes |
+|---|---|---|
+| **Features** | `components/sections/features.tsx` | Static 4×2 grid, no interactivity |
+| **Testimonials** | `components/sections/testimonials.tsx` | Static 3×2 grid |
+| **UseCases** | `components/sections/use-cases.tsx` | Static 2×2 grid with links |
+| **FinalCTA** | `components/sections/final-cta.tsx` | Static CTA section |
+| **Footer** | `components/sections/footer.tsx` | Static links grid |
+| **Dashboard** | `app/(app)/dashboard/page.tsx` | Suspense + async data fetch |
+| **Create page** | `app/(app)/create/page.tsx` | Server wrapper around CreateWizard |
+| **Project detail** | `app/(app)/projects/[id]/page.tsx` | LEFT JOINs videos for download button |
+| **Billing** | `app/(app)/billing/page.tsx` | 4-tier plan table |
+| **Legal pages** | `app/(legal)/` | Privacy, Terms, Pricing, Blog, Contact |
+| **`not-found.tsx`** | `app/not-found.tsx` | Custom 404 (T7) |
 
 ### The `queries.ts` Boundary
 
@@ -1087,12 +1119,16 @@ All four must pass with zero warnings/errors. **husky + lint-staged** automatica
 
 ### Before Every Deploy
 
-1. **Provision external services** — Neon, Google OAuth, OpenAI, Replicate, ElevenLabs, R2 (3 buckets), Stripe, Inngest, Resend, Upstash, Sentry
-2. **Run migrations** — `pnpm drizzle:generate && pnpm drizzle:migrate` against real Neon
-3. **Set `AUTH_URL` AND `NEXT_PUBLIC_APP_URL`** to the same production URL (T1 throws if they differ)
-4. **Set `REPLICATE_SDXL_IPADAPTER_MODEL`** to a real `lucataco/sdxl-ipadapter:<sha>` hash
-5. **Run `pnpm install`** to activate husky
-6. **Post-deploy smoke test:**
+1. **Database (Neon)** — Create DB, get `DATABASE_URL` (pooled) + `DATABASE_URL_UNPOOLED` (direct), run `pnpm drizzle:generate && pnpm drizzle:migrate`
+2. **Auth (Google OAuth)** — Create OAuth 2.0 credentials in Google Cloud Console → get `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`
+3. **AI Providers** — OpenAI (`OPENAI_API_KEY`), Replicate (`REPLICATE_API_TOKEN` + set `REPLICATE_SDXL_IPADAPTER_MODEL` to a real `lucataco/sdxl-ipadapter:<sha>` hash), ElevenLabs (`ELEVENLABS_API_KEY`)
+4. **Cloudflare R2** — Create 3 private buckets (`R2_BUCKET_UPLOADS`, `R2_BUCKET_GENERATED`, `R2_BUCKET_VIDEOS`), get API credentials
+5. **Stripe** — Create products, get `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+6. **Inngest** — Create project, get `INNGEST_EVENT_KEY` + `INNGEST_SIGNING_KEY`
+7. **Upstash** — Create Redis DB, get `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`
+8. **Set `AUTH_URL` AND `NEXT_PUBLIC_APP_URL`** to the same production URL (T1 throws if they differ — set to `https://your-app.com`)
+9. **Run `pnpm install`** to activate husky pre-commit hook
+10. **Post-deploy smoke test:**
    - `GET /api/health` → assert HTTP 200 + `status === 'healthy'` + `config.healthy === true` + empty `configErrors`
    - `GET /dashboard` (unauthenticated) → expect 307 redirect to `/sign-in` on the SAME host (NOT `localhost:3000`)
    - `GET /pricing`, `/blog`, `/contact` → expect 200 with proper metadata
@@ -1585,6 +1621,36 @@ className="mx-auto max-w-7xl"
 | `z-10` | Hero content (above video bg) | `src/components/sections/hero.tsx` |
 | `z-0` | Hero background video | `src/components/sections/hero.tsx` |
 | `-z-10` | Examples hover glow | `src/components/sections/examples.tsx` |
+
+### Radix / shadcn Portal Z-Index
+
+Radix primitives (used by our hand-written shadcn components) create their own stacking context via portals. They render outside the normal DOM tree, so their z-index is relative to the document root, not the parent component.
+
+| Component | Default Z-Index | Notes |
+|---|---|---|
+| `Sheet` (mobile nav) | `z-50` | Radix `Dialog` primitive — full-screen overlay |
+| `DropdownMenu` (language switcher) | `z-50` | Radix `DropdownMenu` — sits above all content |
+| `Accordion` (FAQ) | — | No explicit z-index — stays in document flow |
+| `Dialog` (if used) | `z-50` | Full-screen overlay |
+| `Popover` (if used) | `z-50` | Floating layer above content |
+
+**Rule of thumb:** Never use `z-index` above `50` in component code. The `z-50` tier is reserved for: (1) fixed navigation, (2) skip-to-content, (3) Radix portalled overlays. Everything else should be `z-40` or below.
+
+### Z-Index Conflict Resolution
+
+If you need a new overlay component (e.g., a custom modal):
+
+```typescript
+// ❌ BAD — arbitrary z-index, will clash
+<div className="z-[9999]">
+
+// ✅ GOOD — use the established hierarchy
+<div className="z-40">        {/* below z-50 overlays */}
+  {/* content */}
+</div>
+```
+
+For custom modals that need to appear above shadcn components, wrap with Radix `Dialog` (which handles the portal + z-50 automatically) rather than hand-rolling a z-index solution.
 
 ### Radix Portal Z-Index
 
@@ -2136,6 +2202,20 @@ curl -s -o /dev/null -w "%{http_code}" https://storyintovideo.jesspete.shop/none
 ### Root-Cause Diagnosis: The `/dashboard` Failure
 
 The proxy at `src/proxy.ts:71` correctly uses `new URL('/sign-in', env.NEXT_PUBLIC_APP_URL)` — the issue is that `NEXT_PUBLIC_APP_URL` was set to `http://localhost:3000` instead of `https://storyintovideo.jesspete.shop`. The code was right; the env vars were wrong. This is why T1 throws at boot in production — `console.warn` lets this bug survive into production.
+
+### The 5 New Findings (from Post-Audit-v1 Live-Site Validation, 2026-06-29)
+
+These findings emerged from hitting the **live deployment** with `agent-browser` — they are operational/behavioral issues that unit tests (which run against source code) cannot detect:
+
+1. **Privacy Policy publicly promises unimplemented GDPR endpoints** (Critical) — §4 Data Retention + §6 Your Rights promise `DELETE /api/user` + `GET /api/user/export` that didn't exist at the time. **Status: RESOLVED in Sprint 3 T3+T4.**
+
+2. **Production env var misconfiguration goes silently undetected** (Critical) — `console.warn` at module load is insufficient for production env misconfigs. The `NEXT_PUBLIC_APP_URL=localhost:3000` bug caused all auth redirects to fail with `ERR_CONNECTION_REFUSED`. Lesson: production misconfigurations should fail fast (throw at module load) OR be surfaced via `/api/health`. **Status: T1 now THROWS in production runtime; T2 surfaces via `/api/health` config object.**
+
+3. **Navbar + dashboard + hero use raw `<a href>` instead of `next/link`** (High) — 9 places across 3 files violated the "never use `<a>` for internal routes" rule, causing full-page reloads and Lighthouse regressions. **Status: RESOLVED in Sprint 3 T5 — all 9 files converted to `<Link>`.**
+
+4. **No custom `not-found.tsx` page** (High) — Next.js default 404 inherits root layout metadata, causing unknown URLs to return 200 OK with the marketing page title. Bad for SEO, hides broken links from operators. **Status: RESOLVED in Sprint 3 T7 — custom `src/app/not-found.tsx` shipped.**
+
+5. **`/pricing`, `/blog`, `/contact` routes didn't exist** (Medium) — linked from nav/footer but no route handlers; without `not-found.tsx` they returned 200 OK with the marketing title, hiding the problem from operators + SEO crawlers. **Status: RESOLVED in Sprint 3 T6 — all three implemented as Server Components in `src/app/(legal)/`.`**
 
 ### Post-Deploy Smoke Test (add to CI/CD runbook)
 
