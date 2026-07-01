@@ -57,13 +57,13 @@ export function Navbar() {
         {/* Desktop nav links */}
         <div className="hidden items-center gap-1 sm:flex">
           {NAV_LINKS.map((link) => (
-            <a
+            <Link
               key={link.href}
               href={link.href}
               className="focus-visible:outline-primary rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-all duration-200 hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
             >
               {link.label}
-            </a>
+            </Link>
           ))}
         </div>
 
@@ -97,20 +97,20 @@ export function Navbar() {
           </DropdownMenu>
 
           {/* Sign in (desktop only) */}
-          <a
+          <Link
             href="/sign-in"
             className="focus-visible:outline-primary hidden rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 sm:inline"
           >
             Sign in
-          </a>
+          </Link>
 
           {/* Get Started (desktop) */}
-          <a
+          <Link
             href="/sign-up"
             className="focus-visible:outline-primary hidden rounded-full px-5 py-2 text-base font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 sm:inline"
           >
             Get Started
-          </a>
+          </Link>
 
           {/* Mobile hamburger */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -143,30 +143,30 @@ export function Navbar() {
               </SheetHeader>
               <nav className="flex flex-col gap-2">
                 {NAV_LINKS.map((link) => (
-                  <a
+                  <Link
                     key={link.href}
                     href={link.href}
                     onClick={() => setMobileOpen(false)}
                     className="focus-visible:outline-primary rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
                   >
                     {link.label}
-                  </a>
+                  </Link>
                 ))}
                 <hr className="my-2 border-white/10" />
-                <a
+                <Link
                   href="/sign-in"
                   onClick={() => setMobileOpen(false)}
                   className="focus-visible:outline-primary rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
                   Sign in
-                </a>
-                <a
+                </Link>
+                <Link
                   href="/sign-up"
                   onClick={() => setMobileOpen(false)}
                   className="text-primary hover:bg-primary/10 hover:text-primary focus-visible:outline-primary rounded-lg px-3 py-2 text-base font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
                   Get Started
-                </a>
+                </Link>
               </nav>
             </SheetContent>
           </Sheet>

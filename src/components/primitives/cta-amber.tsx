@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -21,7 +22,7 @@ interface CtaAmberProps {
  */
 export function CtaAmber({ children, href, className, onClick }: CtaAmberProps) {
   return (
-    <a
+    <Link
       href={href}
       onClick={onClick}
       className={cn(
@@ -35,6 +36,6 @@ export function CtaAmber({ children, href, className, onClick }: CtaAmberProps) 
         className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
         aria-hidden="true"
       />
-    </a>
+    </Link>
   );
 }

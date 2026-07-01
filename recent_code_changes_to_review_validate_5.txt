@@ -1,0 +1,998 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 6f97fa1..d34e7e5 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -7,9 +7,9 @@
+ #   4. Unit tests (vitest run — see vitest.config.ts for include paths)
+ #   5. Build (next build — exercises the build-context env fallback)
+ #
+-# E2E tests (Playwright) are NOT run in CI yet — they require a live dev
+-# server + Playwright browser binaries + seeded DB. Add a separate job
+-# once a CI Postgres service is wired up.
++# T9 (status_11.md): Added a separate `e2e` job that runs Playwright E2E tests
++# against a live dev server + seeded Postgres. Uses `continue-on-error: true`
++# initially so E2E flakiness doesn't block PRs — flip to required once stable.
+ #
+ # Caching: pnpm store cache keyed on pnpm-lock.yaml hash. Node version
+ # pinned to 20 (matches the engines field in package.json).
+@@ -69,3 +69,111 @@ jobs:
+           # secrets are needed for the build step.
+           NEXT_PHASE: phase-production-build
+           NODE_ENV: production
++
++  # T9: Playwright E2E tests against a live dev server + seeded Postgres.
++  # Runs only after the quality-gate job passes (needs: quality-gate) to
++  # avoid wasting CI minutes on E2E when lint/typecheck/test/build already
++  # failed. continue-on-error: true so flakiness doesn't block PRs while
++  # we shake out the CI environment.
++  e2e:
++    name: Playwright E2E (Chromium)
++    needs: quality-gate
++    runs-on: ubuntu-latest
++    timeout-minutes: 20
++    continue-on-error: true
++
++    # Postgres service container — the app + seed script need a real DB.
++    # The health check waits for Postgres to accept connections before
++    # the dev server + Playwright start.
++    services:
++      postgres:
++        image: postgres:17-alpine
++        env:
++          POSTGRES_USER: postgres
++          POSTGRES_PASSWORD: postgres
++          POSTGRES_DB: storyintovideo_test
++        ports:
++          - 5432:5432
++        options: >-
++          --health-cmd "pg_isready -U postgres -d storyintovideo_test"
++          --health-interval 10s
++          --health-timeout 5s
++          --health-retries 5
++
++    env:
++      # Wire the service container as the test DB. Both pooled + unpooled
++      # point at the same container — CI doesn't need Neon's -pooler distinction.
++      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/storyintovideo_test
++      DATABASE_URL_UNPOOLED: postgresql://postgres:postgres@localhost:5432/storyintovideo_test
++      # Minimal env for the dev server to boot. The env module's build-context
++      # fallback handles missing values during `next build`, but `next dev`
++      # requires real values for the app routes to function.
++      AUTH_SECRET: ci-dummy-secret-key-for-e2e-tests-only-32ch!!
++      AUTH_URL: http://localhost:3000
++      NEXT_PUBLIC_APP_URL: http://localhost:3000
++      OPENAI_API_KEY: sk-ci-dummy
++      REPLICATE_API_TOKEN: r8_ci-dummy
++      ELEVENLABS_API_KEY: ci-dummy
++      STRIPE_SECRET_KEY: sk_ci-dummy
++      STRIPE_WEBHOOK_SECRET: whsec_ci-dummy
++      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_ci-dummy
++      R2_ACCOUNT_ID: ci-dummy
++      R2_ACCESS_KEY_ID: ci-dummy
++      R2_SECRET_ACCESS_KEY: ci-dummy
++      R2_BUCKET_UPLOADS: siv-uploads-test
++      R2_BUCKET_GENERATED: siv-generated-test
++      R2_BUCKET_VIDEOS: siv-videos-test
++      INNGEST_EVENT_KEY: ci-dummy
++      INNGEST_SIGNING_KEY: ci-dummy
++      RESEND_API_KEY: re_ci-dummy
++      UPSTASH_REDIS_REST_URL: https://example.upstash.io
++      UPSTASH_REDIS_REST_TOKEN: ci-dummy
++      SENTRY_DSN: https://example@sentry.io/1
++      FFMPEG_PATH: /usr/bin/ffmpeg
++      NODE_ENV: development
++
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v4
++
++      - name: Install pnpm
++        uses: pnpm/action-setup@v4
++        with:
++          version: "10.26.0"
++
++      - name: Setup Node.js
++        uses: actions/setup-node@v4
++        with:
++          node-version: 20
++          cache: pnpm
++
++      - name: Install dependencies
++        run: pnpm install --frozen-lockfile
++
++      - name: Install FFmpeg (for video assembly tests)
++        run: sudo apt-get update && sudo apt-get install -y ffmpeg
++
++      - name: Apply database migrations
++        run: pnpm drizzle:migrate
++        env:
++          # drizzle-kit reads .env.local by default via dotenv-cli; we override
++          # with the CI env vars above. The DATABASE_URL_UNPOOLED is what
++          # drizzle-kit uses for DDL (pooled connections + DDL is unreliable).
++          DATABASE_URL_UNPOOLED: postgresql://postgres:postgres@localhost:5432/storyintovideo_test
++
++      - name: Seed database
++        run: pnpm db:seed
++
++      - name: Install Playwright browsers
++        run: pnpm exec playwright install --with-deps chromium
++
++      - name: Run Playwright E2E tests
++        run: pnpm test:e2e
++
++      - name: Upload Playwright report
++        if: ${{ !cancelled() }}
++        uses: actions/upload-artifact@v4
++        with:
++          name: playwright-report
++          path: playwright-report/
++          retention-days: 7
+diff --git a/src/app/(app)/dashboard/page.tsx b/src/app/(app)/dashboard/page.tsx
+index af39c19..8820722 100644
+--- a/src/app/(app)/dashboard/page.tsx
++++ b/src/app/(app)/dashboard/page.tsx
+@@ -1,4 +1,5 @@
+ import { Suspense } from 'react';
++import Link from 'next/link';
+ import { Film } from 'lucide-react';
+ 
+ import { EmptyState } from '@/components/app/empty-state';
+@@ -61,7 +62,7 @@ async function ProjectList() {
+   return (
+     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+       {userProjects.map((project) => (
+-        <a
++        <Link
+           key={project.id}
+           href={`/projects/${project.id}`}
+           className="group hover:border-primary/20 focus-visible:outline-primary rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2"
+@@ -75,7 +76,7 @@ async function ProjectList() {
+           <p className="mt-4 text-xs text-zinc-500">
+             Status: <span className="text-zinc-400">{project.status}</span>
+           </p>
+-        </a>
++        </Link>
+       ))}
+     </div>
+   );
+@@ -92,12 +93,12 @@ export default function DashboardPage() {
+             </h1>
+             <p className="mt-2 text-sm text-zinc-400">Manage your story-into-video projects.</p>
+           </div>
+-          <a
++          <Link
+             href="/create"
+             className="bg-primary hover:bg-primary focus-visible:outline-primary inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold text-zinc-950 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+           >
+             New Project
+-          </a>
++          </Link>
+         </div>
+         <Suspense fallback={<DashboardSkeleton />}>
+           <ProjectList />
+diff --git a/src/app/api/health/route.ts b/src/app/api/health/route.ts
+index d652cbd..7aa5be6 100644
+--- a/src/app/api/health/route.ts
++++ b/src/app/api/health/route.ts
+@@ -6,20 +6,25 @@ import { db } from '@/lib/db';
+ import { env } from '@/lib/env';
+ 
+ /**
+- * Health check endpoint — H9 fix.
++ * Health check endpoint — H9 fix + T2 env sanity check (status_11.md).
+  *
+  * The previous implementation returned { status: 'ok' } unconditionally,
+  * which hid real failures from Docker HEALTHCHECK, Kubernetes liveness probes,
+  * and Vercel monitoring.
+  *
+- * This robust version checks:
+- *   1. Postgres connectivity via SELECT 1
+- *   2. FFmpeg binary accessibility via fs.accessSync (F_OK | X_OK)
++ * H9 fix: checks DB (SELECT 1) + FFmpeg (fs.accessSync) and returns 503 when
++ * either fails.
+  *
+- * Returns 200 + { status: 'healthy', services: { database, ffmpeg } } when
+- * both pass, or 503 + { status: 'unhealthy', errors: [...] } when either
+- * fails. The errors array is populated with human-readable messages for
+- * debugging.
++ * T2 fix (status_11.md): on the live storyintovideo.jesspete.shop deployment,
++ * /api/health was returning {status:'healthy', services:{database:'healthy',
++ * ffmpeg:'healthy'}} even though NEXT_PUBLIC_APP_URL was misconfigured to
++ * http://localhost:3000 — breaking 100% of auth-protected routes. Operators
++ * monitoring the health probe had NO visibility into the env misconfiguration.
++ * T2 adds a read-only env sanity check that compares AUTH_URL host vs
++ * NEXT_PUBLIC_APP_URL host at request time and surfaces the result in the JSON
++ * response under `config`. Importantly, an env mismatch does NOT cause 503 —
++ * DB+FFmpeg being healthy means the container is alive, just misconfigured.
++ * Monitoring can detect the `config.healthy: false` flag separately.
+  *
+  * This route must run on Node.js (not Edge) — it uses fs.accessSync which
+  * is a Node.js API. The default runtime for API routes in Next.js 16 is
+@@ -28,6 +33,19 @@ import { env } from '@/lib/env';
+ 
+ export const dynamic = 'force-dynamic';
+ 
++/**
++ * Extract the host portion of a URL string. Returns null for invalid URLs.
++ * Mirrors the helper in src/lib/env/index.ts (kept local to avoid exporting
++ * an internal helper from the env module).
++ */
++function extractHost(url: string): string | null {
++  try {
++    return new URL(url).host;
++  } catch {
++    return null;
++  }
++}
++
+ export async function GET() {
+   let dbHealthy = false;
+   let ffmpegHealthy = false;
+@@ -52,6 +70,28 @@ export async function GET() {
+     errors.push(`FFmpeg check failed: ${message}`);
+   }
+ 
++  // 3. T2: env sanity check — surface AUTH_URL ↔ NEXT_PUBLIC_APP_URL host
++  //    mismatches in the JSON response. Read-only (never throws) — by the
++  //    time this route is reachable, the env module has already loaded
++  //    successfully. In production with T1 deployed, a host mismatch would
++  //    have already failed-fast at boot, so this check is most useful in
++  //    dev/test contexts where T1 only warns. It's also a defense-in-depth:
++  //    if a future operator disables T1's fail-fast, /api/health still
++  //    surfaces the misconfiguration to monitoring.
++  const configErrors: string[] = [];
++  const authHost = extractHost(env.AUTH_URL);
++  const appHost = extractHost(env.NEXT_PUBLIC_APP_URL);
++  if (authHost && appHost && authHost !== appHost) {
++    configErrors.push(
++      `AUTH_URL host ("${authHost}") differs from NEXT_PUBLIC_APP_URL host ("${appHost}") — ` +
++        `auth-protected routes will redirect to the wrong host.`,
++    );
++  }
++  const configHealthy = configErrors.length === 0;
++
++  // overallHealthy depends ONLY on DB + FFmpeg — an env mismatch is a
++  // configuration issue, not a liveness issue. Returning 503 for a config
++  // error would cause Docker/K8s to restart a perfectly alive container.
+   const overallHealthy = dbHealthy && ffmpegHealthy;
+ 
+   return NextResponse.json(
+@@ -63,6 +103,12 @@ export async function GET() {
+         ffmpeg: ffmpegHealthy ? 'healthy' : 'unhealthy',
+       },
+       errors: errors.length > 0 ? errors : undefined,
++      config: {
++        healthy: configHealthy,
++        authUrl: env.AUTH_URL,
++        appUrl: env.NEXT_PUBLIC_APP_URL,
++      },
++      configErrors: configErrors.length > 0 ? configErrors : undefined,
+     },
+     {
+       status: overallHealthy ? 200 : 503,
+diff --git a/src/app/layout.tsx b/src/app/layout.tsx
+index fba1fa5..6416ee3 100644
+--- a/src/app/layout.tsx
++++ b/src/app/layout.tsx
+@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
+ import { env } from '@/lib/env';
+ import { fontVariables } from '@/lib/fonts';
+ import { Providers } from '@/components/app/providers';
++import { CookieBanner } from '@/components/app/cookie-banner';
+ import './globals.css';
+ 
+ export const metadata: Metadata = {
+@@ -72,6 +73,7 @@ export default function RootLayout({
+           Skip to content
+         </a>
+         <Providers>{children}</Providers>
++        <CookieBanner />
+         <script
+           type="application/ld+json"
+           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+diff --git a/src/components/primitives/cta-amber.tsx b/src/components/primitives/cta-amber.tsx
+index a733be4..4997c22 100644
+--- a/src/components/primitives/cta-amber.tsx
++++ b/src/components/primitives/cta-amber.tsx
+@@ -1,3 +1,4 @@
++import Link from 'next/link';
+ import { ArrowRight } from 'lucide-react';
+ 
+ import { cn } from '@/lib/utils';
+@@ -21,7 +22,7 @@ interface CtaAmberProps {
+  */
+ export function CtaAmber({ children, href, className, onClick }: CtaAmberProps) {
+   return (
+-    <a
++    <Link
+       href={href}
+       onClick={onClick}
+       className={cn(
+@@ -35,6 +36,6 @@ export function CtaAmber({ children, href, className, onClick }: CtaAmberProps)
+         className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
+         aria-hidden="true"
+       />
+-    </a>
++    </Link>
+   );
+ }
+diff --git a/src/components/primitives/cta-ghost.tsx b/src/components/primitives/cta-ghost.tsx
+index c6859f1..fc999c4 100644
+--- a/src/components/primitives/cta-ghost.tsx
++++ b/src/components/primitives/cta-ghost.tsx
+@@ -1,3 +1,4 @@
++import Link from 'next/link';
+ import { ArrowRight } from 'lucide-react';
+ 
+ import { cn } from '@/lib/utils';
+@@ -17,7 +18,7 @@ interface CtaGhostProps {
+  */
+ export function CtaGhost({ children, href, className }: CtaGhostProps) {
+   return (
+-    <a
++    <Link
+       href={href}
+       className={cn(
+         'group inline-flex items-center gap-2',
+@@ -32,6 +33,6 @@ export function CtaGhost({ children, href, className }: CtaGhostProps) {
+         className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
+         aria-hidden="true"
+       />
+-    </a>
++    </Link>
+   );
+ }
+diff --git a/src/components/primitives/cta-gradient.tsx b/src/components/primitives/cta-gradient.tsx
+index f57a8d9..0856b72 100644
+--- a/src/components/primitives/cta-gradient.tsx
++++ b/src/components/primitives/cta-gradient.tsx
+@@ -1,3 +1,5 @@
++import Link from 'next/link';
++
+ import { cn } from '@/lib/utils';
+ 
+ interface CtaGradientProps {
+@@ -16,7 +18,7 @@ interface CtaGradientProps {
+  */
+ export function CtaGradient({ children, href, className }: CtaGradientProps) {
+   return (
+-    <a
++    <Link
+       href={href}
+       className={cn(
+         'group inline-flex items-center gap-2.5 rounded-full px-10 py-4',
+@@ -28,6 +30,6 @@ export function CtaGradient({ children, href, className }: CtaGradientProps) {
+       )}
+     >
+       {children}
+-    </a>
++    </Link>
+   );
+ }
+diff --git a/src/components/sections/examples.tsx b/src/components/sections/examples.tsx
+index 4212bb9..54a5c7d 100644
+--- a/src/components/sections/examples.tsx
++++ b/src/components/sections/examples.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useRef } from 'react';
++import Link from 'next/link';
+ import Image from 'next/image';
+ import { ChevronLeft, ChevronRight } from 'lucide-react';
+ 
+@@ -88,7 +89,7 @@ export function Examples() {
+                 />
+ 
+                 {/* Card body */}
+-                <a
++                <Link
+                   href={card.href}
+                   className="bg-card focus-visible:outline-primary relative block aspect-[9/16] overflow-hidden rounded-[20px] border border-white/5 transition-colors group-hover:border-white/10 focus-visible:outline-2 focus-visible:outline-offset-2"
+                 >
+@@ -110,7 +111,7 @@ export function Examples() {
+                     <h3 className="mb-1 text-lg leading-7 font-bold text-white">{card.title}</h3>
+                     <p className="text-xs text-zinc-400">{card.styleTag}</p>
+                   </div>
+-                </a>
++                </Link>
+               </article>
+             ))}
+           </div>
+diff --git a/src/components/sections/footer.tsx b/src/components/sections/footer.tsx
+index 3b4ec98..691dcde 100644
+--- a/src/components/sections/footer.tsx
++++ b/src/components/sections/footer.tsx
+@@ -36,16 +36,27 @@ export function Footer() {
+                 {col.title}
+               </h3>
+               <ul>
+-                {col.links.map((link) => (
+-                  <li key={link.label}>
+-                    <a
+-                      href={link.href}
+-                      className="focus-visible:outline-primary block py-1.5 text-sm text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
+-                    >
+-                      {link.label}
+-                    </a>
+-                  </li>
+-                ))}
++                {col.links.map((link) =>
++                  link.href.startsWith('/') ? (
++                    <li key={link.label}>
++                      <Link
++                        href={link.href}
++                        className="focus-visible:outline-primary block py-1.5 text-sm text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
++                      >
++                        {link.label}
++                      </Link>
++                    </li>
++                  ) : (
++                    <li key={link.label}>
++                      <a
++                        href={link.href}
++                        className="focus-visible:outline-primary block py-1.5 text-sm text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
++                      >
++                        {link.label}
++                      </a>
++                    </li>
++                  ),
++                )}
+               </ul>
+             </div>
+           ))}
+@@ -55,24 +66,24 @@ export function Footer() {
+         <div className="mt-12 flex flex-col gap-4 border-t border-white/[0.06] pt-8 sm:flex-row sm:items-center sm:justify-between">
+           <p className="text-sm text-zinc-500">{FOOTER_COPYRIGHT}</p>
+           <nav className="flex gap-6" aria-label="Legal">
+-            <a
++            <Link
+               href="/privacy"
+               className="focus-visible:outline-primary text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
+             >
+               Privacy Policy
+-            </a>
+-            <a
++            </Link>
++            <Link
+               href="/terms"
+               className="focus-visible:outline-primary text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
+             >
+               Terms of Service
+-            </a>
+-            <a
++            </Link>
++            <Link
+               href="/contact"
+               className="focus-visible:outline-primary text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
+             >
+               Contact
+-            </a>
++            </Link>
+           </nav>
+         </div>
+       </div>
+diff --git a/src/components/sections/hero.tsx b/src/components/sections/hero.tsx
+index 55de99e..2b822ac 100644
+--- a/src/components/sections/hero.tsx
++++ b/src/components/sections/hero.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useState } from 'react';
++import Link from 'next/link';
+ import { ArrowRight, Sparkles } from 'lucide-react';
+ 
+ import { StyleChip as StyleChipComponent } from '@/components/primitives/style-chip';
+@@ -163,13 +164,13 @@ export function Hero() {
+               </div>
+ 
+               {/* Start Creating CTA — glass pill with amber text */}
+-              <a
++              <Link
+                 href="/create"
+                 className="text-primary focus-visible:outline-primary inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-zinc-800 to-zinc-900 px-5 py-2.5 text-[13px] font-bold transition-all hover:from-zinc-700 hover:to-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 sm:py-2"
+               >
+                 Start Creating
+                 <ArrowRight className="h-3 w-3" aria-hidden="true" />
+-              </a>
++              </Link>
+             </div>
+           </div>
+         </div>
+diff --git a/src/components/sections/navbar.tsx b/src/components/sections/navbar.tsx
+index 2cb29b3..88eb335 100644
+--- a/src/components/sections/navbar.tsx
++++ b/src/components/sections/navbar.tsx
+@@ -57,13 +57,13 @@ export function Navbar() {
+         {/* Desktop nav links */}
+         <div className="hidden items-center gap-1 sm:flex">
+           {NAV_LINKS.map((link) => (
+-            <a
++            <Link
+               key={link.href}
+               href={link.href}
+               className="focus-visible:outline-primary rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-all duration-200 hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
+             >
+               {link.label}
+-            </a>
++            </Link>
+           ))}
+         </div>
+ 
+@@ -97,20 +97,20 @@ export function Navbar() {
+           </DropdownMenu>
+ 
+           {/* Sign in (desktop only) */}
+-          <a
++          <Link
+             href="/sign-in"
+             className="focus-visible:outline-primary hidden rounded-lg px-3 py-1.5 text-sm font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 sm:inline"
+           >
+             Sign in
+-          </a>
++          </Link>
+ 
+           {/* Get Started (desktop) */}
+-          <a
++          <Link
+             href="/sign-up"
+             className="focus-visible:outline-primary hidden rounded-full px-5 py-2 text-base font-medium text-white/60 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 sm:inline"
+           >
+             Get Started
+-          </a>
++          </Link>
+ 
+           {/* Mobile hamburger */}
+           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+@@ -143,30 +143,30 @@ export function Navbar() {
+               </SheetHeader>
+               <nav className="flex flex-col gap-2">
+                 {NAV_LINKS.map((link) => (
+-                  <a
++                  <Link
+                     key={link.href}
+                     href={link.href}
+                     onClick={() => setMobileOpen(false)}
+                     className="focus-visible:outline-primary rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
+                   >
+                     {link.label}
+-                  </a>
++                  </Link>
+                 ))}
+                 <hr className="my-2 border-white/10" />
+-                <a
++                <Link
+                   href="/sign-in"
+                   onClick={() => setMobileOpen(false)}
+                   className="focus-visible:outline-primary rounded-lg px-3 py-2 text-base font-medium text-white/80 transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
+                 >
+                   Sign in
+-                </a>
+-                <a
++                </Link>
++                <Link
+                   href="/sign-up"
+                   onClick={() => setMobileOpen(false)}
+                   className="text-primary hover:bg-primary/10 hover:text-primary focus-visible:outline-primary rounded-lg px-3 py-2 text-base font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+                 >
+                   Get Started
+-                </a>
++                </Link>
+               </nav>
+             </SheetContent>
+           </Sheet>
+diff --git a/src/components/sections/use-cases.tsx b/src/components/sections/use-cases.tsx
+index 90eba8e..ae13ccf 100644
+--- a/src/components/sections/use-cases.tsx
++++ b/src/components/sections/use-cases.tsx
+@@ -1,3 +1,4 @@
++import Link from 'next/link';
+ import { ArrowRight } from 'lucide-react';
+ 
+ import { Eyebrow } from '@/components/primitives/eyebrow';
+@@ -29,7 +30,7 @@ export function UseCases() {
+             const Icon = uc.icon;
+             return (
+               <ScrollReveal key={uc.id} delay={Math.min(idx * 80, 400)}>
+-                <a
++                <Link
+                   href={uc.href}
+                   className="group hover:border-primary/20 focus-visible:outline-primary relative block overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 transition-all duration-300 hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2"
+                 >
+@@ -60,7 +61,7 @@ export function UseCases() {
+                       aria-hidden="true"
+                     />
+                   </span>
+-                </a>
++                </Link>
+               </ScrollReveal>
+             );
+           })}
+diff --git a/src/lib/env/index.ts b/src/lib/env/index.ts
+index 577faf8..1f80bec 100644
+--- a/src/lib/env/index.ts
++++ b/src/lib/env/index.ts
+@@ -199,30 +199,50 @@ function extractHost(url: string | undefined): string | null {
+  * (no real env vars available) and uses placeholders. At runtime with real env
+  * vars, full validation applies.
+  *
+- * HOST-MISMATCH WARNING (T2 remediation): If AUTH_URL and NEXT_PUBLIC_APP_URL
+- * resolve to different hosts, Auth.js v5 (without `trustHost: true`) would
+- * redirect auth callbacks to the AUTH_URL host — breaking authentication in
+- * production (e.g., when AUTH_URL=http://localhost:3000 leaks to prod). We
+- * emit a console.warn (not throw) so the app still boots, but the misconfig
+- * is loud and visible in server logs.
++ * HOST-MISMATCH (T1 remediation, status_11.md): If AUTH_URL and
++ * NEXT_PUBLIC_APP_URL resolve to different hosts, Auth.js v5 may redirect
++ * auth callbacks to the wrong host (e.g., AUTH_URL=http://localhost:3000
++ * leaked to production → /dashboard redirects to localhost → ERR_CONNECTION_REFUSED).
++ *
++ * The previous behavior (status_10.md) only emitted console.warn — which was
++ * silently buried in production server logs. The live storyintovideo.jesspete.shop
++ * deployment was broken for exactly this reason. T1 promotes the warning to
++ * a THROWN ERROR in production runtime (fail-fast at boot), so the app
++ * refuses to start with a clear error instead of silently degrading auth.
++ *
++ * Behavior matrix:
++ *   - production runtime: THROW (fail-fast — operators must fix the env)
++ *   - development:        console.warn only (operator is likely debugging)
++ *   - test:               console.warn only (test suites rely on env flexibility)
++ *   - build context:      never reached (placeholders match: both localhost:3000)
+  */
+ function parseEnv(): EnvData {
+   const result = envSchema.safeParse(process.env);
+   if (result.success) {
+-    // Surface AUTH_URL ↔ NEXT_PUBLIC_APP_URL host mismatches. This is a
+-    // warning, not an error — the app should still boot so operators can
+-    // diagnose via logs. With trustHost: true on the NextAuth config, the
+-    // mismatch is no longer fatal, but it's still a misconfiguration that
+-    // should be fixed (AUTH_URL is used for email magic links, etc.).
++    // Surface AUTH_URL ↔ NEXT_PUBLIC_APP_URL host mismatches. The warn is
++    // always emitted for visibility; in production we additionally throw to
++    // fail-fast at boot (T1 fix).
+     const authHost = extractHost(result.data.AUTH_URL);
+     const appHost = extractHost(result.data.NEXT_PUBLIC_APP_URL);
+     if (authHost && appHost && authHost !== appHost) {
+-      console.warn(
++      const message =
+         `[env] AUTH_URL host ("${authHost}") differs from NEXT_PUBLIC_APP_URL host ("${appHost}"). ` +
+-          `This is a common cause of auth redirect loops in production. ` +
+-          `Set AUTH_URL to the same host as NEXT_PUBLIC_APP_URL, or rely on trustHost:true ` +
+-          `(already set in src/lib/auth/config.ts) to use the incoming request's Host header.`,
+-      );
++        `This is a common cause of auth redirect loops in production — e.g. /dashboard ` +
++        `redirecting to a localhost URL that browsers cannot reach. ` +
++        `Set AUTH_URL to the same host as NEXT_PUBLIC_APP_URL, or rely on trustHost:true ` +
++        `(already set in src/lib/auth/config.ts) to use the incoming request's Host header.`;
++      console.warn(message);
++      // T1: fail-fast in production runtime. Build context is excluded because
++      // it uses matching localhost placeholders (never reaches this branch when
++      // isBuildContext=true). Dev/test keep the warn-only behavior so operators
++      // can debug with mismatched URLs locally.
++      if (result.data.NODE_ENV === 'production') {
++        throw new Error(
++          `\n❌ Host mismatch in environment variables:\n  ${message}\n\n` +
++            `Fix: set NEXT_PUBLIC_APP_URL and AUTH_URL to the same host in your production env,\n` +
++            `then redeploy. The app refuses to boot to prevent silent auth failures.\n`,
++        );
++      }
+     }
+     return result.data;
+   }
+diff --git a/src/lib/storage/r2.ts b/src/lib/storage/r2.ts
+index 2f4a6d8..a63ad3e 100644
+--- a/src/lib/storage/r2.ts
++++ b/src/lib/storage/r2.ts
+@@ -2,6 +2,7 @@ import {
+   S3Client,
+   PutObjectCommand,
+   GetObjectCommand,
++  DeleteObjectsCommand,
+   type PutObjectCommandInput,
+ } from '@aws-sdk/client-s3';
+ import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
+@@ -130,5 +131,66 @@ export function buildObjectKey(projectId: string, filename: string): string {
+   return `${projectId}/${filename}`;
+ }
+ 
++/**
++ * T4 (status_11.md) — Best-effort bulk deletion of a user's R2 media.
++ *
++ * Called by DELETE /api/user after the DB CASCADE has wiped the user's
++ * projects. The keys are collected BEFORE the DB delete (in deleteUserAccount)
++ * because CASCADE would make it impossible to find them afterward.
++ *
++ * R2's DeleteObjects API accepts up to 1000 keys per request. We batch
++ * accordingly. Errors are logged but NOT thrown — the DB deletion is the
++ * source of truth for "account deleted", and R2 orphans are acceptable
++ * (they're inert without DB rows pointing to them, and the Privacy Policy
++ * §4 promises deletion "within 30 days" — we delete immediately when R2
++ * is reachable, and the 30-day window covers transient R2 outages).
++ *
++ * @param keys - R2 object keys to delete (across all 3 buckets — the function
++ *               tries each bucket; keys not found in a bucket are silently
++ *               ignored by R2's DeleteObjects API)
++ * @returns The number of keys successfully queued for deletion
++ */
++export async function deleteUserMedia(keys: string[]): Promise<number> {
++  if (keys.length === 0) return 0;
++
++  let deletedCount = 0;
++  const BATCH_SIZE = 1000; // R2/S3 DeleteObjects max per request
++
++  // Try each bucket — a given key exists in exactly one bucket, but we don't
++  // know which without querying. DeleteObjects silently ignores missing keys,
++  // so blasting all 3 buckets is safe and avoids 3x list-then-delete round-trips.
++  const buckets: BucketName[] = ['uploads', 'generated', 'videos'];
++
++  for (const bucket of buckets) {
++    for (let i = 0; i < keys.length; i += BATCH_SIZE) {
++      const batch = keys.slice(i, i + BATCH_SIZE);
++      try {
++        const command = new DeleteObjectsCommand({
++          Bucket: BUCKET_MAP[bucket],
++          Delete: {
++            Objects: batch.map((key) => ({ Key: key })),
++            Quiet: true, // Don't return per-key results — we just want the count
++          },
++        });
++        const result = await r2Client.send(command);
++        // result.Deleted?.length is undefined when Quiet:true — use Errors instead
++        if (result.Errors && result.Errors.length > 0) {
++          console.warn(
++            `[r2] deleteUserMedia: ${result.Errors.length} errors in bucket ${bucket}:`,
++            result.Errors.slice(0, 5).map((e) => `${e.Key}: ${e.Message}`),
++          );
++        }
++        deletedCount += batch.length;
++      } catch (err) {
++        // Best-effort — log and continue. DB deletion has already succeeded.
++        const message = err instanceof Error ? err.message : String(err);
++        console.warn(`[r2] deleteUserMedia: batch failed in bucket ${bucket}: ${message}`);
++      }
++    }
++  }
++
++  return deletedCount;
++}
++
+ export { r2Client, BUCKET_MAP };
+ export type { BucketName };
+diff --git a/src/tests/unit/cta-routes.test.ts b/src/tests/unit/cta-routes.test.ts
+index 92b5626..22e6a16 100644
+--- a/src/tests/unit/cta-routes.test.ts
++++ b/src/tests/unit/cta-routes.test.ts
+@@ -103,3 +103,57 @@ describe('S1-09: Marketing CTAs wired to real routes', () => {
+     }
+   });
+ });
++
++/**
++ * T5 (status_11.md) — Internal navigation must use next/link, not <a href>.
++ *
++ * CLAUDE.md line 92: "next/link for all internal navigation — never use <a>
++ * for internal routes". The previous codebase violated this in 6+ files,
++ * causing full-page reloads on every nav click (degrades UX + Lighthouse).
++ *
++ * This test enforces the rule via source-reading: any href starting with "/"
++ * (an internal route) must be inside a <Link> component, not an <a>. Hash
++ * anchors (#main) and mailto: links are exempt — next/link doesn't handle
++ * these the same way.
++ */
++
++// Re-read sources (the consts above were captured at module load; this ensures
++// we read the current state of the files at test time).
++function readSource(relPath: string): string {
++  return readFileSync(resolve(__dirname, relPath), 'utf-8');
++}
++
++describe('T5: Internal navigation uses next/link (not <a href>)', () => {
++  // Files that contain internal navigation links and must use <Link> for them.
++  // Exemptions:
++  //   - layout.tsx: skip-to-content uses <a href="#main"> (hash anchor — not internal route)
++  //   - footer.tsx: mailto: link for support email (not internal route)
++  //   - legal pages: mailto: links for privacy@/legal@ (not internal route)
++  const FILES_WITH_INTERNAL_LINKS: { relPath: string; label: string }[] = [
++    { relPath: '../../components/sections/navbar.tsx', label: 'navbar' },
++    { relPath: '../../components/sections/hero.tsx', label: 'hero' },
++    { relPath: '../../components/sections/examples.tsx', label: 'examples' },
++    { relPath: '../../components/sections/use-cases.tsx', label: 'use-cases' },
++    { relPath: '../../components/sections/footer.tsx', label: 'footer' },
++    { relPath: '../../components/primitives/cta-amber.tsx', label: 'cta-amber' },
++    { relPath: '../../components/primitives/cta-gradient.tsx', label: 'cta-gradient' },
++    { relPath: '../../components/primitives/cta-ghost.tsx', label: 'cta-ghost' },
++    { relPath: '../../app/(app)/dashboard/page.tsx', label: 'dashboard' },
++  ];
++
++  for (const { relPath, label } of FILES_WITH_INTERNAL_LINKS) {
++    it(`${label}: imports next/link`, () => {
++      const source = readSource(relPath);
++      expect(source).toMatch(/import\s+Link\s+from\s+['"]next\/link['"]/);
++    });
++
++    it(`${label}: no <a href="/..."> (internal routes use <Link>)`, () => {
++      const source = readSource(relPath);
++      // Match <a followed by anything (non-greedy) then href="/..." — catches
++      // <a href="/create">, <a className="..." href="/sign-in">, etc.
++      // Exempt: href="#..." (hash anchors) and href="mailto:..." (email links).
++      const internalAnchorPattern = /<a\b[^>]*\bhref\s*=\s*['"]\/[^'"]*['"][^>]*>/;
++      expect(source).not.toMatch(internalAnchorPattern);
++    });
++  }
++});
+diff --git a/src/tests/unit/env.test.ts b/src/tests/unit/env.test.ts
+index 013f913..7b31b36 100644
+--- a/src/tests/unit/env.test.ts
++++ b/src/tests/unit/env.test.ts
+@@ -154,14 +154,25 @@ describe('env module — Zod validation', () => {
+     expect(env.AUTH_SECRET.length).toBeGreaterThanOrEqual(32);
+   });
+ 
+-  // T2 (remediation): When AUTH_URL and NEXT_PUBLIC_APP_URL have different
+-  // hosts, Auth.js v5 may redirect auth callbacks to the wrong host (e.g.,
+-  // http://localhost:3000 in production). The env module emits a console.warn
+-  // at module load to surface this misconfiguration early.
+-  it('warns when AUTH_URL host differs from NEXT_PUBLIC_APP_URL host', async () => {
++  // T1 (remediation, status_11.md): When AUTH_URL and NEXT_PUBLIC_APP_URL have
++  // different hosts, Auth.js v5 may redirect auth callbacks to the wrong host
++  // (e.g., http://localhost:3000 in production → ERR_CONNECTION_REFUSED).
++  //
++  // The previous behavior (status_10.md) only emitted console.warn — which was
++  // silently buried in production server logs. The live storyintovideo.jesspete.shop
++  // deployment was broken for exactly this reason: NEXT_PUBLIC_APP_URL was set
++  // to http://localhost:3000, every /dashboard redirect went to localhost, and
++  // the console.warn was never noticed.
++  //
++  // T1 fix: PROMOTE the warning to a THROWN ERROR in production runtime (fail-
++  // fast at boot). Keep the console.warn in dev/test for visibility. Never fire
++  // in build context (placeholders match anyway).
++
++  it('warns when AUTH_URL host differs from NEXT_PUBLIC_APP_URL host (dev context)', async () => {
+     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+     const mismatched = {
+       ...VALID_ENV,
++      NODE_ENV: 'development', // dev: warn but do NOT throw
+       AUTH_URL: 'http://localhost:3000',
+       NEXT_PUBLIC_APP_URL: 'https://storyintovideo.jesspete.shop',
+     };
+@@ -188,6 +199,82 @@ describe('env module — Zod validation', () => {
+     warnSpy.mockRestore();
+   });
+ 
++  // T1: Production fail-fast — the core new behavior.
++  it('T1: THROWS at module load in production when AUTH_URL host ≠ NEXT_PUBLIC_APP_URL host', async () => {
++    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
++    const mismatched = {
++      ...VALID_ENV,
++      NODE_ENV: 'production', // VALID_ENV already sets this, but be explicit
++      AUTH_URL: 'http://localhost:3000',
++      NEXT_PUBLIC_APP_URL: 'https://storyintovideo.jesspete.shop',
++    };
++    Object.assign(process.env, mismatched);
++    await expect(import('@/lib/env')).rejects.toThrow(
++      /AUTH_URL.*NEXT_PUBLIC_APP_URL.*host|host.*differ/i,
++    );
++    warnSpy.mockRestore();
++  });
++
++  // T1: Dev/test must NOT throw — operators running locally with mismatched
++  // URLs are typically debugging and need the app to boot.
++  it('T1: does NOT throw in development when hosts mismatch (still warns)', async () => {
++    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
++    const mismatched = {
++      ...VALID_ENV,
++      NODE_ENV: 'development',
++      AUTH_URL: 'http://localhost:3000',
++      NEXT_PUBLIC_APP_URL: 'https://storyintovideo.jesspete.shop',
++    };
++    Object.assign(process.env, mismatched);
++    const { env } = await import('@/lib/env');
++    expect(env.NEXT_PUBLIC_APP_URL).toBe('https://storyintovideo.jesspete.shop');
++    expect(warnSpy).toHaveBeenCalledWith(
++      expect.stringMatching(/AUTH_URL.*NEXT_PUBLIC_APP_URL.*host/i),
++    );
++    warnSpy.mockRestore();
++  });
++
++  it('T1: does NOT throw in test context when hosts mismatch (still warns)', async () => {
++    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
++    const mismatched = {
++      ...VALID_ENV,
++      NODE_ENV: 'test',
++      AUTH_URL: 'http://localhost:3000',
++      NEXT_PUBLIC_APP_URL: 'https://storyintovideo.jesspete.shop',
++    };
++    Object.assign(process.env, mismatched);
++    const { env } = await import('@/lib/env');
++    expect(env.NEXT_PUBLIC_APP_URL).toBe('https://storyintovideo.jesspete.shop');
++    expect(warnSpy).toHaveBeenCalledWith(
++      expect.stringMatching(/AUTH_URL.*NEXT_PUBLIC_APP_URL.*host/i),
++    );
++    warnSpy.mockRestore();
++  });
++
++  // T1: Build context must NOT throw — even if hosts were mismatched (they
++  // aren't in the placeholder fallback, but this guards against future changes
++  // to the placeholder values). The build must always succeed.
++  it('T1: does NOT throw in build context (NEXT_PHASE=phase-production-build) even with mismatched hosts', async () => {
++    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
++    vi.stubEnv('NEXT_PHASE', 'phase-production-build');
++    // Wipe the validated env vars so the build-context fallback kicks in.
++    // We deliberately set NO env vars here — the build context uses placeholders.
++    Object.keys(process.env).forEach((key) => {
++      if (
++        !key.startsWith('npm_') &&
++        !['PATH', 'HOME', 'USER', 'SHELL', 'LANG', 'TERM', '_', 'SHLVL', 'PWD', 'NEXT_PHASE'].includes(key)
++      ) {
++        delete process.env[key];
++      }
++    });
++    const { env } = await import('@/lib/env');
++    // Placeholders are both 'http://localhost:3000' → match → no throw.
++    expect(env.AUTH_URL).toBe('http://localhost:3000');
++    expect(env.NEXT_PUBLIC_APP_URL).toBe('http://localhost:3000');
++    warnSpy.mockRestore();
++    vi.unstubAllEnvs();
++  });
++
+   // T3 (remediation): OPENAI_API_KEY must accept all valid OpenAI key prefixes,
+   // not just 'sk-'. Modern OpenAI keys use prefix-scoped formats:
+   //   - sk-...           (legacy)
+diff --git a/src/tests/unit/health.test.ts b/src/tests/unit/health.test.ts
+index ad528ba..0382fef 100644
+--- a/src/tests/unit/health.test.ts
++++ b/src/tests/unit/health.test.ts
+@@ -47,4 +47,52 @@ describe('H9: Robust health endpoint', () => {
+     expect(source).toMatch(/ffmpeg/);
+     expect(source).toMatch(/healthy|unhealthy/);
+   });
++
++  // T2 (status_11.md): /api/health must surface env misconfigurations.
++  //
++  // On the live storyintovideo.jesspete.shop deployment, /api/health was
++  // returning {status:'healthy', services:{database:'healthy', ffmpeg:'healthy'}}
++  // even though NEXT_PUBLIC_APP_URL was misconfigured to http://localhost:3000 —
++  // breaking 100% of auth-protected routes. Operators monitoring the health
++  // probe had NO visibility into the env misconfiguration.
++  //
++  // T2 fix: add an env sanity check (read-only — never throws) that compares
++  // AUTH_URL host vs NEXT_PUBLIC_APP_URL host at request time, and surfaces the
++  // result in the JSON response. Importantly, an env mismatch should NOT cause
++  // a 503 — DB+FFmpeg being healthy means the container is alive, just
++  // misconfigured. Monitoring can detect the config flag separately.
++
++  it('T2: health route reads env.AUTH_URL (for env sanity check)', () => {
++    const source = readFileSync(ROUTE_PATH, 'utf-8');
++    // Must reference env.AUTH_URL — not just process.env — to go through the
++    // validated env module.
++    expect(source).toMatch(/env\.AUTH_URL/);
++  });
++
++  it('T2: health route reads env.NEXT_PUBLIC_APP_URL (for env sanity check)', () => {
++    const source = readFileSync(ROUTE_PATH, 'utf-8');
++    expect(source).toMatch(/env\.NEXT_PUBLIC_APP_URL/);
++  });
++
++  it('T2: health route includes a config object in the JSON response', () => {
++    const source = readFileSync(ROUTE_PATH, 'utf-8');
++    // The response should surface env sanity as a `config` field — mirrors the
++    // existing `services` pattern (database/ffmpeg).
++    expect(source).toMatch(/config:/);
++  });
++
++  it('T2: health route includes configErrors array (mirrors errors pattern)', () => {
++    const source = readFileSync(ROUTE_PATH, 'utf-8');
++    // Surface env misconfigurations in a separate array — keeps `errors`
++    // focused on service failures (DB/FFmpeg) and `configErrors` on env issues.
++    expect(source).toMatch(/configErrors/);
++  });
++
++  it('T2: health route does NOT gate 503 on env mismatch (config is independent of overallHealthy)', () => {
++    const source = readFileSync(ROUTE_PATH, 'utf-8');
++    // The overallHealthy computation must only depend on dbHealthy && ffmpegHealthy.
++    // An env mismatch should NOT cause 503 — that would restart a "healthy"
++    // container in Docker/K8s. Monitoring detects the config flag separately.
++    expect(source).toMatch(/overallHealthy\s*=\s*dbHealthy\s*&&\s*ffmpegHealthy/);
++  });
+ });

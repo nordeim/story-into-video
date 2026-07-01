@@ -103,3 +103,57 @@ describe('S1-09: Marketing CTAs wired to real routes', () => {
     }
   });
 });
+
+/**
+ * T5 (status_11.md) — Internal navigation must use next/link, not <a href>.
+ *
+ * CLAUDE.md line 92: "next/link for all internal navigation — never use <a>
+ * for internal routes". The previous codebase violated this in 6+ files,
+ * causing full-page reloads on every nav click (degrades UX + Lighthouse).
+ *
+ * This test enforces the rule via source-reading: any href starting with "/"
+ * (an internal route) must be inside a <Link> component, not an <a>. Hash
+ * anchors (#main) and mailto: links are exempt — next/link doesn't handle
+ * these the same way.
+ */
+
+// Re-read sources (the consts above were captured at module load; this ensures
+// we read the current state of the files at test time).
+function readSource(relPath: string): string {
+  return readFileSync(resolve(__dirname, relPath), 'utf-8');
+}
+
+describe('T5: Internal navigation uses next/link (not <a href>)', () => {
+  // Files that contain internal navigation links and must use <Link> for them.
+  // Exemptions:
+  //   - layout.tsx: skip-to-content uses <a href="#main"> (hash anchor — not internal route)
+  //   - footer.tsx: mailto: link for support email (not internal route)
+  //   - legal pages: mailto: links for privacy@/legal@ (not internal route)
+  const FILES_WITH_INTERNAL_LINKS: { relPath: string; label: string }[] = [
+    { relPath: '../../components/sections/navbar.tsx', label: 'navbar' },
+    { relPath: '../../components/sections/hero.tsx', label: 'hero' },
+    { relPath: '../../components/sections/examples.tsx', label: 'examples' },
+    { relPath: '../../components/sections/use-cases.tsx', label: 'use-cases' },
+    { relPath: '../../components/sections/footer.tsx', label: 'footer' },
+    { relPath: '../../components/primitives/cta-amber.tsx', label: 'cta-amber' },
+    { relPath: '../../components/primitives/cta-gradient.tsx', label: 'cta-gradient' },
+    { relPath: '../../components/primitives/cta-ghost.tsx', label: 'cta-ghost' },
+    { relPath: '../../app/(app)/dashboard/page.tsx', label: 'dashboard' },
+  ];
+
+  for (const { relPath, label } of FILES_WITH_INTERNAL_LINKS) {
+    it(`${label}: imports next/link`, () => {
+      const source = readSource(relPath);
+      expect(source).toMatch(/import\s+Link\s+from\s+['"]next\/link['"]/);
+    });
+
+    it(`${label}: no <a href="/..."> (internal routes use <Link>)`, () => {
+      const source = readSource(relPath);
+      // Match <a followed by anything (non-greedy) then href="/..." — catches
+      // <a href="/create">, <a className="..." href="/sign-in">, etc.
+      // Exempt: href="#..." (hash anchors) and href="mailto:..." (email links).
+      const internalAnchorPattern = /<a\b[^>]*\bhref\s*=\s*['"]\/[^'"]*['"][^>]*>/;
+      expect(source).not.toMatch(internalAnchorPattern);
+    });
+  }
+});

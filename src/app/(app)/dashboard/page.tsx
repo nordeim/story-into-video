@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import Link from 'next/link';
 import { Film } from 'lucide-react';
 
 import { EmptyState } from '@/components/app/empty-state';
@@ -61,7 +62,7 @@ async function ProjectList() {
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
       {userProjects.map((project) => (
-        <a
+        <Link
           key={project.id}
           href={`/projects/${project.id}`}
           className="group hover:border-primary/20 focus-visible:outline-primary rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2"
@@ -75,7 +76,7 @@ async function ProjectList() {
           <p className="mt-4 text-xs text-zinc-500">
             Status: <span className="text-zinc-400">{project.status}</span>
           </p>
-        </a>
+        </Link>
       ))}
     </div>
   );
@@ -92,12 +93,12 @@ export default function DashboardPage() {
             </h1>
             <p className="mt-2 text-sm text-zinc-400">Manage your story-into-video projects.</p>
           </div>
-          <a
+          <Link
             href="/create"
             className="bg-primary hover:bg-primary focus-visible:outline-primary inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold text-zinc-950 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             New Project
-          </a>
+          </Link>
         </div>
         <Suspense fallback={<DashboardSkeleton />}>
           <ProjectList />

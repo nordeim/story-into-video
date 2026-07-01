@@ -154,14 +154,25 @@ describe('env module — Zod validation', () => {
     expect(env.AUTH_SECRET.length).toBeGreaterThanOrEqual(32);
   });
 
-  // T2 (remediation): When AUTH_URL and NEXT_PUBLIC_APP_URL have different
-  // hosts, Auth.js v5 may redirect auth callbacks to the wrong host (e.g.,
-  // http://localhost:3000 in production). The env module emits a console.warn
-  // at module load to surface this misconfiguration early.
-  it('warns when AUTH_URL host differs from NEXT_PUBLIC_APP_URL host', async () => {
+  // T1 (remediation, status_11.md): When AUTH_URL and NEXT_PUBLIC_APP_URL have
+  // different hosts, Auth.js v5 may redirect auth callbacks to the wrong host
+  // (e.g., http://localhost:3000 in production → ERR_CONNECTION_REFUSED).
+  //
+  // The previous behavior (status_10.md) only emitted console.warn — which was
+  // silently buried in production server logs. The live storyintovideo.jesspete.shop
+  // deployment was broken for exactly this reason: NEXT_PUBLIC_APP_URL was set
+  // to http://localhost:3000, every /dashboard redirect went to localhost, and
+  // the console.warn was never noticed.
+  //
+  // T1 fix: PROMOTE the warning to a THROWN ERROR in production runtime (fail-
+  // fast at boot). Keep the console.warn in dev/test for visibility. Never fire
+  // in build context (placeholders match anyway).
+
+  it('warns when AUTH_URL host differs from NEXT_PUBLIC_APP_URL host (dev context)', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const mismatched = {
       ...VALID_ENV,
+      NODE_ENV: 'development', // dev: warn but do NOT throw
       AUTH_URL: 'http://localhost:3000',
       NEXT_PUBLIC_APP_URL: 'https://storyintovideo.jesspete.shop',
     };
@@ -186,6 +197,93 @@ describe('env module — Zod validation', () => {
       expect.stringMatching(/AUTH_URL.*NEXT_PUBLIC_APP_URL.*host/i),
     );
     warnSpy.mockRestore();
+  });
+
+  // T1: Production fail-fast — the core new behavior.
+  it('T1: THROWS at module load in production when AUTH_URL host ≠ NEXT_PUBLIC_APP_URL host', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const mismatched = {
+      ...VALID_ENV,
+      NODE_ENV: 'production', // VALID_ENV already sets this, but be explicit
+      AUTH_URL: 'http://localhost:3000',
+      NEXT_PUBLIC_APP_URL: 'https://storyintovideo.jesspete.shop',
+    };
+    Object.assign(process.env, mismatched);
+    await expect(import('@/lib/env')).rejects.toThrow(
+      /AUTH_URL.*NEXT_PUBLIC_APP_URL.*host|host.*differ/i,
+    );
+    warnSpy.mockRestore();
+  });
+
+  // T1: Dev/test must NOT throw — operators running locally with mismatched
+  // URLs are typically debugging and need the app to boot.
+  it('T1: does NOT throw in development when hosts mismatch (still warns)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const mismatched = {
+      ...VALID_ENV,
+      NODE_ENV: 'development',
+      AUTH_URL: 'http://localhost:3000',
+      NEXT_PUBLIC_APP_URL: 'https://storyintovideo.jesspete.shop',
+    };
+    Object.assign(process.env, mismatched);
+    const { env } = await import('@/lib/env');
+    expect(env.NEXT_PUBLIC_APP_URL).toBe('https://storyintovideo.jesspete.shop');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/AUTH_URL.*NEXT_PUBLIC_APP_URL.*host/i),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('T1: does NOT throw in test context when hosts mismatch (still warns)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const mismatched = {
+      ...VALID_ENV,
+      NODE_ENV: 'test',
+      AUTH_URL: 'http://localhost:3000',
+      NEXT_PUBLIC_APP_URL: 'https://storyintovideo.jesspete.shop',
+    };
+    Object.assign(process.env, mismatched);
+    const { env } = await import('@/lib/env');
+    expect(env.NEXT_PUBLIC_APP_URL).toBe('https://storyintovideo.jesspete.shop');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/AUTH_URL.*NEXT_PUBLIC_APP_URL.*host/i),
+    );
+    warnSpy.mockRestore();
+  });
+
+  // T1: Build context must NOT throw — even if hosts were mismatched (they
+  // aren't in the placeholder fallback, but this guards against future changes
+  // to the placeholder values). The build must always succeed.
+  it('T1: does NOT throw in build context (NEXT_PHASE=phase-production-build) even with mismatched hosts', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubEnv('NEXT_PHASE', 'phase-production-build');
+    // Wipe the validated env vars so the build-context fallback kicks in.
+    // We deliberately set NO env vars here — the build context uses placeholders.
+    Object.keys(process.env).forEach((key) => {
+      if (
+        !key.startsWith('npm_') &&
+        ![
+          'PATH',
+          'HOME',
+          'USER',
+          'SHELL',
+          'LANG',
+          'TERM',
+          '_',
+          'SHLVL',
+          'PWD',
+          'NEXT_PHASE',
+        ].includes(key)
+      ) {
+        delete process.env[key];
+      }
+    });
+    const { env } = await import('@/lib/env');
+    // Placeholders are both 'http://localhost:3000' → match → no throw.
+    expect(env.AUTH_URL).toBe('http://localhost:3000');
+    expect(env.NEXT_PUBLIC_APP_URL).toBe('http://localhost:3000');
+    warnSpy.mockRestore();
+    vi.unstubAllEnvs();
   });
 
   // T3 (remediation): OPENAI_API_KEY must accept all valid OpenAI key prefixes,

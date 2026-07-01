@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { cn } from '@/lib/utils';
 
 interface CtaGradientProps {
@@ -16,7 +18,7 @@ interface CtaGradientProps {
  */
 export function CtaGradient({ children, href, className }: CtaGradientProps) {
   return (
-    <a
+    <Link
       href={href}
       className={cn(
         'group inline-flex items-center gap-2.5 rounded-full px-10 py-4',
@@ -28,6 +30,6 @@ export function CtaGradient({ children, href, className }: CtaGradientProps) {
       )}
     >
       {children}
-    </a>
+    </Link>
   );
 }

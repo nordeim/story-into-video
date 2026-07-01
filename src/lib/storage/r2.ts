@@ -2,6 +2,7 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  DeleteObjectsCommand,
   type PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -128,6 +129,67 @@ export async function putObject(
 /** Build an R2 object key from a project ID + filename */
 export function buildObjectKey(projectId: string, filename: string): string {
   return `${projectId}/${filename}`;
+}
+
+/**
+ * T4 (status_11.md) — Best-effort bulk deletion of a user's R2 media.
+ *
+ * Called by DELETE /api/user after the DB CASCADE has wiped the user's
+ * projects. The keys are collected BEFORE the DB delete (in deleteUserAccount)
+ * because CASCADE would make it impossible to find them afterward.
+ *
+ * R2's DeleteObjects API accepts up to 1000 keys per request. We batch
+ * accordingly. Errors are logged but NOT thrown — the DB deletion is the
+ * source of truth for "account deleted", and R2 orphans are acceptable
+ * (they're inert without DB rows pointing to them, and the Privacy Policy
+ * §4 promises deletion "within 30 days" — we delete immediately when R2
+ * is reachable, and the 30-day window covers transient R2 outages).
+ *
+ * @param keys - R2 object keys to delete (across all 3 buckets — the function
+ *               tries each bucket; keys not found in a bucket are silently
+ *               ignored by R2's DeleteObjects API)
+ * @returns The number of keys successfully queued for deletion
+ */
+export async function deleteUserMedia(keys: string[]): Promise<number> {
+  if (keys.length === 0) return 0;
+
+  let deletedCount = 0;
+  const BATCH_SIZE = 1000; // R2/S3 DeleteObjects max per request
+
+  // Try each bucket — a given key exists in exactly one bucket, but we don't
+  // know which without querying. DeleteObjects silently ignores missing keys,
+  // so blasting all 3 buckets is safe and avoids 3x list-then-delete round-trips.
+  const buckets: BucketName[] = ['uploads', 'generated', 'videos'];
+
+  for (const bucket of buckets) {
+    for (let i = 0; i < keys.length; i += BATCH_SIZE) {
+      const batch = keys.slice(i, i + BATCH_SIZE);
+      try {
+        const command = new DeleteObjectsCommand({
+          Bucket: BUCKET_MAP[bucket],
+          Delete: {
+            Objects: batch.map((key) => ({ Key: key })),
+            Quiet: true, // Don't return per-key results — we just want the count
+          },
+        });
+        const result = await r2Client.send(command);
+        // result.Deleted?.length is undefined when Quiet:true — use Errors instead
+        if (result.Errors && result.Errors.length > 0) {
+          console.warn(
+            `[r2] deleteUserMedia: ${result.Errors.length} errors in bucket ${bucket}:`,
+            result.Errors.slice(0, 5).map((e) => `${e.Key}: ${e.Message}`),
+          );
+        }
+        deletedCount += batch.length;
+      } catch (err) {
+        // Best-effort — log and continue. DB deletion has already succeeded.
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[r2] deleteUserMedia: batch failed in bucket ${bucket}: ${message}`);
+      }
+    }
+  }
+
+  return deletedCount;
 }
 
 export { r2Client, BUCKET_MAP };

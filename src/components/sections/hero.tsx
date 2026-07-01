@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { ArrowRight, Sparkles } from 'lucide-react';
 
 import { StyleChip as StyleChipComponent } from '@/components/primitives/style-chip';
@@ -163,13 +164,13 @@ export function Hero() {
               </div>
 
               {/* Start Creating CTA — glass pill with amber text */}
-              <a
+              <Link
                 href="/create"
                 className="text-primary focus-visible:outline-primary inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-zinc-800 to-zinc-900 px-5 py-2.5 text-[13px] font-bold transition-all hover:from-zinc-700 hover:to-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 sm:py-2"
               >
                 Start Creating
                 <ArrowRight className="h-3 w-3" aria-hidden="true" />
-              </a>
+              </Link>
             </div>
           </div>
         </div>

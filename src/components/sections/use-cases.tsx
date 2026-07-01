@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
 import { Eyebrow } from '@/components/primitives/eyebrow';
@@ -29,7 +30,7 @@ export function UseCases() {
             const Icon = uc.icon;
             return (
               <ScrollReveal key={uc.id} delay={Math.min(idx * 80, 400)}>
-                <a
+                <Link
                   href={uc.href}
                   className="group hover:border-primary/20 focus-visible:outline-primary relative block overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 transition-all duration-300 hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
@@ -60,7 +61,7 @@ export function UseCases() {
                       aria-hidden="true"
                     />
                   </span>
-                </a>
+                </Link>
               </ScrollReveal>
             );
           })}

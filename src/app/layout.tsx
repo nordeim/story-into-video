@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { env } from '@/lib/env';
 import { fontVariables } from '@/lib/fonts';
 import { Providers } from '@/components/app/providers';
+import { CookieBanner } from '@/components/app/cookie-banner';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -72,6 +73,7 @@ export default function RootLayout({
           Skip to content
         </a>
         <Providers>{children}</Providers>
+        <CookieBanner />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

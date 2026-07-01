@@ -199,30 +199,50 @@ function extractHost(url: string | undefined): string | null {
  * (no real env vars available) and uses placeholders. At runtime with real env
  * vars, full validation applies.
  *
- * HOST-MISMATCH WARNING (T2 remediation): If AUTH_URL and NEXT_PUBLIC_APP_URL
- * resolve to different hosts, Auth.js v5 (without `trustHost: true`) would
- * redirect auth callbacks to the AUTH_URL host — breaking authentication in
- * production (e.g., when AUTH_URL=http://localhost:3000 leaks to prod). We
- * emit a console.warn (not throw) so the app still boots, but the misconfig
- * is loud and visible in server logs.
+ * HOST-MISMATCH (T1 remediation, status_11.md): If AUTH_URL and
+ * NEXT_PUBLIC_APP_URL resolve to different hosts, Auth.js v5 may redirect
+ * auth callbacks to the wrong host (e.g., AUTH_URL=http://localhost:3000
+ * leaked to production → /dashboard redirects to localhost → ERR_CONNECTION_REFUSED).
+ *
+ * The previous behavior (status_10.md) only emitted console.warn — which was
+ * silently buried in production server logs. The live storyintovideo.jesspete.shop
+ * deployment was broken for exactly this reason. T1 promotes the warning to
+ * a THROWN ERROR in production runtime (fail-fast at boot), so the app
+ * refuses to start with a clear error instead of silently degrading auth.
+ *
+ * Behavior matrix:
+ *   - production runtime: THROW (fail-fast — operators must fix the env)
+ *   - development:        console.warn only (operator is likely debugging)
+ *   - test:               console.warn only (test suites rely on env flexibility)
+ *   - build context:      never reached (placeholders match: both localhost:3000)
  */
 function parseEnv(): EnvData {
   const result = envSchema.safeParse(process.env);
   if (result.success) {
-    // Surface AUTH_URL ↔ NEXT_PUBLIC_APP_URL host mismatches. This is a
-    // warning, not an error — the app should still boot so operators can
-    // diagnose via logs. With trustHost: true on the NextAuth config, the
-    // mismatch is no longer fatal, but it's still a misconfiguration that
-    // should be fixed (AUTH_URL is used for email magic links, etc.).
+    // Surface AUTH_URL ↔ NEXT_PUBLIC_APP_URL host mismatches. The warn is
+    // always emitted for visibility; in production we additionally throw to
+    // fail-fast at boot (T1 fix).
     const authHost = extractHost(result.data.AUTH_URL);
     const appHost = extractHost(result.data.NEXT_PUBLIC_APP_URL);
     if (authHost && appHost && authHost !== appHost) {
-      console.warn(
+      const message =
         `[env] AUTH_URL host ("${authHost}") differs from NEXT_PUBLIC_APP_URL host ("${appHost}"). ` +
-          `This is a common cause of auth redirect loops in production. ` +
-          `Set AUTH_URL to the same host as NEXT_PUBLIC_APP_URL, or rely on trustHost:true ` +
-          `(already set in src/lib/auth/config.ts) to use the incoming request's Host header.`,
-      );
+        `This is a common cause of auth redirect loops in production — e.g. /dashboard ` +
+        `redirecting to a localhost URL that browsers cannot reach. ` +
+        `Set AUTH_URL to the same host as NEXT_PUBLIC_APP_URL, or rely on trustHost:true ` +
+        `(already set in src/lib/auth/config.ts) to use the incoming request's Host header.`;
+      console.warn(message);
+      // T1: fail-fast in production runtime. Build context is excluded because
+      // it uses matching localhost placeholders (never reaches this branch when
+      // isBuildContext=true). Dev/test keep the warn-only behavior so operators
+      // can debug with mismatched URLs locally.
+      if (result.data.NODE_ENV === 'production') {
+        throw new Error(
+          `\n❌ Host mismatch in environment variables:\n  ${message}\n\n` +
+            `Fix: set NEXT_PUBLIC_APP_URL and AUTH_URL to the same host in your production env,\n` +
+            `then redeploy. The app refuses to boot to prevent silent auth failures.\n`,
+        );
+      }
     }
     return result.data;
   }

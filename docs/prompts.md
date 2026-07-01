@@ -22,6 +22,10 @@ Awesome meticulous review, analysis and planning. Please keep up the good work. 
 
 ---
 
+yes, please meticulously plan to proceed with T1 to T2 in sequence. first create a comprehensive remediation plan with a detailed ToDo list, then validate the remediation plan against the codebase to check for alignment before proceeding to execute it meticulously.
+
+---
+
 please meticulously use the CLI browser tools, agent-browser and/or playwright-cli (run them in bash shell), to test `/sign-in`. next, meticulously plan to do E2E tests to validate the code changes involved in production readiness transformation.
 
 ---

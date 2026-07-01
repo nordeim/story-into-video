@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
+import Link from 'next/link';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -88,7 +89,7 @@ export function Examples() {
                 />
 
                 {/* Card body */}
-                <a
+                <Link
                   href={card.href}
                   className="bg-card focus-visible:outline-primary relative block aspect-[9/16] overflow-hidden rounded-[20px] border border-white/5 transition-colors group-hover:border-white/10 focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
@@ -110,7 +111,7 @@ export function Examples() {
                     <h3 className="mb-1 text-lg leading-7 font-bold text-white">{card.title}</h3>
                     <p className="text-xs text-zinc-400">{card.styleTag}</p>
                   </div>
-                </a>
+                </Link>
               </article>
             ))}
           </div>

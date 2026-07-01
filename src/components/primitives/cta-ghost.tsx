@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -17,7 +18,7 @@ interface CtaGhostProps {
  */
 export function CtaGhost({ children, href, className }: CtaGhostProps) {
   return (
-    <a
+    <Link
       href={href}
       className={cn(
         'group inline-flex items-center gap-2',
@@ -32,6 +33,6 @@ export function CtaGhost({ children, href, className }: CtaGhostProps) {
         className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
         aria-hidden="true"
       />
-    </a>
+    </Link>
   );
 }

@@ -36,16 +36,27 @@ export function Footer() {
                 {col.title}
               </h3>
               <ul>
-                {col.links.map((link) => (
-                  <li key={link.label}>
-                    <a
-                      href={link.href}
-                      className="focus-visible:outline-primary block py-1.5 text-sm text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
-                    >
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
+                {col.links.map((link) =>
+                  link.href.startsWith('/') ? (
+                    <li key={link.label}>
+                      <Link
+                        href={link.href}
+                        className="focus-visible:outline-primary block py-1.5 text-sm text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ) : (
+                    <li key={link.label}>
+                      <a
+                        href={link.href}
+                        className="focus-visible:outline-primary block py-1.5 text-sm text-zinc-400 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
+                      >
+                        {link.label}
+                      </a>
+                    </li>
+                  ),
+                )}
               </ul>
             </div>
           ))}
@@ -55,24 +66,24 @@ export function Footer() {
         <div className="mt-12 flex flex-col gap-4 border-t border-white/[0.06] pt-8 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-zinc-500">{FOOTER_COPYRIGHT}</p>
           <nav className="flex gap-6" aria-label="Legal">
-            <a
+            <Link
               href="/privacy"
               className="focus-visible:outline-primary text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
             >
               Privacy Policy
-            </a>
-            <a
+            </Link>
+            <Link
               href="/terms"
               className="focus-visible:outline-primary text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
             >
               Terms of Service
-            </a>
-            <a
+            </Link>
+            <Link
               href="/contact"
               className="focus-visible:outline-primary text-sm text-zinc-500 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2"
             >
               Contact
-            </a>
+            </Link>
           </nav>
         </div>
       </div>

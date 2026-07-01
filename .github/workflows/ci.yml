@@ -7,9 +7,9 @@
 #   4. Unit tests (vitest run — see vitest.config.ts for include paths)
 #   5. Build (next build — exercises the build-context env fallback)
 #
-# E2E tests (Playwright) are NOT run in CI yet — they require a live dev
-# server + Playwright browser binaries + seeded DB. Add a separate job
-# once a CI Postgres service is wired up.
+# T9 (status_11.md): Added a separate `e2e` job that runs Playwright E2E tests
+# against a live dev server + seeded Postgres. Uses `continue-on-error: true`
+# initially so E2E flakiness doesn't block PRs — flip to required once stable.
 #
 # Caching: pnpm store cache keyed on pnpm-lock.yaml hash. Node version
 # pinned to 20 (matches the engines field in package.json).
@@ -69,3 +69,111 @@ jobs:
           # secrets are needed for the build step.
           NEXT_PHASE: phase-production-build
           NODE_ENV: production
+
+  # T9: Playwright E2E tests against a live dev server + seeded Postgres.
+  # Runs only after the quality-gate job passes (needs: quality-gate) to
+  # avoid wasting CI minutes on E2E when lint/typecheck/test/build already
+  # failed. continue-on-error: true so flakiness doesn't block PRs while
+  # we shake out the CI environment.
+  e2e:
+    name: Playwright E2E (Chromium)
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+
+    # Postgres service container — the app + seed script need a real DB.
+    # The health check waits for Postgres to accept connections before
+    # the dev server + Playwright start.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: storyintovideo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d storyintovideo_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Wire the service container as the test DB. Both pooled + unpooled
+      # point at the same container — CI doesn't need Neon's -pooler distinction.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/storyintovideo_test
+      DATABASE_URL_UNPOOLED: postgresql://postgres:postgres@localhost:5432/storyintovideo_test
+      # Minimal env for the dev server to boot. The env module's build-context
+      # fallback handles missing values during `next build`, but `next dev`
+      # requires real values for the app routes to function.
+      AUTH_SECRET: ci-dummy-secret-key-for-e2e-tests-only-32ch!!
+      AUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      OPENAI_API_KEY: sk-ci-dummy
+      REPLICATE_API_TOKEN: r8_ci-dummy
+      ELEVENLABS_API_KEY: ci-dummy
+      STRIPE_SECRET_KEY: sk_ci-dummy
+      STRIPE_WEBHOOK_SECRET: whsec_ci-dummy
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_ci-dummy
+      R2_ACCOUNT_ID: ci-dummy
+      R2_ACCESS_KEY_ID: ci-dummy
+      R2_SECRET_ACCESS_KEY: ci-dummy
+      R2_BUCKET_UPLOADS: siv-uploads-test
+      R2_BUCKET_GENERATED: siv-generated-test
+      R2_BUCKET_VIDEOS: siv-videos-test
+      INNGEST_EVENT_KEY: ci-dummy
+      INNGEST_SIGNING_KEY: ci-dummy
+      RESEND_API_KEY: re_ci-dummy
+      UPSTASH_REDIS_REST_URL: https://example.upstash.io
+      UPSTASH_REDIS_REST_TOKEN: ci-dummy
+      SENTRY_DSN: https://example@sentry.io/1
+      FFMPEG_PATH: /usr/bin/ffmpeg
+      NODE_ENV: development
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "10.26.0"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install FFmpeg (for video assembly tests)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Apply database migrations
+        run: pnpm drizzle:migrate
+        env:
+          # drizzle-kit reads .env.local by default via dotenv-cli; we override
+          # with the CI env vars above. The DATABASE_URL_UNPOOLED is what
+          # drizzle-kit uses for DDL (pooled connections + DDL is unreliable).
+          DATABASE_URL_UNPOOLED: postgresql://postgres:postgres@localhost:5432/storyintovideo_test
+
+      - name: Seed database
+        run: pnpm db:seed
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        run: pnpm test:e2e
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
