@@ -84,24 +84,33 @@ src/
 │   │   ├── create/page.tsx                 # Create wizard (story input)
 │   │   ├── projects/[id]/page.tsx          # Project detail + pipeline status
 │   │   └── billing/page.tsx                # 4-tier plan table
+│   ├── (legal)/                            # Legal + marketing content pages (Server Components)
+│   │   ├── privacy/page.tsx                # Privacy Policy (mandatory for launch)
+│   │   ├── terms/page.tsx                  # Terms of Service (mandatory for launch)
+│   │   ├── pricing/page.tsx                # Pricing page (Sprint 3 T6)
+│   │   ├── blog/page.tsx                   # Blog index (Sprint 3 T6)
+│   │   └── contact/page.tsx                # Contact page (Sprint 3 T6)
 │   ├── api/
 │   │   ├── auth/[...nextauth]/route.ts     # Auth.js (force-dynamic)
 │   │   ├── inngest/route.ts                # Inngest webhook (force-dynamic)
 │   │   ├── stripe/webhook/route.ts         # Stripe webhook (force-dynamic, idempotent via ON CONFLICT)
 │   │   ├── projects/[id]/progress/route.ts # SSE progress stream (force-dynamic, rate-limited)
 │   │   ├── projects/[id]/download/route.ts # Click-time R2 URL signing (H4 fix)
-│   │   └── health/route.ts                 # Health check (DB + FFmpeg, H9 fix)
-│   ├── layout.tsx                # Root: fonts, metadata, Providers, skip-to-content
+│   │   ├── user/export/route.ts            # GDPR data export (Sprint 3 T3; uses `auth()` not `verifySession()`)
+│   │   ├── user/route.ts                   # GDPR account deletion + R2 best-effort cleanup (Sprint 3 T4)
+│   │   └── health/route.ts                 # Health check (DB + FFmpeg, H9; + config object + configErrors, Sprint 3 T2)
+│   ├── layout.tsx                # Root: fonts, metadata, Providers, skip-to-content, CookieBanner
 │   ├── page.tsx                  # Marketing page (10 sections, unchanged)
+│   ├── not-found.tsx             # Custom 404 page (Sprint 3 T7; replaces Next.js default)
 │   ├── globals.css               # @theme + 13 keyframes + @utility + a11y
 │   └── icon.tsx
 ├── components/
 │   ├── primitives/               # Marketing presentational (7 files)
 │   ├── sections/                 # Marketing page sections (10 files)
 │   ├── ui/                       # Hand-written shadcn (4: button, accordion, sheet, dropdown-menu)
-│   └── app/                      # App components (7: auth-form, create-wizard, empty-state, providers, project-progress-panel, project-download-button, project-share-button) — SignedDownloadWrapper DELETED (H4: replaced by click-time API route)
+│   └── app/                      # App components (8: auth-form, create-wizard, empty-state, providers, project-progress-panel, project-download-button, project-share-button, cookie-banner — Sprint 3 T8) — SignedDownloadWrapper DELETED (H4: replaced by click-time API route)
 ├── features/                     # Layer 2 + 3: Feature modules
-│   ├── auth/{actions,domain/verify-session}.ts  # signUpAction (C1) + DAL auth function
+│   ├── auth/{actions,domain/verify-session,queries}.ts  # signUpAction (C1) + DAL auth function + getUserExportData (T3) / deleteUserAccount (T4)
 │   ├── projects/{queries,actions}.ts       # getUserProjects, createProjectAction
 │   ├── pipeline/
 │   │   ├── queries.ts                      # appendCharacter, appendScene, updateProjectProgress
@@ -114,14 +123,14 @@ src/
 │   ├── auth/{config,index}.ts              # Auth.js v5 (Google + Credentials + Drizzle adapter)
 │   ├── ai/{openai,replicate,elevenlabs}.ts # AI provider clients
 │   ├── inngest/{client,functions}.ts       # Inngest client + registrations
-│   ├── storage/r2.ts                       # R2 signed URLs (3 buckets) — NEVER import in client components
+│   ├── storage/r2.ts                       # R2 signed URLs (3 buckets) + deleteUserMedia (T4) — NEVER import in client components
 │   ├── rate-limit.ts                       # Upstash Ratelimit clients (C3: auth, pipeline, SSE)
 │   ├── stripe/client.ts                    # Stripe SDK + PRICE_IDS
 │   ├── data/                               # Static marketing data (10 files)
 │   ├── hooks/                              # use-scrolled, use-reveal, use-reduced-motion, use-project-progress
 │   ├── fonts.ts · utils.ts
 ├── tests/
-│   ├── unit/                     # 48 files, 396 tests
+│   ├── unit/                     # 53 files, 479 tests
 │   ├── e2e/                      # 9 files, 48 tests
 │   └── setup.ts                  # jest-dom + test env vars
 ├── types/index.ts                # 12 marketing interfaces
@@ -131,7 +140,7 @@ src/
 └── pre-commit                    # Runs `pnpm lint-staged` on staged files
 ```
 
-## Routes (15 total)
+## Routes (22 total)
 
 | Route | Type | Purpose |
 |---|---|---|
@@ -143,12 +152,18 @@ src/
 | `/billing` | ○ Static | Plan table + upgrade (**T1: wired to `billingCheckoutAction` Server Action**) |
 | `/privacy` | ○ Static | Privacy Policy (mandatory for launch) |
 | `/terms` | ○ Static | Terms of Service (mandatory for launch) |
+| `/pricing` | ○ Static | Pricing page (Server Component, Sprint 3 T6) |
+| `/blog` | ○ Static | Blog index (Server Component, Sprint 3 T6) |
+| `/contact` | ○ Static | Contact page (Server Component, Sprint 3 T6) |
 | `/api/auth/[...nextauth]` | ƒ Dynamic | Auth.js catch-all |
 | `/api/inngest` | ƒ Dynamic | Pipeline webhook |
 | `/api/stripe/webhook` | ƒ Dynamic | Billing webhook |
 | `/api/projects/[id]/progress` | ƒ Dynamic | SSE progress stream (2s polling, owner-checked, **T5: `claimSseSlot`/`releaseSseSlot`/`refreshSseSlot` slot pattern**) |
 | `/api/projects/[id]/download` | ƒ Dynamic | Click-time R2 URL signing (H4 fix — fresh signed URL per request; **T6: classifies R2 errors 502/504/500**) |
-| `/api/health` | ƒ Dynamic | Health check (DB `SELECT 1` + FFmpeg `accessSync`, returns 503 if unhealthy — H9 fix) |
+| `/api/user/export` | ƒ Dynamic | GDPR data export (Sprint 3 T3; uses `auth()` not `verifySession()`) |
+| `/api/user` (DELETE) | ƒ Dynamic | GDPR account deletion + R2 best-effort cleanup (Sprint 3 T4) |
+| `/api/health` | ƒ Dynamic | Health check (DB `SELECT 1` + FFmpeg `accessSync`, returns 503 if DB/FFmpeg unhealthy — H9; **Sprint 3 T2: also returns `config` object ({healthy, authUrl, appUrl}) + `configErrors` array — NOTE: `config.healthy=false` does NOT trigger 503**) |
+| `/_not-found` | ○ Static | Custom 404 page (Sprint 3 T7; replaces Next.js default) |
 | Proxy | ƒ Proxy | Protects `/dashboard`, `/create`, `/settings`, `/billing`, `/projects` + Host header validation (H6) |
 
 ## Build & Quality Commands (Actual)
@@ -158,7 +173,7 @@ pnpm dev          # Development server (Turbopack)
 pnpm build        # Production build (hybrid: static + dynamic)
 pnpm lint         # eslint . (flat config)
 pnpm typecheck    # tsc --noEmit (strict + noUncheckedIndexedAccess)
-pnpm test         # vitest run (396 unit tests, jsdom)
+pnpm test         # vitest run (479 unit tests, jsdom)
 pnpm test:e2e     # playwright test (48 E2E tests, Chromium, auto-starts dev)
 pnpm format       # prettier --write
 pnpm format:check # prettier --check
@@ -175,7 +190,7 @@ pnpm drizzle-kit studio     # Schema browser
 
 All components use `interface` (not `type` for object shapes), zero `any`. Critical rules:
 
-- `'use client'` only for: Navbar, Hero, Examples, Faq, Workflow, ScrollReveal (marketing); AuthForm (C1: now calls signUpAction in sign-up mode), CreateWizard, Providers, ProjectProgressPanel, ProjectDownloadButton (H4: now fetches /api/projects/[id]/download at click time), ProjectShareButton (app)
+- `'use client'` only for: Navbar, Hero, Examples, Faq, Workflow, ScrollReveal (marketing); AuthForm (C1: now calls signUpAction in sign-up mode), CreateWizard, Providers, ProjectProgressPanel, ProjectDownloadButton (H4: now fetches /api/projects/[id]/download at click time), ProjectShareButton (app), CookieBanner (Sprint 3 T8: useSyncExternalStore over localStorage, mounted in layout.tsx)
 - Server components by default: Features, Testimonials, UseCases, FinalCta, Footer (marketing); dashboard, project detail, billing, privacy, terms pages (app)
 - `next/image` for all raster images, `next/font` for all fonts
 - **Auth-first Server Actions:** every action starts with `verifySession()` before any logic
@@ -302,13 +317,13 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 
 ### Remediation Sprint 2 (post-review hardening)
 36. **`trustHost: true` is mandatory for reverse-proxy deployments** — without it, Auth.js v5 falls back to `AUTH_URL` for callback URLs. If `AUTH_URL=http://localhost:3000` leaks to production, auth redirects resolve to localhost → `ERR_CONNECTION_REFUSED`. This was a P0 production outage. (T2)
-37. **AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch warning** — the env module emits a `console.warn` at module load when the two hosts differ. With `trustHost: true` it's no longer fatal, but it should still be fixed. (T2)
+37. **AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch** — env module THROWS in production runtime (was `console.warn` only — Sprint 3 T1 hardening). Still warns in dev/test. Build context unaffected (placeholders). With `trustHost: true` it's no longer fatal for auth redirects, but the env module now fails fast at runtime in production. (T2/T1)
 38. **`OPENAI_API_KEY.startsWith('sk-')` is NOT too strict** — `sk-proj-*`, `sk-svcacct-*`, `sk-admin-*` all literally start with `sk-`. Investigation revealed the original concern was unfounded. 5 regression-guard tests added. (T3)
 39. **Hardcoded third-party model IDs are an operational liability** — the placeholder `SDXL_IPADAPTER_MODEL` hash was a UUID-format string, not Replicate's 64-char hex SHA. Scene generation would have 404'd. Model IDs are now env-configurable with format validation. (T4)
 40. **`putObject` needs a size guard** — `MAX_PUT_OBJECT_BYTES = 500 MB` + `PayloadTooLargeError`. R2's limit is 5 GB, but function memory is the real constraint. (T7)
 41. **SSE needs both server-side and client-side resilience** — `maxDuration = 800` (T6, corrected) is the Vercel Pro/Enterprise GA ceiling under Fluid Compute (now default). The previous value of 900 exceeded the GA limit. Client-side reconnect with exponential backoff (1s → 2s → 4s, max 3 attempts) handles Vercel Hobby's 300s cap. (T6)
 42. **`pnpm-workspace.yaml` requires `packages:` field** — pnpm 9+ enforces this even for single-package repos. Fresh clones fail with `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION`. Fix: `packages: ['.']`. The engine floor is now `pnpm >=10.26.0` to match the `allowBuilds` syntax. (T0)
-43. **CI runs the full quality gate** — `.github/workflows/ci.yml` runs `pnpm lint && pnpm typecheck && pnpm test && pnpm build` on every PR. lint-staged only checks staged files; CI catches whole-codebase regressions. (T8)
+43. **CI runs the full quality gate** — `.github/workflows/ci.yml` runs `pnpm lint && pnpm typecheck && pnpm test && pnpm build` on every PR. lint-staged only checks staged files; CI catches whole-codebase regressions. (T8) **Sprint 3 T9: an `e2e` job was added with a Postgres service container, running `pnpm test:e2e`.**
 
 ### Remediation Sprint 3 (revenue integrity + auth + security + design)
 44. **`debitCredits()` signature changed (C5)** — now requires `idempotencyKey` as the 4th arg and returns `DebitResult { idempotent, eventId, creditsRemaining }`. Old callers that pass 3 args will fail to compile. Use deterministic keys like `${projectId}:voiceover`.
@@ -329,7 +344,7 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 
 ## What's Implemented vs. Outstanding
 
-### ✅ Implemented (code layer — 396 unit tests + 48 E2E tests, all GREEN)
+### ✅ Implemented (code layer — 479 unit tests + 48 E2E tests, all GREEN)
 - Auth.js v5 (Google OAuth + Credentials, Drizzle adapter, JWT sessions, **`trustHost: true`** for reverse-proxy compatibility — T2)
 - Drizzle schema (11 tables, 8 enums) + migration config
 - `verifySession()` DAL + middleware route protection
@@ -354,7 +369,7 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 - `getFfmpegPath()` helper — resolves FFmpeg binary from `env.FFMPEG_PATH` (**H1 fix: via env module, not `process.env`**)
 - **C3 + T5 fix: Rate limiting** — `src/lib/rate-limit.ts` with `authRateLimit` (10/15min/IP), `pipelineRateLimit` (5/min/user), `sseRateLimit` (1/user/project — kept for backward compat but no longer used in SSE route). **T5: SSE route now uses `claimSseSlot`/`releaseSseSlot`/`refreshSseSlot` Redis slot pattern** (SET NX EX 30 + DEL on abort + EXPIRE on poll). New deps: `@upstash/ratelimit`, `@upstash/redis`.
 - **H6 fix: Proxy host header validation** — rejects requests with unauthorized Host headers (canonical + localhost + `.vercel.app`). `/projects/:path*` added to matcher.
-- **H9 fix: Robust health endpoint** — `/api/health` checks DB (`SELECT 1`) + FFmpeg (`fs.accessSync`), returns 503 when unhealthy.
+- **H9 fix: Robust health endpoint** — `/api/health` checks DB (`SELECT 1`) + FFmpeg (`fs.accessSync`), returns 503 when unhealthy. **Sprint 3 T2: now also returns a `config` object ({healthy, authUrl, appUrl}) + `configErrors` array. Caveat: `config.healthy=false` does NOT trigger 503 — monitoring must inspect the JSON body.**
 - **H3 fix: Style chip enum** — `medieval` and `japanese-animation` added to `visualStyleEnum` + Zod + `STYLE_PROMPTS` (migration `0004`).
 - **M2 fix: Story length** — Hero textarea `maxLength` 500→5000, counter `/ 5000`, amber threshold ≥4500.
 - **C5 fix: Idempotency** — `usageEvents.idempotencyKey` column + UNIQUE index. All `append*` queries use `onConflictDoNothing`. UNIQUE constraints on `videos/voiceovers.projectId`, `characters(projectId,name)`, `scenes(projectId,order)`.
@@ -362,10 +377,10 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 - Privacy Policy + Terms of Service pages (Server Components, AI-specific clauses)
 - All 14 marketing CTAs wired to real routes
 - husky + lint-staged pre-commit hook (`.husky/pre-commit`)
-- **AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch warning** at module load
-- **GitHub Actions CI** (`.github/workflows/ci.yml`) running lint + typecheck + test + build on every PR
+- **AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch** — env module THROWS in production runtime (Sprint 3 T1 hardening; was `console.warn` only). Dev/test still warn.
+- **GitHub Actions CI** (`.github/workflows/ci.yml`) running lint + typecheck + test + build on every PR + e2e (Sprint 3 T9, with Postgres service container)
 - **`pnpm-workspace.yaml` fixed** with `packages: ['.']` field
-- 396 unit tests (48 files) + 48 E2E tests (9 files)
+- 479 unit tests (53 files) + 48 E2E tests (9 files)
 
 ### ⚠️ Outstanding (requires external resources / not yet done)
 - **External service credentials** — Neon, Google OAuth, OpenAI, Replicate, ElevenLabs, R2, Stripe, Inngest, Resend, Upstash, Sentry (fill `.env.local` from `.env.example`)
@@ -375,12 +390,12 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 - **Character consistency validated end-to-end** — manual R&D test (Risk R1, highest-risk component). Code is wired; needs real API keys.
 - **FFmpeg assembly validated end-to-end** — rewritten + unit-tested with mocked fluent-ffmpeg; needs real-world test with actual scene images + audio + SRT. **H5 (FFmpeg stream-to-R2) deferred** — requires `@aws-sdk/lib-storage` refactor to eliminate `/tmp` OOM risk.
 - **Monitoring** — Sentry, Vercel Analytics, Axiom not integrated (env var `SENTRY_DSN` in schema)
-- **E2E tests in CI** — Playwright E2E not yet in the GitHub Actions workflow (needs Postgres service container + browser binaries + seeded data)
-- **GDPR/CCPA endpoints missing** — cookie consent banner + `GET /api/user/export` + `DELETE /api/user` not implemented. ⚠️ **The Privacy Policy ALREADY promises these features** (§4 Data Retention + §6 Your Rights: Erasure + Portability). This is now a compliance P0 — the live legal page is making promises the code can't keep. Schema has `onDelete: 'cascade'` on every FK from `users`, so DB cascade is wired; only the API surface is missing.
+- ~~**E2E tests in CI**~~ → **Fixed (Sprint 3 T9)**: `.github/workflows/ci.yml` now includes an `e2e` job with Postgres 17 service container, FFmpeg install, drizzle migrations + seed, Playwright Chromium install. `continue-on-error: true` initially.
+- ~~**GDPR/CCPA endpoints missing**~~ → **Fixed (Sprint 3 T3 + T4 + T8)**: GET /api/user/export (T3); DELETE /api/user (T4, deleteUserAccount + deleteUserMedia for R2 best-effort cleanup); cookie consent banner (T8). All three now match the Privacy Policy promises.
 - **Other content pages missing** — `/pricing`, `/blog`, `/contact` linked from nav/footer but not implemented. ⚠️ Without a custom `not-found.tsx`, these dead links return 200 OK with the marketing page title (confirmed on live site), hiding the problem from operators + SEO.
-- **Navbar + dashboard + hero use raw `<a href>` instead of `next/link`** — `src/components/sections/navbar.tsx` (6 places), `src/app/(app)/dashboard/page.tsx` (2 places), `src/components/sections/hero.tsx` (1 place). Violates the "never use `<a>` for internal routes" rule. Causes full-page reloads on every nav click, degrading Lighthouse + UX.
+- ~~**Navbar + dashboard + hero use raw `<a href>`**~~ → **Fixed (Sprint 3 T5)**: All internal `<a href="/...">` replaced with `<Link>` across 9 files. `mailto:` and hash anchors kept as `<a>`.
 - **No custom `not-found.tsx` page** — Next.js default 404 inherits root layout metadata, making unknown URLs return 200 OK with the marketing page title. Bad for SEO, hides broken links.
-- **Env host-mismatch warning is insufficient** — `src/lib/env/index.ts:217-226` only `console.warn`s when `AUTH_URL` and `NEXT_PUBLIC_APP_URL` hosts differ. In production behind a reverse proxy, this was missed — causing the live `/dashboard` redirect to `http://localhost:3000`. The T2 code fix IS deployed (proven by `/api/health` returning the H9 DB+FFmpeg check), but `NEXT_PUBLIC_APP_URL` on the production server is set to `http://localhost:3000`. Fix: (a) set the env var correctly, (b) promote the warning to a thrown error in production, (c) surface env misconfigurations via `/api/health`.
+- ~~**Env host-mismatch warning is insufficient**~~ → **Fixed (Sprint 3 T1 + T2)** — T1 throws in production runtime; T2 surfaces via /api/health config object. Remaining: set env vars correctly on production host.
 - ~~**H2 — Brand color full replacement**~~ → **DONE (T11)** — `sed` sweep across 45 files replaced `amber-300/400/500/600` → `primary`, `bg-zinc-950` → `bg-background`, `bg-zinc-900` → `bg-card`, `bg-black` → `bg-background`. `brand-tokens.test.ts` now enforces 0 violations.
 - **M3 — Character image R2 upload** — `referenceImageKey` currently stores Replicate CDN URLs, not R2 keys. Uploading to R2 matches the docs' intent but requires pipeline Step 2 refactor.
 
@@ -429,7 +444,7 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 - ~~Host Header Injection risk~~ → Fixed (H6: `proxy.ts` validates Host header against whitelist; `/projects/:path*` added to matcher)
 - ~~Stripe webhook TOCTOU race~~ → Fixed (H7: INSERT-first `ON CONFLICT DO NOTHING`; removed hardcoded system user UUID; `usageEvents.userId` nullable). **T4: idempotency INSERT moved to AFTER side effects** + pre-check SELECT (prevents permanently-lost subscription updates on transient DB errors).
 - ~~`IMAGE_MODERATION_FAIL_OPEN` insecure default~~ → Fixed (H8: default flipped from `'true'` to `'false'` in production)
-- ~~Health endpoint bare~~ → Fixed (H9: checks DB `SELECT 1` + FFmpeg `fs.accessSync`, returns 503 when unhealthy)
+- ~~Health endpoint bare~~ → Fixed (H9: checks DB `SELECT 1` + FFmpeg `fs.accessSync`, returns 503 when unhealthy) **Sprint 3 T2: extended with `config` object + `configErrors` array (no 503 on config errors — by design).**
 - ~~Row lock untested~~ → Fixed (H10: `.for('update')` now test-verified via source-reading + concurrency test)
 - ~~Story length 500 vs 5000 mismatch~~ → Fixed (M2: Hero `maxLength` 500→5000, counter `/ 5000`, threshold ≥4500)
 - ~~Whisper no language param~~ → Fixed (M4: `alignSubtitles` accepts `{ audioBuffer, language? }`, defaults `'en'`)
@@ -449,6 +464,17 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 - ~~Dead `buildFfmpegCommand` export — second source of truth (M-5)~~ → Fixed (T10: deleted)
 - ~~Brand color system bypassed 122+ times across 28 files (M-6)~~ → Fixed (T11: `sed` sweep across 45 files → `primary`/`background`/`card` tokens; `brand-tokens.test.ts` enforces 0 violations)
 - ~~`useProjectProgress` double-close risk + `Date.now()` temp file collisions + hardcoded `metadataBase` placeholder (L-2/L-3/L-4)~~ → Fixed (T12: `eventSource=null` guard, `crypto.randomUUID()`, `env.NEXT_PUBLIC_APP_URL`)
+
+### ✅ Recently Closed (Sprint 3 — T1–T9 compliance + UX + CI hardening)
+- ~~Host-mismatch only console.warns~~ → Fixed (T1: env module now THROWS in production runtime; dev/test still warn)
+- ~~`/api/health` doesn't surface env misconfigurations~~ → Fixed (T2: returns `config` object {healthy, authUrl, appUrl} + `configErrors` array; NOTE: `config.healthy=false` does NOT trigger 503)
+- ~~No GDPR data export endpoint~~ → Fixed (T3: `GET /api/user/export` + `getUserExportData(userId)` in `src/features/auth/queries.ts`; uses `auth()` not `verifySession()`)
+- ~~No GDPR account deletion endpoint~~ → Fixed (T4: `DELETE /api/user` + `deleteUserAccount(userId)` + `deleteUserMedia(keys[])` in `src/lib/storage/r2.ts`; R2 cleanup best-effort)
+- ~~Raw `<a href>` for internal nav~~ → Fixed (T5: all 9 files migrated to `<Link>`; `mailto:` + hash anchors kept as `<a>`)
+- ~~`/pricing`, `/blog`, `/contact` return 200 with marketing title~~ → Fixed (T6: all three implemented as Server Components in `src/app/(legal)/`)
+- ~~No custom 404 page~~ → Fixed (T7: `src/app/not-found.tsx`)
+- ~~No cookie consent banner~~ → Fixed (T8: `src/components/app/cookie-banner.tsx` client component using `useSyncExternalStore`, mounted in `layout.tsx`)
+- ~~E2E tests not in CI~~ → Fixed (T9: `.github/workflows/ci.yml` `e2e` job with Postgres service container)
 
 ## Troubleshooting
 
@@ -479,12 +505,12 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 | Project detail page shows "This page couldn't load" | Client component imports `r2.ts` at module level, triggering env validation crash in browser | **Never import `@/lib/storage/r2` in `'use client'` files.** Sign URLs in Server Components, pass as props. |
 | `assemble-video` can't find FFmpeg binary | `@ffmpeg-installer/ffmpeg` removed; system FFmpeg not installed | `sudo apt install ffmpeg` (Ubuntu) or `brew install ffmpeg` (macOS). Set `FFMPEG_PATH` env var if non-standard. |
 | husky pre-commit hook doesn't run | `pnpm install` didn't run `prepare` script | Run `pnpm install`; ensure `.husky/pre-commit` is executable |
-| Auth redirects to `http://localhost:3000` in production | `AUTH_URL` env var set to localhost, OR reverse proxy doesn't forward `X-Forwarded-Host` | Set `AUTH_URL` to the production URL. The `trustHost: true` config (T2) makes Auth.js use the request's Host header as a fallback. The env module emits a `console.warn` when AUTH_URL and NEXT_PUBLIC_APP_URL hosts differ. |
+| Auth redirects to `http://localhost:3000` in production | `AUTH_URL` env var set to localhost, OR reverse proxy doesn't forward `X-Forwarded-Host` | Set `AUTH_URL` to the production URL. The `trustHost: true` config (T2) makes Auth.js use the request's Host header as a fallback. The env module now THROWS in production runtime (Sprint 3 T1) when hosts differ — set both to the same production URL or the app will crash-loop. |
 | `pnpm install` fails with `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION  packages field missing or empty` | `pnpm-workspace.yaml` missing `packages:` field (T0) | Add `packages: ['.']` to `pnpm-workspace.yaml` (already done in this repo) |
 | `putObject` throws `PayloadTooLargeError` | Body exceeds `MAX_PUT_OBJECT_BYTES` (500 MB) | Use multipart upload via `CreateMultipartUploadCommand` for larger files. The 500 MB cap is intentional — function memory is the real constraint. (T7) |
 | SSE stream disconnects after 300s (Vercel Hobby) | `maxDuration = 800` (T6, corrected) is the Vercel Pro/Enterprise GA ceiling under Fluid Compute. Hobby caps at 300s. | Upgrade to Vercel Pro OR rely on client-side reconnect (T6) which reopens after 1s/2s/4s backoff. UI shows "Reconnecting to live updates…" during reconnect. NOTE: the previous value of 900 exceeded the Pro GA limit. |
 | Replicate scene generation 404s | `REPLICATE_SDXL_IPADAPTER_MODEL` is the SDXL base placeholder (T4 default) | Set `REPLICATE_SDXL_IPADAPTER_MODEL` env var to a real `lucataco/sdxl-ipadapter:<sha>` hash from replicate.com/explorer |
-| Server log shows `[env] AUTH_URL host ("localhost:3000") differs from NEXT_PUBLIC_APP_URL host` | AUTH_URL and NEXT_PUBLIC_APP_URL point to different hosts | Set both to the same production URL. With `trustHost: true` (T2) this is no longer fatal, but should still be fixed (AUTH_URL is used for email magic links, etc.). |
+| Server log shows `[env] AUTH_URL host ("localhost:3000") differs from NEXT_PUBLIC_APP_URL host` | AUTH_URL and NEXT_PUBLIC_APP_URL point to different hosts | Set both to the same production URL. With `trustHost: true` (T2) auth redirects no longer crash, but the env module now THROWS at module load in production (Sprint 3 T1). Set both to the same production URL. |
 | Billing upgrade buttons return 404 | Form posted to non-existent `/api/stripe/checkout` route (C-1 bug, fixed in T1) | Fixed: billing page now uses `<form action={billingCheckoutAction}>` Server Action. Ensure `billingCheckoutAction` is imported from `@/features/billing/actions` (has `"use server"`). |
 | `/dashboard` returns `ERR_CONNECTION_REFUSED` for unauthenticated users | Proxy redirect used `nextUrl.origin` which resolves to `http://` behind TLS-terminating reverse proxy (C-2 bug, fixed in T2) | Fixed: proxy now uses `new URL('/sign-in', env.NEXT_PUBLIC_APP_URL)`. Verify `NEXT_PUBLIC_APP_URL` is set to the public HTTPS URL in `.env.local`. |
 | Dashboard shows ghost "pending" projects the user never completed | `createProjectAction` inserted the project before debiting credits; InsufficientCreditsError left an orphan row (H-1 bug, fixed in T3) | Fixed: INSERT + debit now wrapped in `db.transaction()` via `debitCreditsTx`. To clean up existing orphans: `DELETE FROM projects WHERE status = 'pending' AND progress_percent = 0;` |
@@ -496,14 +522,14 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 | `tsc` error: "Argument of type 'string \| undefined' is not assignable to parameter of type 'string'" inside a closure | TypeScript doesn't preserve `session.user.id` narrowing inside closures (T5 lesson) | Capture `const userId: string = session.user.id` BEFORE the closure so the type is narrowed. |
 | Live site `/dashboard` redirects to `http://localhost:3000/sign-in` → ERR_CONNECTION_REFUSED | Production `NEXT_PUBLIC_APP_URL` env var is set to `http://localhost:3000` instead of the public HTTPS URL. The T2 code fix IS deployed (proxy uses `env.NEXT_PUBLIC_APP_URL`). | Set `NEXT_PUBLIC_APP_URL=https://storyintovideo.jesspete.shop` (and `AUTH_URL` to the same host) in the production environment, then redeploy. Verify by checking `/api/health` and confirming the redirect target host matches the request host. |
 | Live site `/pricing`, `/blog`, `/contact` return 200 OK with marketing page title | No route handlers exist for these paths AND no custom `not-found.tsx` — Next.js default 404 inherits root layout metadata | Implement the routes (preferred) OR add `src/app/not-found.tsx` with proper 404 metadata + on-brand UX so dead links are visible to operators + SEO crawlers. |
-| Nav clicks cause full-page reloads (visible flash, Lighthouse regression) | Navbar/dashboard/hero use raw `<a href>` instead of `<Link>` from `next/link` (violates the "never use `<a>` for internal routes" rule) | Replace all internal `<a href>` with `<Link href>` from `next/link`. The `cta-routes.test.ts` verifies href values but not the component type — add a source-reading assertion for `<Link` usage. |
-| `/api/health` returns 200 healthy but auth-protected routes still broken | The health check only validates DB + FFmpeg, NOT env var correctness. `NEXT_PUBLIC_APP_URL` misconfiguration goes undetected. | (Planned fix) Extend `/api/health` to verify `AUTH_URL` and `NEXT_PUBLIC_APP_URL` hosts match, returning 503 if they differ. Operators monitoring `/api/health` will then catch env misconfigurations without reading server logs. |
+| Nav clicks cause full-page reloads (visible flash, Lighthouse regression) | Navbar/dashboard/hero use raw `<a href>` instead of `<Link>` from `next/link` (violates the "never use `<a>` for internal routes" rule) | Fixed (Sprint 3 T5): all 9 files now use `<Link>`. `mailto:` and hash anchors intentionally kept as `<a>`. |
+| `/api/health` returns 200 healthy but auth-protected routes still broken | DB + FFmpeg healthy, but env is misconfigured | **Fixed (Sprint 3 T2)** — `/api/health` now returns a `config` object ({healthy, authUrl, appUrl}) + `configErrors` array. NOTE: `config.healthy=false` does NOT trigger 503 (so monitoring must inspect the JSON body, not just the HTTP status). |
 
 ## Lessons Learned
 
 1. **`suppressHydrationWarning` on `<body>`** — Browser extensions inject attributes before React hydrates. `<html>` alone is insufficient.
 2. **Workflow is `'use client'`** — Uses `useState` for video loading choreography. Don't assume server components for "mostly static" sections.
-3. **Test counts drift from plans** — MEP planned 6+3, actual is now 396 unit + 48 E2E. Always verify against `pnpm test` output.
+3. **Test counts drift from plans** — MEP planned 6+3, actual is now 479 unit + 48 E2E. Always verify against `pnpm test` output.
 4. **File structure evolves** — `features/`, `lib/db/`, `lib/ai/`, `lib/auth/`, `lib/storage/`, `lib/inngest/`, `lib/stripe/`, `lib/env/` were created during production build. Update docs as you build.
 5. **Playwright needs separate install** — `pnpm install` doesn't install browser binaries.
 6. **Zod v4 `.url()` accepts any scheme** — compose `.url()` (validates URL format) with `.refine()` (restricts protocol to `postgres:`/`postgresql:`) for `DATABASE_URL`. The Zod v3 limitation where `.url()` rejected `postgresql://` no longer applies in v4.
@@ -537,12 +563,12 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 34. **SSE needs both server-side and client-side resilience** — `maxDuration = 800` (T6, corrected) is the Vercel Pro/Enterprise GA ceiling under Fluid Compute. The previous value of 900 exceeded the GA limit. Client-side reconnect with exponential backoff (1s → 2s → 4s, max 3 attempts) handles Vercel Hobby's 300s cap. (T6)
 35. **`putObject` needs a size guard** — `MAX_PUT_OBJECT_BYTES = 500 MB` + `PayloadTooLargeError`. R2's limit is 5 GB, but function memory is the real constraint. (T7)
 36. **`pnpm-workspace.yaml` requires `packages:` field** — pnpm 9+ enforces this even for single-package repos. Fresh clones fail with `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION`. Fix: `packages: ['.']`. The engine floor is now `pnpm >=10.26.0` to match the `allowBuilds` syntax. (T0)
-37. **CI runs the full quality gate** — `.github/workflows/ci.yml` runs `pnpm lint && pnpm typecheck && pnpm test && pnpm build` on every PR. lint-staged only checks staged files; CI catches whole-codebase regressions. (T8)
+37. **CI runs the full quality gate** — `.github/workflows/ci.yml` runs `pnpm lint && pnpm typecheck && pnpm test && pnpm build` on every PR. lint-staged only checks staged files; CI catches whole-codebase regressions. (T8) **Sprint 3 T9: e2e job added (Postgres service container).**
 
 ### Post-Audit-v1 Validation (2026-06-29)
-38. **`console.warn` is insufficient for env misconfigurations in production** — the AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch warning at `src/lib/env/index.ts:217-226` only emits `console.warn`. Behind a reverse proxy, server logs are easily missed. The live site at `storyintovideo.jesspete.shop` exhibited exactly this failure: `NEXT_PUBLIC_APP_URL=http://localhost:3000` caused every auth-protected route to redirect to `http://localhost:3000/sign-in` → `ERR_CONNECTION_REFUSED`. The T2 code fix was correctly deployed (proven by `/api/health` returning the H9 DB+FFmpeg check), but the env var was wrong. Lesson: production env misconfigurations should fail fast (throw at module load) OR be surfaced via `/api/health`.
-39. **Legal pages must not promise features the code doesn't implement** — the Privacy Policy at `src/app/(legal)/privacy/page.tsx` §4 publicly states "You may delete your account at any time, which triggers a CASCADE deletion…" and §6 lists GDPR rights to Erasure + Portability. No `DELETE /api/user` or `GET /api/user/export` endpoint exists. This is a compliance P0. Lesson: every right promised in legal copy must trace to a working endpoint.
-40. **`<a href>` vs `<Link>` drift is easy to miss in source-reading tests** — navbar, dashboard, and hero all use raw `<a href>` for internal routes, violating the "never use `<a>` for internal routes" rule. The existing `cta-routes.test.ts` verifies the href VALUES but not whether they're rendered as `<a>` or `<Link>`. Lesson: source-reading tests should assert both the route AND the component type when the distinction matters for performance.
+38. **`console.warn` is insufficient for env misconfigurations in production** — the AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch warning at `src/lib/env/index.ts:217-226` only emits `console.warn`. Behind a reverse proxy, server logs are easily missed. The live site at `storyintovideo.jesspete.shop` exhibited exactly this failure: `NEXT_PUBLIC_APP_URL=http://localhost:3000` caused every auth-protected route to redirect to `http://localhost:3000/sign-in` → `ERR_CONNECTION_REFUSED`. The T2 code fix was correctly deployed (proven by `/api/health` returning the H9 DB+FFmpeg check), but the env var was wrong. Lesson: production env misconfigurations should fail fast (throw at module load) OR be surfaced via `/api/health`. **RESOLVED in Sprint 3 T1+T2: env module now THROWS in production runtime; /api/health now surfaces config errors in the JSON body.**
+39. **Legal pages must not promise features the code doesn't implement** — the Privacy Policy at `src/app/(legal)/privacy/page.tsx` §4 publicly states "You may delete your account at any time, which triggers a CASCADE deletion…" and §6 lists GDPR rights to Erasure + Portability. No `DELETE /api/user` or `GET /api/user/export` endpoint exists. This is a compliance P0. Lesson: every right promised in legal copy must trace to a working endpoint. **RESOLVED in Sprint 3 T3+T4: both endpoints now exist and wire to the CASCADE-deletion schema already in place.**
+40. **`<a href>` vs `<Link>` drift is easy to miss in source-reading tests** — navbar, dashboard, and hero all use raw `<a href>` for internal routes, violating the "never use `<a>` for internal routes" rule. The existing `cta-routes.test.ts` verifies the href VALUES but not whether they're rendered as `<a>` or `<Link>`. Lesson: source-reading tests should assert both the route AND the component type when the distinction matters for performance. **RESOLVED in Sprint 3 T5: 9 files converted to `<Link>`.**
 41. **Next.js default 404 inherits root layout metadata** — without a custom `src/app/not-found.tsx`, any unknown URL returns 200 OK with the marketing page title. This hides broken links from operators and is bad for SEO. Lesson: always ship a custom `not-found.tsx` with proper metadata + on-brand UX.
 42. **Live-site behavioral testing catches what unit tests can't** — the `/dashboard` ERR_CONNECTION_REFUSED issue was only discoverable by hitting the live URL with a browser. Unit tests verify the proxy code uses `env.NEXT_PUBLIC_APP_URL` (correct), but can't catch the operational misconfiguration of that env var. Lesson: add a smoke test that hits `/api/health` + `/dashboard` (expecting redirect to `/sign-in` on the SAME host) after every deploy.
 
@@ -573,13 +599,13 @@ scanline-scroll, lang-dropdown-in, marquee-scroll
 
 ### Remediation Sprint 2 (post-review hardening)
 13. **`trustHost: true` on NextAuth config** — Auth.js v5 now uses the incoming request's Host header instead of `AUTH_URL`. Fixes the P0 production outage where auth redirects resolved to `localhost:3000`. (T2)
-14. **AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch warning** — the env module emits a `console.warn` at module load when the two hosts differ. Not fatal with `trustHost: true`, but still a misconfiguration that should be fixed. (T2)
+14. **AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch** — env module now THROWS in production runtime (Sprint 3 T1 hardening; was `console.warn`). Dev/test still warn. Not fatal to auth redirects (thanks to `trustHost: true` — T2), but the app process now fails fast in production if misconfigured. (T2/T1)
 15. **`SignedDownloadWrapper` extracted to its own file (T1), then DELETED in H4** — was inline in `projects/[id]/page.tsx`. T1 (remediation sprint 2) extracted it to `src/components/app/signed-download-wrapper.tsx` for independent testability + reuse (app component count went 7→8). H4 (remediation sprint 3) replaced it entirely with the click-time `/api/projects/[id]/download` API route — `SignedDownloadWrapper` was DELETED, app component count went back to 7. **The current count is 7 app components** (auth-form, create-wizard, empty-state, providers, project-progress-panel, project-download-button, project-share-button).
 16. **SDXL model IDs moved to env vars** — `REPLICATE_SDXL_MODEL` and `REPLICATE_SDXL_IPADAPTER_MODEL` are now read from the validated `env` module. The Zod schema validates the `owner/model:sha` format. The placeholder IP-Adapter hash was replaced with the SDXL base model + an explicit operator warning. (T4)
 17. **`moderationSkipped` field on `ImageModerationResult`** — the fail-open bypass is now observable. A `console.warn` is emitted on every skip. The policy is env-configurable via `IMAGE_MODERATION_FAIL_OPEN` (default `true`; set to `false` for production fail-closed). (T5)
 18. **SSE reconnect with exponential backoff** — `useProjectProgress` reopens the EventSource after errors, with 1s → 2s → 4s backoff, up to 3 attempts. New `connectionState: 'reconnecting'` value surfaces in the UI as "Reconnecting to live updates…". `maxDuration` on the SSE route set to 800 (Vercel Pro/Enterprise GA ceiling under Fluid Compute; the earlier value of 900 exceeded the GA limit and silently fell back to the platform default). (T6)
 19. **`putObject` size guard** — `MAX_PUT_OBJECT_BYTES = 500 MB` constant + `PayloadTooLargeError` thrown when exceeded. R2's hard limit is 5 GB, but function memory is the real constraint. (T7)
-20. **GitHub Actions CI** — `.github/workflows/ci.yml` runs `pnpm lint && pnpm typecheck && pnpm test && pnpm build` on every push to main and every PR. pnpm store cache keyed on lockfile hash. E2E tests not yet in CI (need Postgres service + Playwright browsers). (T8)
+20. **GitHub Actions CI** — `.github/workflows/ci.yml` runs `pnpm lint && pnpm typecheck && pnpm test && pnpm build` on every push to main and every PR. pnpm store cache keyed on lockfile hash. **Sprint 3 T9: e2e job added with Postgres service container.**
 21. **`pnpm-workspace.yaml` fixed** — added the missing `packages: ['.']` field + standardized on `allowBuilds` syntax (removed deprecated `onlyBuiltDependencies` array); engine floor bumped to `pnpm >=10.26.0`. (T0)
 
 ### Post-Review Hardening (design_critique.md remediation)
