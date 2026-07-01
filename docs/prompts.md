@@ -26,6 +26,10 @@ yes, please meticulously plan to proceed with T1 to T2 in sequence. first create
 
 ---
 
+the dev server is live at URL `https://storyintovideo.jesspete.shop`, please meticulously plan to run E2E tests using the CLI browser tools 'agent-browser' and/or 'playwright-cli' directly as already installed system commands (refer to skills by the tool names on the usage patterns).
+
+---
+
 please meticulously use the CLI browser tools, agent-browser and/or playwright-cli (run them in bash shell), to test `/sign-in`. next, meticulously plan to do E2E tests to validate the code changes involved in production readiness transformation.
 
 ---
