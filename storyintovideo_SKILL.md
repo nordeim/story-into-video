@@ -101,7 +101,7 @@ Every component has a purpose beyond aesthetics. The hierarchy is:
 | Billing | Stripe | `^22.3.0` | "Basil" API (2025-03-31) — `current_period_end` moved to `items.data[0]` |
 | Validation | Zod (env + Server Action inputs) | `^4.4.3` | Zod v4 `.url()` accepts any scheme → compose with `.refine()` for protocol restriction |
 | Video | FFmpeg (system binary) | `fluent-ffmpeg ^2.1.3` | `FFMPEG_PATH` env var (default `/usr/bin/ffmpeg`); `@ffmpeg-installer/ffmpeg` REMOVED (Turbopack-incompatible) |
-| Rate Limiting | Upstash Ratelimit + Redis | `@upstash/ratelimit ^2.0.8` | 3 limiters: auth 10/15min/IP, pipeline 5/min/user, SSE slot pattern |
+| Rate Limiting | Upstash Ratelimit + Redis | `@upstash/ratelimit ^2.0.8`, `@upstash/redis ^1.38.0` | 3 limiters: auth 10/15min/IP, pipeline 5/min/user, SSE slot pattern |
 | Hashing | bcryptjs | `^3.0.3` | Cost factor 12 |
 | Testing (unit) | Vitest + jsdom | `vitest ^4.0.0` | 524 tests across 58 files |
 | Testing (E2E) | Playwright | `^1.61.0` | Chromium only; 48 tests across 9 spec files |
@@ -317,7 +317,7 @@ export default defineConfig({
 });
 ```
 
-### 3.3 Environment Variables (27 required + 3 optional = 30 total)
+### 3.3 Environment Variables (30 total — 20 required, 5 with defaults, 2 optional)
 
 All env vars are validated by a Zod schema in `src/lib/env/index.ts`. **Never read `process.env.*` directly** — always import `env` from `@/lib/env`.
 
