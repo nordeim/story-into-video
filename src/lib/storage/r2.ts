@@ -192,5 +192,4 @@ export async function deleteUserMedia(keys: string[]): Promise<number> {
   return deletedCount;
 }
 
-export { r2Client, BUCKET_MAP };
 export type { BucketName };

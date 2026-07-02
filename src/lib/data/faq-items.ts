@@ -23,7 +23,7 @@ export const FAQ_ITEMS: FAQItem[] = [
     id: 'visual-style',
     question: 'Can I customize the visual style?',
     answer:
-      'Absolutely. Choose from 7+ visual styles including Ghibli, Oil Painting, Anime, Realistic, Cyberpunk, Watercolor, and Comic — or describe a custom style and the AI will adapt.',
+      'Absolutely. Choose from 8 visual styles including Ghibli, Medieval, Oil Painting, Anime, Japanese animation, Realistic, Cyberpunk, and Watercolor — or describe a custom style and the AI will adapt.',
   },
   {
     id: 'generation-time',

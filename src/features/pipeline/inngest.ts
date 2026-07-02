@@ -89,7 +89,17 @@ export const pipelineFunction = inngest.createFunction(
     // Step 1: Story analysis
     const analysis = await step.run('analyze-story', async () => {
       await updateProjectProgress(projectId, 'analyzing', 'Analyzing story…', 10);
-      return analyzeStory(project.story);
+      try {
+        return await analyzeStory(project.story);
+      } catch (err) {
+        // NF-6: Mark the project failed so users see a clear error state
+        // instead of a ghost "Analyzing… 10%" that never resolves.
+        // Re-throw so Inngest still retries — if the retry succeeds, the
+        // project status will be updated to the next step's progress.
+        const message = err instanceof Error ? err.message : String(err);
+        await setProjectFailed(projectId, `Story analysis failed: ${message}`);
+        throw err;
+      }
     });
 
     // Step 2: Character generation (with image moderation per ADR-011)
@@ -200,133 +210,165 @@ export const pipelineFunction = inngest.createFunction(
     // Step 4: Voiceover synthesis (ElevenLabs TTS, chunked)
     await step.run('synthesize-voiceover', async () => {
       await updateProjectProgress(projectId, 'synthesizing_voice', 'Synthesizing voiceover…', 65);
+      try {
+        const narrationText = buildNarrationText(analysis);
+        const voiceResult = await synthesizeVoice({
+          text: narrationText,
+          voiceId: DEFAULT_VOICE_ID,
+        });
 
-      const narrationText = buildNarrationText(analysis);
-      const voiceResult = await synthesizeVoice({
-        text: narrationText,
-        voiceId: DEFAULT_VOICE_ID,
-      });
+        // Upload the audio buffer to R2 (generated bucket)
+        const audioKey = buildObjectKey(projectId, 'voiceover.mp3');
+        await putObject('generated', audioKey, voiceResult.audioBuffer, 'audio/mpeg');
 
-      // Upload the audio buffer to R2 (generated bucket)
-      const audioKey = buildObjectKey(projectId, 'voiceover.mp3');
-      await putObject('generated', audioKey, voiceResult.audioBuffer, 'audio/mpeg');
+        // Insert the voiceover row
+        await appendVoiceover(
+          projectId,
+          DEFAULT_VOICE_ID,
+          'Rachel',
+          audioKey,
+          voiceResult.duration,
+          narrationText,
+        );
 
-      // Insert the voiceover row
-      await appendVoiceover(
-        projectId,
-        DEFAULT_VOICE_ID,
-        'Rachel',
-        audioKey,
-        voiceResult.duration,
-        narrationText,
-      );
-
-      // Debit voiceover credits — idempotent via ON CONFLICT (C5)
-      await debitCredits(
-        project.userId,
-        CREDIT_COSTS.voiceover,
-        'voiceover',
-        `${projectId}:voiceover`,
-        projectId,
-      );
+        // Debit voiceover credits — idempotent via ON CONFLICT (C5)
+        await debitCredits(
+          project.userId,
+          CREDIT_COSTS.voiceover,
+          'voiceover',
+          `${projectId}:voiceover`,
+          projectId,
+        );
+      } catch (err) {
+        // NF-6: Mark failed so users see the error instead of a stuck 65%.
+        const message = err instanceof Error ? err.message : String(err);
+        await setProjectFailed(projectId, `Voiceover synthesis failed: ${message}`);
+        throw err;
+      }
     });
 
     // Step 5: Subtitle alignment (Whisper ASR → SRT)
     await step.run('align-subtitles', async () => {
       await updateProjectProgress(projectId, 'aligning_subtitles', 'Aligning subtitles…', 80);
+      try {
+        // Fetch the voiceover we just created
+        const voiceover = await getProjectVoiceover(projectId);
+        if (!voiceover?.audioKey) {
+          throw new Error('Voiceover not found for subtitle alignment');
+        }
 
-      // Fetch the voiceover we just created
-      const voiceover = await getProjectVoiceover(projectId);
-      if (!voiceover?.audioKey) {
-        throw new Error('Voiceover not found for subtitle alignment');
+        // Download the audio from R2 to feed Whisper
+        const audioDownloadUrl = await getSignedDownloadUrl('generated', voiceover.audioKey);
+        const audioResponse = await fetch(audioDownloadUrl);
+        const audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
+
+        // Run Whisper ASR (M4: default language 'en' for now — future: detect
+        // from the story analysis or accept user input)
+        const subtitleResult = await alignSubtitles({ audioBuffer });
+
+        // Upload the SRT to R2
+        const subtitleKey = buildObjectKey(projectId, 'subtitles.srt');
+        await putObject(
+          'generated',
+          subtitleKey,
+          Buffer.from(subtitleResult.srt, 'utf-8'),
+          'text/plain',
+        );
+
+        // Create the video row (so we can attach the subtitle to it)
+        await appendVideo(projectId, null, subtitleKey, null, '720p');
+        await updateVideoSubtitle(projectId, subtitleKey);
+
+        // Debit subtitle alignment credits — idempotent via ON CONFLICT (C5)
+        await debitCredits(
+          project.userId,
+          CREDIT_COSTS.subtitle_alignment,
+          'subtitle_alignment',
+          `${projectId}:subtitle_alignment`,
+          projectId,
+        );
+      } catch (err) {
+        // NF-6: Mark failed so users see the error instead of a stuck 80%.
+        const message = err instanceof Error ? err.message : String(err);
+        await setProjectFailed(projectId, `Subtitle alignment failed: ${message}`);
+        throw err;
       }
-
-      // Download the audio from R2 to feed Whisper
-      const audioDownloadUrl = await getSignedDownloadUrl('generated', voiceover.audioKey);
-      const audioResponse = await fetch(audioDownloadUrl);
-      const audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
-
-      // Run Whisper ASR (M4: default language 'en' for now — future: detect
-      // from the story analysis or accept user input)
-      const subtitleResult = await alignSubtitles({ audioBuffer });
-
-      // Upload the SRT to R2
-      const subtitleKey = buildObjectKey(projectId, 'subtitles.srt');
-      await putObject(
-        'generated',
-        subtitleKey,
-        Buffer.from(subtitleResult.srt, 'utf-8'),
-        'text/plain',
-      );
-
-      // Create the video row (so we can attach the subtitle to it)
-      await appendVideo(projectId, null, subtitleKey, null, '720p');
-      await updateVideoSubtitle(projectId, subtitleKey);
-
-      // Debit subtitle alignment credits — idempotent via ON CONFLICT (C5)
-      await debitCredits(
-        project.userId,
-        CREDIT_COSTS.subtitle_alignment,
-        'subtitle_alignment',
-        `${projectId}:subtitle_alignment`,
-        projectId,
-      );
     });
 
     // Step 6: Video assembly (FFmpeg → MP4)
     await step.run('assemble-video', async () => {
       await updateProjectProgress(projectId, 'assembling_video', 'Assembling your video…', 90);
+      try {
+        // Gather inputs for FFmpeg
+        const scenes = await getProjectScenes(projectId);
+        const voiceover = await getProjectVoiceover(projectId);
+        if (!voiceover?.audioKey) {
+          throw new Error('Voiceover not found for video assembly');
+        }
 
-      // Gather inputs for FFmpeg
-      const scenes = await getProjectScenes(projectId);
-      const voiceover = await getProjectVoiceover(projectId);
-      if (!voiceover?.audioKey) {
-        throw new Error('Voiceover not found for video assembly');
+        const audioUrl = await getSignedDownloadUrl('generated', voiceover.audioKey);
+
+        // Fetch the SRT content (we wrote it in Step 5)
+        const subtitleKey = buildObjectKey(projectId, 'subtitles.srt');
+        const srtDownloadUrl = await getSignedDownloadUrl('generated', subtitleKey);
+        const srtResponse = await fetch(srtDownloadUrl);
+        const subtitlesSrt = await srtResponse.text();
+
+        // Sign scene image URLs — FFmpeg needs accessible URLs, not R2 keys
+        const sceneImageUrls = await Promise.all(
+          scenes.map((s) => getSignedDownloadUrl('generated', s.generatedImageKey!)),
+        );
+
+        // Assemble the video
+        const assembleResult = await assembleVideo({
+          sceneImageUrls,
+          sceneDurations: scenes.map((s) => s.duration ?? 8),
+          audioUrl,
+          subtitlesSrt,
+          aspectRatio: project.aspectRatio,
+          resolution: '720p',
+        });
+
+        // Upload the final MP4 to R2 (videos bucket)
+        const videoKey = buildObjectKey(projectId, 'final.mp4');
+        await putObject('videos', videoKey, assembleResult.videoBuffer, 'video/mp4');
+
+        // Update the video row (created in Step 5) with the actual video key + duration
+        await updateVideo(projectId, videoKey, assembleResult.duration);
+
+        // Debit video assembly credits — idempotent via ON CONFLICT (C5)
+        await debitCredits(
+          project.userId,
+          CREDIT_COSTS.video_assembly,
+          'video_assembly',
+          `${projectId}:video_assembly`,
+          projectId,
+        );
+      } catch (err) {
+        // NF-6: Mark failed so users see the error instead of a stuck 90%.
+        const message = err instanceof Error ? err.message : String(err);
+        await setProjectFailed(projectId, `Video assembly failed: ${message}`);
+        throw err;
       }
-
-      const audioUrl = await getSignedDownloadUrl('generated', voiceover.audioKey);
-
-      // Fetch the SRT content (we wrote it in Step 5)
-      const subtitleKey = buildObjectKey(projectId, 'subtitles.srt');
-      const srtDownloadUrl = await getSignedDownloadUrl('generated', subtitleKey);
-      const srtResponse = await fetch(srtDownloadUrl);
-      const subtitlesSrt = await srtResponse.text();
-
-      // Sign scene image URLs — FFmpeg needs accessible URLs, not R2 keys
-      const sceneImageUrls = await Promise.all(
-        scenes.map((s) => getSignedDownloadUrl('generated', s.generatedImageKey!)),
-      );
-
-      // Assemble the video
-      const assembleResult = await assembleVideo({
-        sceneImageUrls,
-        sceneDurations: scenes.map((s) => s.duration ?? 8),
-        audioUrl,
-        subtitlesSrt,
-        aspectRatio: project.aspectRatio,
-        resolution: '720p',
-      });
-
-      // Upload the final MP4 to R2 (videos bucket)
-      const videoKey = buildObjectKey(projectId, 'final.mp4');
-      await putObject('videos', videoKey, assembleResult.videoBuffer, 'video/mp4');
-
-      // Update the video row (created in Step 5) with the actual video key + duration
-      await updateVideo(projectId, videoKey, assembleResult.duration);
-
-      // Debit video assembly credits — idempotent via ON CONFLICT (C5)
-      await debitCredits(
-        project.userId,
-        CREDIT_COSTS.video_assembly,
-        'video_assembly',
-        `${projectId}:video_assembly`,
-        projectId,
-      );
     });
 
     // Final step: mark project as completed
     await step.run('complete', async () => {
-      await updateProjectProgress(projectId, 'completed', 'Your video is ready!', 100);
+      // NF-6: The complete step is special. By the time we reach it, the MP4 is
+      // already in R2 and the video row has status='completed' (set by updateVideo
+      // in Step 6). If this final updateProjectProgress call fails (e.g., DB blip),
+      // we do NOT mark the project failed — the user can still download the video
+      // via /api/projects/[id]/download (which checks videoKey presence, not
+      // status === 'completed'). We log the error and let the pipeline return
+      // success so Inngest doesn't retry (which would re-run Step 6 needlessly).
+      try {
+        await updateProjectProgress(projectId, 'completed', 'Your video is ready!', 100);
+      } catch (err) {
+        console.error(
+          `[pipeline] Failed to mark project ${projectId} as completed (video is in R2; user can still download):`,
+          err,
+        );
+      }
     });
 
     return { success: true, projectId };

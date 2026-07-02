@@ -77,6 +77,23 @@ jobs:
           NEXT_PHASE: phase-production-build
           NODE_ENV: production
 
+      # NF-1: Guard against dev-only chunks leaking into the production build.
+      # The live site was previously running `next dev` in production (confirmed
+      # by hmr-client chunks in the HTML). This step greps the .next/ output for
+      # the dev-only HMR client and fails the build if found.
+      - name: Verify build output contains no dev-only chunks (hmr-client)
+        run: |
+          if grep -rl "hmr-client" .next/ 2>/dev/null; then
+            echo "❌ FAIL: dev-only hmr-client chunks found in production build output"
+            echo "This indicates the build is running in dev mode. Check:"
+            echo "  - NODE_ENV is set to 'production'"
+            echo "  - NEXT_PHASE is set to 'phase-production-build'"
+            echo "  - No `next dev` invocation in the build step"
+            exit 1
+          else
+            echo "✅ PASS: no dev-only hmr-client chunks in build output"
+          fi
+
   # T9: Playwright E2E tests against a live dev server + seeded Postgres.
   # Runs only after the quality-gate job passes (needs: quality-gate) to
   # avoid wasting CI minutes on E2E when lint/typecheck/test/build already

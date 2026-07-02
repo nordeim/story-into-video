@@ -22,6 +22,7 @@ vi.mock('@/lib/ai/openai', () => ({
     chat: { completions: { create: vi.fn() } },
   },
   GPT_MODEL: 'gpt-4o',
+  WHISPER_MODEL: 'whisper-1',
 }));
 
 vi.mock('@/lib/stripe/client', () => ({

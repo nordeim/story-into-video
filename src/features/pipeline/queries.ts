@@ -196,8 +196,3 @@ export async function updateVideo(
     .set({ videoKey, duration, status: 'completed' })
     .where(eq(videos.projectId, projectId));
 }
-
-export async function getProjectVideo(projectId: string) {
-  const [video] = await db.select().from(videos).where(eq(videos.projectId, projectId)).limit(1);
-  return video;
-}

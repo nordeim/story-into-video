@@ -29,6 +29,7 @@ vi.mock('@/lib/ai/openai', () => ({
     chat: { completions: { create: vi.fn() } },
   },
   GPT_MODEL: 'gpt-4o',
+  WHISPER_MODEL: 'whisper-1',
 }));
 
 vi.mock('@/lib/ai/replicate', () => ({
@@ -167,7 +168,6 @@ vi.mock('@/features/pipeline/queries', () => ({
     audioKey: 'p1/voiceover.mp3',
     transcript: 'A test story summary.',
   }),
-  getProjectVideo: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('@/lib/db', () => ({

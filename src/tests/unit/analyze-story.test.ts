@@ -13,6 +13,7 @@ vi.mock('@/lib/ai/openai', () => ({
     },
   },
   GPT_MODEL: 'gpt-4o',
+  WHISPER_MODEL: 'whisper-1',
 }));
 
 import { openai } from '@/lib/ai/openai';

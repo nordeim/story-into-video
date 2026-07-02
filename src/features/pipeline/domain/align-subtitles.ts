@@ -1,4 +1,4 @@
-import { openai } from '@/lib/ai/openai';
+import { openai, WHISPER_MODEL } from '@/lib/ai/openai';
 
 /**
  * Subtitle alignment — uses OpenAI Whisper API to get word-level timestamps,
@@ -44,7 +44,7 @@ export async function alignSubtitles(input: AlignSubtitlesInput): Promise<AlignS
   // Whisper API accepts audio file uploads
   const transcription = await openai.audio.transcriptions.create({
     file: new File([new Uint8Array(input.audioBuffer)], 'voiceover.mp3', { type: 'audio/mp3' }),
-    model: 'whisper-1',
+    model: WHISPER_MODEL,
     language,
     response_format: 'verbose_json',
     timestamp_granularities: ['word'],

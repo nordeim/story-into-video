@@ -1,5 +1,14 @@
 # StoryIntoVideo Remediation — Execution Summary
 
+> ⚠️ **SUPERSEDED** — This document was written 2026-06-28 and is no longer current.
+> The latest status is in `status_12.md` (and the upcoming `status_13.md`).
+> Specifically:
+> - H2 (brand colors) is now CLOSED (T11 sed sweep + `brand-tokens.test.ts` enforces 0 violations)
+> - H5 (`@aws-sdk/lib-storage`) is NOT installed — the claim "dep installed" below is inaccurate;
+>   see `CLAUDE.md` for the corrected status
+> - The test count (377) is outdated; the current count is 524+ (see `status_12.md` / `status_13.md`)
+> - All 12 tasks (T1–T12) listed below are CLOSED; see `REMEDIATION_PLAN_v2.md` for audit-v2 findings (NF-1 through NF-6)
+
 **Executor:** Claw Code (Frontend Architect & Avant-Garde UI Designer)
 **Date:** 2026-06-28
 **Method:** TDD (RED → GREEN → REFACTOR → COMMIT) per task, verification gate per phase
