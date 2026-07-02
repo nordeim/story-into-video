@@ -30,6 +30,10 @@ the dev server is live at URL `https://storyintovideo.jesspete.shop`, please met
 
 ---
 
+please meticulously plan to review and validate @storyintovideo_SKILL.md against the codebase for alignment, and also validate against the prior versions of SKILL.md @storyintovideo_SKILL-v7.md and @storyintovideo_SKILL-v8.md to check for regressions caused by accidental ommissions of still valid and useful details and sections. all SKILL files I referred to are in the current project folder: `/home/project/story-into-video-prod/storyintovideo_SKILL.md` , `/home/project/story-into-video-prod/storyintovideo_SKILL-v7.md` and `/home/project/story-into-video-prod/storyintovideo_SKILL-v8.md`
+
+---
+
 please meticulously use the CLI browser tools, agent-browser and/or playwright-cli (run them in bash shell), to test `/sign-in`. next, meticulously plan to do E2E tests to validate the code changes involved in production readiness transformation.
 
 ---

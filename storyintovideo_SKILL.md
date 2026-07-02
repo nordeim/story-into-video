@@ -3,7 +3,7 @@
 > **Version:** 9.0 (v9 — post-audit-v2 remediation)
 > **Last Updated:** 2026-07-02
 > **Status:** CANONICAL — supersedes all `storyintovideo_SKILL-v*.md` files
-> **Test count:** 524 unit (58 files) + 48 E2E (9 specs) = 572 total, all GREEN
+> **Test count:** 524 unit (58 files) + 48 E2E (10 spec files) = 572 total, all GREEN
 > **Route count:** 22 (13 static + 9 dynamic)
 
 This skill file distills the complete knowledge of the StoryIntoVideo codebase — design philosophy, tech stack, architecture, component patterns, hooks, accessibility, anti-patterns, debugging, lessons learned, and the exact tokens/interfaces/z-index map that a coding agent needs to replicate or extend this project with the same quality bar.
@@ -206,6 +206,47 @@ pnpm install  # runs `prepare: husky || true`
   "exclude": ["node_modules", "skills", "docs"]
 }
 ```
+
+#### `drizzle.config.ts` (CRITICAL: never use `db push` in production)
+
+```typescript
+import 'dotenv/config';
+import { defineConfig } from 'drizzle-kit';
+
+export default defineConfig({
+  schema: './src/lib/db/schema/index.ts',
+  out: './drizzle',
+  dialect: 'postgresql',
+  dbCredentials: {
+    url: process.env.DATABASE_URL_UNPOOLED!, // Direct Neon connection (NOT pooled)
+  },
+  verbose: true,
+  strict: true,
+});
+```
+
+**CRITICAL RULES:**
+- **Never use `drizzle-kit push` in production** — always `drizzle-kit generate` + `drizzle-kit migrate`
+- **Migrations need `DATABASE_URL_UNPOOLED`** — pooled connections + DDL is unreliable
+- **All FKs from `users` are `onDelete: 'cascade'`** — GDPR deletion relies on this
+
+#### `pnpm-workspace.yaml` (pnpm 10.26+ required)
+
+```yaml
+packages:
+  - '.'
+allowBuilds:
+  esbuild: true
+  protobufjs: true
+  sharp: true
+  unrs-resolver: true
+```
+
+**Critical notes:**
+- `packages: ['.']` is **required** even for single-package repos (pnpm 9+ enforces this)
+- `allowBuilds` (pnpm 10.26+) replaced `onlyBuiltDependencies` (removed in pnpm 11)
+- The engine floor is `>=10.26.0` to match the `allowBuilds` syntax
+- `esbuild` must be approved or `drizzle-kit`, `vitest`, and `tsx` won't build
 
 #### `next.config.ts` (6 security headers — NF-2)
 ```typescript
@@ -938,7 +979,7 @@ Before claiming any task is complete, verify ALL of the following:
 pnpm lint           # 0 warnings (ESLint flat config)
 pnpm typecheck      # 0 errors (tsc --noEmit, strict + noUncheckedIndexedAccess)
 pnpm test           # 524 unit tests pass (58 files)
-pnpm test:e2e       # 48 E2E tests pass (9 specs, requires Playwright browsers)
+pnpm test:e2e       # 48 E2E tests pass (10 spec files, requires Playwright browsers)
 pnpm format:check   # All files pass Prettier
 pnpm build          # 0 errors (hybrid: static + dynamic)
 ```
@@ -953,7 +994,40 @@ node scripts/check-env.js
 # Checks: host-mismatch, AUTH_SECRET ≥32 chars, placeholder API keys, missing required vars
 ```
 
-### 11.4 Post-Deployment Verification
+### 11.4 Post-Deploy Live-Site Smoke Test (30-Second Check)
+
+After every deploy, run this shell script to catch operational misconfigurations that unit tests cannot detect (the `NEXT_PUBLIC_APP_URL=localhost` failure on 2026-06-29 was discovered exactly this way):
+
+```bash
+#!/bin/bash
+set -e
+
+HOST="https://storyintovideo.jesspete.shop"
+REDIRECT=$(curl -sI "$HOST/dashboard" | grep -i location | tr -d '\r')
+
+# 1. Verify auth redirect stays on same host (catches NEXT_PUBLIC_APP_URL misconfig)
+if echo "$REDIRECT" | grep -q "localhost"; then
+  echo "FAIL: Redirects to localhost — env NEXT_PUBLIC_APP_URL is wrong"
+  exit 1
+fi
+
+# 2. Verify /api/health returns healthy DB + FFmpeg + configHealthy (H9 + T2)
+curl -s "$HOST/api/health" | jq '.status == "healthy" and .config.healthy' | grep true
+
+# 3. Verify known routes return 200
+for path in / /pricing /blog /contact /privacy /terms; do
+  code=$(curl -s -o /dev/null -w "%{http_code}" "$HOST$path")
+  [[ "$code" == "200" ]] || { echo "FAIL: $path returned $code"; exit 1; }
+done
+
+# 4. Verify 404 page returns proper 404 (not 200 with marketing title)
+code=$(curl -s -o /dev/null -w "%{http_code}" "$HOST/nonexistent")
+[[ "$code" == "404" ]] || { echo "FAIL: 404 returned $code"; exit 1; }
+
+echo "✅ Smoke test passed"
+```
+
+### 11.5 Post-Deployment Verification
 ```bash
 node scripts/verify-deployment.js
 # 9 checks: /api/health, /dashboard redirect, /pricing+/blog+/contact 200, /sign-in, 404, /privacy+/terms
@@ -1023,14 +1097,48 @@ node scripts/verify-deployment.js
 25. **Docs claiming "dep installed" when it isn't is a real bug** (NF-5) — verify doc claims against `package.json` at doc-writing time.
 26. **Pipeline steps without try/catch create ghost "in progress" projects** (NF-6) — every step that can throw must catch + `setProjectFailed` + re-throw. Exception: the final "mark complete" step (work is done, don't mark it failed).
 
-### Additional Lessons (27–60 from prior sprints, summarized)
+### Audit-v1 Remediation Lessons (27–50, condensed)
 
-27. **`console.warn` is insufficient for env misconfigurations in production** — throw at module load OR surface via `/api/health`.
-28. **Legal pages must not promise features the code doesn't implement** — every right promised in legal copy must trace to a working endpoint.
-29. **`<a href>` vs `<Link>` drift is easy to miss in source-reading tests** — assert both the route AND the component type.
-30. **Next.js default 404 inherits root layout metadata** — always ship a custom `not-found.tsx`.
-31. **Live-site behavioral testing catches what unit tests can't** — add a smoke test after every deploy.
-32–60. *(See CLAUDE.md "Lessons Learned" section 32–60 for the full list covering T1–T12 audit-v1 remediation lessons — includes R2 error classification, EventSource double-close, `Date.now()` collisions, `metadataBase` placeholders, host header injection, Stripe webhook idempotency, SSE slot release, and more.)*
+27. **Server Action forms must live in a `"use server"` module** — defining inline in a Server Component page causes build failure (T1).
+28. **Behind a TLS-terminating reverse proxy, `nextUrl.origin` lies** — always use `env.NEXT_PUBLIC_APP_URL` for redirects (T2).
+29. **Idempotency-key-too-early is a silent data-loss anti-pattern** — INSERT the idempotency row **AFTER** side effects succeed (T4).
+30. **Upstash `fixedWindow` rate limiters can't release on disconnect** — use Redis `SET NX EX` + `DEL` for connection-counting (T5).
+31. **Drizzle transactions can't be nested** — extract a `*Tx(tx, ...)` variant that accepts the transaction handle (T3).
+32. **Source-reading tests must search for `.method()` not `db.method()`** — multiline chains break `indexOf` on the receiver (T4 test).
+33. **TypeScript doesn't preserve `session.user.id` narrowing inside closures** — capture `const userId: string = session.user.id` before the closure (T5).
+34. **`appendVideo` setting `status='completed'` at insert time is a state-machine lie** — use `'rendering'` at insert, `'completed'` on completion (T8).
+35. **Module-load constants make env-configurable behavior untestable per-call** — move the read into a function body (T9).
+36. **Dead exports accumulate silently across sprints** — every export should have at least one importer (NF-4).
+37. **Large mechanical sweeps need scripted `sed`, not manual edits** — Rule of 500: use automation for >500-line refactors (T11).
+38. **`metadataBase` hardcoded to a placeholder breaks social sharing** — use `env.NEXT_PUBLIC_APP_URL` (T12/L-4).
+39. **`Date.now()` temp file names collide under concurrency** — use `crypto.randomUUID()` (T12/L-3).
+40. **`EventSource.close()` is idempotent but sloppy** — set `eventSource = null` after close to guard against double-close (T12/L-2).
+41. **R2 error classification matters for operators** — 502/504/500 lets operators distinguish transient from permanent failures (T6).
+42. **Payment failure should not silently zero-out credits** — return `InsufficientCreditsError` so the user sees why the pipeline didn't start (T3).
+43. **The `complete` step must NOT call `setProjectFailed`** — the video is already in R2; marking failed would contradict reality (NF-6).
+44. **Every `debitCredits` call MUST pass an `idempotencyKey`** — no exceptions. Deterministic per (project, step, entity) (C5).
+45. **Replicate scene generation 404s silently if IP-Adapter model is a placeholder** — validate model format in env schema (T4).
+46. **Client component imports of `r2.ts` crash the browser** — `env` module validates 30 vars at load; only `NEXT_PUBLIC_*` exist client-side (H4).
+47. **`FFMPEG_PATH` must go through the Zod env schema** — `process.env.FFMPEG_PATH` bypasses validation (H1).
+48. **Host Header Injection is a real attack vector** — validate Host header in proxy against whitelist (H6).
+49. **Stripe webhook TOCTOU race was a silent revenue leak** — concurrent webhooks could double-charge; `ON CONFLICT DO NOTHING` + pre-check SELECT prevents it (H7).
+50. **Production env misconfigurations should fail-fast** — `console.warn` is insufficient; throw at module load in production (T1).
+
+### Sprint 3 Lessons (51–55)
+
+51. **Legal pages must not promise features the code doesn't implement** — every right promised in legal copy must trace to a working endpoint (T3/T4).
+52. **`<a href>` vs `<Link>` drift is easy to miss in source-reading tests** — assert both the route AND the component type (T5).
+53. **Next.js default 404 inherits root layout metadata** — always ship a custom `not-found.tsx` (T7).
+54. **`useSyncExternalStore` is the SSR-safe way to read `localStorage`** — avoids the `react-hooks/set-state-in-effect` lint rule (T8).
+55. **R2 cleanup on account deletion is best-effort** — DB cascade always succeeds; R2 errors are logged but don't fail the GDPR request (T4).
+
+### Audit-v2 Lessons (2026-07-02)
+
+56. **`next dev` in production is a silent failure mode** (NF-1) — symptoms: 5-10× slower, source paths leak, HMR WebSocket exposed, `cache-control: no-cache`. Unit tests can't catch this — it's operational. Lesson: always ship a production Dockerfile + CI guard that greps for `hmr-client`.
+57. **CSP `'unsafe-inline'` is required for Next.js App Router** (NF-2) — Next.js injects inline `<script>` chunks for router state. Ship `'unsafe-inline'` first (better than no CSP), upgrade to nonce-based later.
+58. **Three-way drift between DB enum, UI array, and marketing copy is easy to miss** (NF-3) — derive user-facing counts from the source-of-truth array OR add a regression test.
+59. **Docs claiming "dep installed" when it isn't is a real bug** (NF-5) — verify doc claims against `package.json` at doc-writing time.
+60. **Pipeline steps without try/catch create ghost "in progress" projects** (NF-6) — every step that can throw must catch + `setProjectFailed` + re-throw. Exception: the final "mark complete" step.
 
 ---
 
@@ -1136,25 +1244,93 @@ node scripts/verify-deployment.js
 
 ## 15. Coding Patterns
 
-### 15.1 Server Action Pattern
+### 15.1 Complete `createProjectAction` Walkthrough (7 Steps — T3/C3/C4/T7)
+
 ```typescript
 // src/features/projects/actions.ts
 'use server';
 
-import { verifySession } from '@/features/auth/domain/verify-session';
-import { pipelineRateLimit } from '@/lib/rate-limit';
-import { CreateProjectSchema } from './schema';
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { z } from 'zod';
 import { db } from '@/lib/db';
+import { projects } from '@/lib/db/schema';
+import { verifySession } from '@/features/auth/domain/verify-session';
+import { moderateContent } from举世@/features/pipeline
+import {
+  debitCreditsTx,
+  getOrCreateSubscription,
+  InsufficientCreditsError,
+} from '@/features/billing/queries';
+import { CREDIT_COSTS } from '@/features/billing/domain/tier-limits';
+import { inngest, PIPELINE_EVENT } from '@/lib/inngest/client';
+import { pipelineRateLimit } from '@/lib/rate-limit';
+import { setProjectFailed } from '@/features/pipeline/queries';
 
-export async function createProjectAction(input: unknown) {
-  const session = await verifySession();  // 1. Auth first (throws NEXT_REDIRECT if unauthenticated)
-  await pipelineRateLimit.limit(session.user.id);  // 2. Rate limit
-  
-  const parsed = CreateProjectSchema.safeParse(input);  // 3. Zod validation
-  if (!parsed.success) return { success: false, code: 'VALIDATION' };
-  
-  // 4. Business logic...
-  return { success: true };
+export async function createProjectAction(
+  input: z.infer<typeof CreateProjectSchema>,
+): Promise<CreateProjectResult> {
+
+  // ── 1. AUTH FIRST ──
+  const session = await verifySession({ redirectTo: '/create' });
+  const userId = session.user?.id;
+  if (!userId) {
+    return { success: false, error: 'Not authenticated', code: 'UNAUTHORIZED' };
+  }
+
+  // ── 2. RATE LIMIT (C3: 5/min/user) ──
+  const { success: rateLimitOk } = await pipelineRateLimit.limit(userId);
+  if (!rateLimitOk) {
+    return { success: false, error: 'You are creating projects too quickly.', code: 'RATE_LIMITED' };
+  }
+
+  // ── 3. ZOD VALIDATE ──
+  const parsed = CreateProjectSchema.safeParse(input);
+  if (!parsed.success) { /* return VALIDATION */ }
+
+  // ── 4. CONTENT MODERATION ──
+  const moderation = await moderateContent(parsed.data.story);
+  if (moderation.flagged) { /* return FLAGGED */ }
+
+  // ── 5. ENSURE SUBSCRIPTION EXISTS ──
+  await getOrCreateSubscription(userId);
+
+  // ── 6. INSERT + DEBIT IN A SINGLE TRANSACTION (T3/H-1) ──
+  // If debit throws InsufficientCreditsError, the transaction rolls back
+  // and NO orphan project row is committed. The user sees a clean error.
+  let projectId: string;
+  try {
+    projectId = await db.transaction(async (tx) => {
+      const [project] = await tx
+        .insert(projects)
+        .values({ /* ... */ })
+        .returning({ id: projects.id });
+
+      await debitCreditsTx(
+        tx, userId, CREDIT_COSTS.analysis, 'analysis',
+        `${project.id}:analysis`,
+        project.id,
+      );
+
+      return project.id;
+    });
+  } catch (err) {
+    if (err instanceof InsufficientCreditsError) {
+      return { success: false, error: err.message, code: 'INSUFFICIENT_CREDITS' };
+    }
+    throw err;
+  }
+
+  // ── 7. TRIGGER INNGEST (T7: try/catch → setProjectFailed) ──
+  try {
+    await inngest.send({ name: PIPELINE_EVENT, data: { projectId } });
+  } catch (err) {
+    await setProjectFailed(projectId, 'Failed to queue the AI pipeline.');
+    return { success: false, error: 'Failed to queue the AI pipeline.', code: 'INTERNAL' };
+  }
+
+  revalidatePath('/dashboard');
+  redirect(`/projects/${projectId}`);
 }
 ```
 
@@ -1778,6 +1954,87 @@ See `REMEDIATION_PLAN_v2.md` + `status_13.md`.
 | NF-6 | 🟡 Medium | Pipeline steps lack try/catch | Wrapped steps 1/4/5/6 in try/catch with `setProjectFailed` |
 
 **Test progression:** 479 (Sprint 3) → 524 (audit-v2, +45 new across 5 new test files)
+
+---
+
+---
+
+## Appendix D: Post-Deploy Live-Site Validation
+
+The following methodology complements unit tests and CI — it validates the **live deployment** against operational misconfigurations that automated tests cannot catch (e.g., env var misconfigurations on the production server, DNS issues, reverse-proxy misconfigurations).
+
+### The 2026-06-29 Failure
+
+The `storyintovideo.jesspete.shop` deployment was **fully passing CI** (lint, typecheck, test, build) but **broken in production**:
+- `/dashboard` redirected to `http://localhost:3000/sign-in` → `ERR_CONNECTION_REFUSED`
+- Root cause: `NEXT_PUBLIC_APP_URL=http://localhost:3000` was set on the production server
+- The code was correct; the env var was wrong
+- **Unit tests cannot catch this — only a live smoke test can**
+
+### 30-Second Smoke Test Script
+
+Run this after every deploy:
+
+```bash
+#!/bin/bash
+set -e
+
+HOST="https://storyintovideo.jesspete.shop"
+REDIRECT=$(curl -sI "$HOST/dashboard" | grep -i location | tr -d '\r')
+
+# 1. Verify auth redirect stays on same host
+echo "$REDIRECT" | grep -q "localhost" && { echo "FAIL: Redirects to localhost"; exit 1; }
+
+# 2. Verify /api/health (DB + FFmpeg + configHealthy)
+curl -s "$HOST/api/health" | jq '.status == "healthy" and .config.healthy' | grep true
+
+# 3. Verify known routes return 200
+for path in / /pricing /blog /contact /privacy /terms; do
+  code=$(curl -s -o /dev/null -w "%{http_code}" "$HOST$path")
+  [[ "$code" == "200" ]] || { echo "FAIL: $path returned $code"; exit 1; }
+done
+
+# 4. Verify 404 page returns proper 404
+code=$(curl -s -o /dev/null -w "%{http_code}" "$HOST/nonexistent")
+[[ "$code" == "404" ]] || { echo "FAIL: 404 returned $code"; exit 1; }
+
+echo "✅ Smoke test passed"
+```
+
+### `agent-browser` E2E on Live Site
+
+Use the `agent-browser` CLI for deeper validation (navigation, screenshots, DOM inspection):
+
+```bash
+# Verify marketing page renders with correct title
+agent-browser open https://storyintovideo.jesspete.shop/
+agent-browser get title
+# Expected: "StoryIntoVideo - Turn Stories Into Videos with AI"
+
+# Verify redirect host matches (not localhost)
+agent-browser open https://storyintovideo.jesspete.shop/dashboard
+agent-browser get url
+# Expected: "https://storyintovideo.jesspete.shop/sign-in?callbackUrl=%2Fdashboard"
+# Forbidden: "http://localhost:3000/sign-in?..."
+```
+
+### What This Catches (That CI Cannot)
+
+| Failure | CI Can Catch? | Smoke Test Catches? |
+|---|---|---|
+| Missing env var (build works, runtime fails) | No | Yes — `/api/health` returns 503 |
+| `NEXT_PUBLIC_APP_URL=localhost` on prod | No | Yes — redirect points to localhost |
+| DNS not propagated to CDN | No | Yes — `curl` fails with NXDOMAIN |
+| HSTS not applied | No | Yes — `curl -I` inspects headers |
+| Stale assets from previous deploy | No | Yes — if cache headers misconfigured |
+| Database migrations not applied | Build passes | Yes — `SELECT 1` returns error → 503 |
+
+### Lessons from Live-Site Validation
+
+1. **CI passing ≠ production working** — CI validates code; smoke tests validate deployment
+2. **Env var misconfigurations are the #1 production killer** — they pass CI (placeholders) but break runtime
+3. **Always verify the Host header matches the public domain** — `curl -I /dashboard` reveals the redirect target
+4. **Run smoke tests from outside the production VPC** — catches DNS, CDN, and TLS issues that internal health checks miss
 
 ---
 
