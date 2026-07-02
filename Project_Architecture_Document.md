@@ -8,7 +8,7 @@
 - `README.md` (quick start + build state)
 - `CLAUDE.md` (comprehensive agent briefing)
 - `AGENTS.md` (compact agent instructions)
-**Last Updated:** 2026-07-01 (v1.3 — Sprint 3 T1–T9 compliance + UX + CI hardening)
+**Last Updated:** 2026-07-02 (v1.4 — Audit-v2 remediation NF-1 through NF-6)
 **Audience:** Senior Engineers, Tech Leads, DevOps, and Onboarding Engineers
 **Rule:** Every architectural decision in this document traces to a specific rationale.
            Nothing is here "because it's popular."
@@ -17,6 +17,7 @@
 
 #### Revision Block
 
+- **v1.4 (2026-07-02):** Audit-v2 remediation NF-1 through NF-6 — production Dockerfile + docker-compose.prod.yml + DEPLOYMENT_RUNBOOK.md + CI dev-chunk guard (NF-1), Content-Security-Policy + Strict-Transport-Security headers (NF-2), FAQ copy reconciled with STYLE_CHIPS (NF-3), dead exports removed + WHISPER_MODEL wired (NF-4), doc inaccuracy corrected re: @aws-sdk/lib-storage + Sentry (NF-5), pipeline steps 1/4/5/6 wrapped in try/catch with setProjectFailed (NF-6). Updated test counts (479→524, 53→58 files).
 - **v1.3 (2026-07-01):** Sprint 3 T1–T9 — env host-mismatch throw (T1), /api/health config (T2), GDPR export (T3), GDPR deletion + R2 cleanup (T4), next/link migration (T5), /pricing /blog /contact pages (T6), custom 404 (T7), cookie banner (T8), E2E in CI (T9). Updated test counts (396→479, 48→53 files).
 - **v1.2 (2026-06-29):** `[ALIGN]` Post-audit-v1 alignment. Updated test counts (377→396, 43→48 files), corrected brand color status (H2/T11 now COMPLETE — 0 violations, was "75+ bypassed"), added T1–T12 audit remediation entries to Known Issues (12 items closed), refreshed Outstanding Tasks (5 new findings: navbar `<a>` vs `<Link>` violation, Privacy Policy promises unimplemented GDPR endpoints, missing `not-found.tsx`, env host-mismatch only warns, missing `/pricing`/`/blog`/`/contact` routes confirmed), updated §9.2 env var table (IMAGE_MODERATION_FAIL_OPEN default is now context-dependent per H8), and refreshed live-site validation findings (C-2 code fix confirmed deployed via `/api/health` returning full DB+FFmpeg check — remaining `localhost:3000` redirect on `/dashboard` is operational env-var misconfiguration, not a code bug).
 - **v1.1 (2026-06-28):** `[ALIGN]` Comprehensive alignment update after remediation sprint 3. Updated test counts (288→377, 36→43 files), env var count (28→30), removed `signed-download-wrapper.tsx` (DELETED in H4 fix), added `signUpAction`/`rate-limit.ts`/`api/projects/[id]/download` route, fixed Pattern 3 (LEFT JOIN), Pattern 4 (click-time signing), Pattern 5 (Inngest v4 `triggers` array), ADR-005 (click-time signing), ERD (idempotency_key, nullable userId, UNIQUE constraints), security section (H6 host header validation, C3 rate limiting, C5 idempotency), Known Issues (12 items closed in sprint 3), Key Files (removed wrapper, added new files), developer handbook commands (drizzle:generate/migrate/studio), and removed duplicate voiceovers ERD block.
@@ -85,7 +86,7 @@ Every version is pinned. Every choice has a rationale.
 | Video | FFmpeg (system binary) | — | `FFMPEG_PATH` env var; `@ffmpeg-installer/ffmpeg` incompatible with Turbopack |
 | Package Manager | pnpm | >=10.26.0 | `allowBuilds` syntax for native build script approval |
 | CI/CD | GitHub Actions | — | lint + typecheck + test + build on every PR + Playwright e2e with Postgres 17 service container (e2e job, continue-on-error) on every PR (Sprint 3 T9) |
-| Testing | Vitest (jsdom) + Playwright (Chromium) | vitest ^4.0 / playwright ^1.61 | 479 unit (53 files) + 48 E2E (9 specs), all GREEN |
+| Testing | Vitest (jsdom) + Playwright (Chromium) | vitest ^4.0 / playwright ^1.61 | 524 unit (58 files) + 48 E2E (9 specs), all GREEN |
 
 ### 1.3 Architecture Decision Records (ADRs)
 
@@ -331,7 +332,7 @@ src/
 │   ├── fonts.ts                      # Geist + Outfit font config
 │   └── utils.ts                      # cn() utility (clsx + tailwind-merge)
 ├── tests/
-│   ├── unit/                         # 53 files, 479 tests (Vitest + jsdom)
+│   ├── unit/                         # 58 files, 524 tests (Vitest + jsdom)
 │   ├── e2e/                          # 9 files, 48 tests (Playwright + Chromium)
 │   └── setup.ts                      # jest-dom + test env vars
 ├── types/
@@ -721,7 +722,7 @@ Reduced motion: `@media (prefers-reduced-motion: reduce)` globally disables all 
 | Stripe webhooks must verify signature | `stripe.webhooks.constructEvent()` with `env.STRIPE_WEBHOOK_SECRET` |
 | R2 buckets are private | All access via signed URLs with time-limited expiry |
 | Passwords hashed with bcryptjs | `bcrypt.hash(password, 12)` in Auth.js Credentials provider |
-| Security headers | X-Frame-Options DENY, nosniff, strict referrer, Permissions-Policy |
+| Security headers | X-Frame-Options DENY, nosniff, strict referrer, Permissions-Policy, **Content-Security-Policy** (NF-2: `default-src 'self'`, `frame-ancestors 'none'`, etc.), **Strict-Transport-Security** (NF-2: `max-age=63072000; includeSubDomains; preload`) |
 
 ### 6.2 Security Utilities
 
@@ -830,7 +831,7 @@ createProjectAction (Server Action)
 
 Each step is **idempotent** (Inngest may retry). Steps update `project.status` + `progressDetail` and debit credits via Drizzle transaction.
 
-**Error handling:** Failed steps set `project.status = 'failed'` with `errorMessage`. Inngest retries, but terminal failures (e.g., content moderation block) are not retried.
+**Error handling:** Failed steps set `project.status = 'failed'` with `errorMessage`. Inngest retries, but terminal failures (e.g., content moderation block) are not retried. **NF-6 fix:** steps 1 (analyze-story), 4 (synthesize-voiceover), 5 (align-subtitles), 6 (assemble-video) now wrap their body in try/catch that calls `setProjectFailed(projectId, "<step> failed: <message>")` on error, then re-throws (so Inngest still retries). The `complete` step is special: if `updateProjectProgress('completed', ...)` fails, it logs the error but does NOT call `setProjectFailed` — the video is already in R2 (uploaded in Step 6), so the user can still download it via `/api/projects/[id]/download` (which checks `videoKey` presence, not `status === 'completed'`).
 
 ---
 
@@ -849,9 +850,9 @@ Each step is **idempotent** (Inngest may retry). Steps update `project.status` +
 | Post-review hardening | 3 | 18 | Vitest + jsdom |
 | Download + Share + API | 3 | 41 | Vitest + jsdom |
 | Pipeline integration + Credits | 4 | 32 | Vitest + jsdom |
-| **Unit Total** | **53** | **479** | |
+| **Unit Total** | **58** | **524** | |
 | **E2E** | **9** | **48** | Playwright (Chromium) |
-| **Grand Total** | **62** | **527** | |
+| **Grand Total** | **67** | **572** | |
 
 ### 8.2 Test Patterns
 
@@ -867,7 +868,7 @@ Each step is **idempotent** (Inngest may retry). Steps update `project.status` +
 ### 8.3 Pre-PR / Pre-bash
 pnpm lint              # Zero warnings (ESLint flat config)
 pnpm typecheck         # Zero errors (tsc --noEmit, strict + noUncheckedIndexedAccess)
-pnpm test              # 479 unit tests pass (53 files)
+pnpm test              # 524 unit tests pass (58 files)
 pnpm test:e2e          # 48 E2E tests pass (9 specs, requires Playwright browsers)
 pnpm format:check      # All files pass Prettier
 pnpm build            # Zero errors (hybrid: static + dynamic)
@@ -891,6 +892,14 @@ Output structure:
 - RSC payloads in `.next/server/app/`
 
 The build exercises the build-context env fallback (NEXT_PHASE=phase-production-build). No real secrets needed.
+
+**Production deployment (NF-1):** Use the production `Dockerfile` (NOT `Dockerfile.dev` which runs `next dev`):
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+The production Dockerfile is multi-stage (deps → builder → runtime), uses `node:24-alpine`, installs `ffmpeg` + `curl`, runs as a non-root user, has a healthcheck on `/api/health`, and runs `pnpm start` (which invokes `next start`). See `docs/DEPLOYMENT_RUNBOOK.md` for the full process. The CI workflow includes a guard that greps `.next/` for `hmr-client` (dev-only chunk) and fails the build if found — prevents deploying `next dev` to production.
 
 ### 9.2 Environment Variables
 
@@ -1007,7 +1016,7 @@ pnpm dev                        # Turbopack, port 3000
 | `pnpm start` | Serve built output |
 | `pnpm lint` | ESLint (flat config, zero warnings) |
 | `pnpm typecheck` | tsc --noEmit (strict + noUncheckedIndexedAccess) |
-| `pnpm test` | Vitest unit tests (479 tests, 53 files, jsdom) |
+| `pnpm test` | Vitest unit tests (524 tests, 58 files, jsdom) |
 | `pnpm test:e2e` | Playwright E2E tests (48 tests, Chromium) |
 | `pnpm format` | Prettier auto-fix |
 | `pnpm format:check` | Prettier verify |
@@ -1048,7 +1057,9 @@ Prettier: single quotes, trailing commas, 100 char width, 2-space indent, `prett
 | **HIGH** | Replicate IP-Adapter model hash is placeholder | Scene generation won't apply character consistency | Open — requires `REPLICATE_SDXL_IPADAPTER_MODEL` env var |
 | **HIGH** | Character consistency not validated end-to-end | Highest-risk component (Risk R1) | Open — requires real API keys |
 | **HIGH** | No Stripe products configured | Billing page is non-functional | Open — requires Stripe Dashboard |
-| **MEDIUM** | No monitoring (Sentry/Analytics/Axiom) | Production issues undetected | Open — env vars in schema |
+| **MEDIUM** | No monitoring (Sentry/Analytics/Axiom) | Production issues undetected | Open — `SENTRY_DSN` in env schema but `@sentry/nextjs` NOT installed (NF-5 corrected docs) |
+| **MEDIUM** | H5 — FFmpeg `/tmp` OOM risk | Large 4K videos can OOM | Open — `@aws-sdk/lib-storage` NOT installed (NF-5 corrected docs); refactor deferred |
+| **MEDIUM** | CSP uses `'unsafe-inline'` for script-src | XSS mitigation weaker than nonce-based | Open — NF-2 added CSP with `'unsafe-inline'` (Next.js App Router requires it); nonce-based upgrade deferred |
 | ~~**MEDIUM**~~ | ~~E2E tests not in CI~~ | ~~Regressions can slip through CI~~ | ✅ Closed (Sprint 3 T9: e2e job with Postgres 17 service container, continue-on-error) |
 | ~~**MEDIUM**~~ | ~~No cookie consent banner~~ | ~~GDPR/CCPA non-compliant~~ | ✅ Closed (Sprint 3 T8: `cookie-banner.tsx` mounted in root layout) |
 | ~~**MEDIUM**~~ | ~~`/pricing`, `/blog`, `/contact` not implemented~~ | ~~Dead links from nav/footer~~ | ✅ Closed (Sprint 3 T6: pages added under `(legal)/` route group) |
@@ -1103,6 +1114,26 @@ Prettier: single quotes, trailing commas, 100 char width, 2-space indent, `prett
 - ~~Env host-mismatch warning insufficient~~ → **Fixed** (Sprint 3 T1: now throws in production runtime; T2: surfaces via /api/health config + configErrors)
 - ~~`/pricing`, `/blog`, `/contact` routes don't exist~~ → **Fixed** (Sprint 3 T6: pages added under `(legal)/` route group; nav + footer links now resolve)
 
+**Recently closed (audit v2 remediation — NF-1 through NF-6, see `REMEDIATION_PLAN_v2.md` + `status_13.md`):**
+
+Audit-v2 was triggered by a live-site behavioral smoke test at `https://storyintovideo.jesspete.shop/` that surfaced 6 findings NOT captured by audit-v1 or Sprint 3. All 6 remediated via TDD (479 → 524 tests, +45 new across 5 new test files).
+
+- ~~**NF-1 (Critical): Live site runs `next dev` instead of `next start`**~~ → **Fixed**. Root cause: only `Dockerfile.dev` existed. Created production `Dockerfile` (multi-stage, `pnpm start`), `docker-compose.prod.yml`, `docs/DEPLOYMENT_RUNBOOK.md`, and a CI guard in `.github/workflows/ci.yml` that greps `.next/` for `hmr-client` (dev-only chunk). 18 new tests in `deployment.test.ts`.
+- ~~**NF-2 (High): Missing CSP + HSTS headers**~~ → **Fixed**. `next.config.ts` `headers()` now returns 6 headers (was 4). CSP: `default-src 'self'`, `frame-ancestors 'none'`, `base-uri 'self'`, `form-action 'self'`, `object-src 'none'`, etc. HSTS: `max-age=63072000; includeSubDomains; preload`. 8 new tests in `security-headers.test.ts`. (Note: `'unsafe-inline'` required for Next.js App Router; nonce-based CSP deferred.)
+- ~~**NF-3 (Medium): FAQ "7+ styles" copy drift vs 8-chip marquee**~~ → **Fixed**. Updated `faq-items.ts` to match `STYLE_CHIPS` (8 styles, all labels). 5 new tests in `faq-style-consistency.test.ts`.
+- ~~**NF-4 (Medium): Dead/unused exports**~~ → **Fixed**. Removed `getProjectVideo` + `export` on `r2Client`/`BUCKET_MAP`. Kept `WHISPER_MODEL` and made it actually used in `align-subtitles.ts` (was hardcoded `'whisper-1'`). 8 new tests in `dead-exports.test.ts`.
+- ~~**NF-5 (Medium): Documentation inaccuracy**~~ → **Fixed**. Corrected CLAUDE.md/AGENTS.md (`@aws-sdk/lib-storage` NOT installed; `@sentry/nextjs` NOT installed). Marked `remediation_execution_summary.md` as SUPERSEDED.
+- ~~**NF-6 (Medium): Pipeline steps lack error handling → ghost "in progress" projects**~~ → **Fixed**. Steps 1, 4, 5, 6 now wrap in try/catch with `setProjectFailed` + re-throw. The `complete` step logs-only (video is already in R2). 6 new tests in `pipeline-error-handling.test.ts`.
+
+**Still outstanding (deferred to follow-up sprint):**
+- **H5 — FFmpeg stream-to-R2** — `@aws-sdk/lib-storage` is NOT installed; refactor requires `pnpm add @aws-sdk/lib-storage` + rewriting `assemble-video.ts` to use the `Upload` class. (NF-5 corrected the docs.)
+- **M3 — Character image R2 upload** — `referenceImageKey` stores Replicate CDN URLs, not R2 keys.
+- **Sentry integration** — `@sentry/nextjs` NOT installed; `SENTRY_DSN` is env-schema-only.
+- **Nonce-based CSP** — current CSP uses `'unsafe-inline'` for `script-src` (Next.js requires it); upgrade to nonce-based in a future hardening sprint.
+- **Bundle size monitoring** — `next/bundle-analyzer` not configured.
+- **Visual regression testing** — pixel-perfect verification is manual.
+- **Stripe `PRICE_IDS`** — placeholder values; real Stripe products needed.
+
 ---
 
 ## 12. Key Files Reference
@@ -1126,7 +1157,7 @@ Prettier: single quotes, trailing commas, 100 char width, 2-space indent, `prett
 | `src/components/sections/hero.tsx` | Hero (4-layer, glass input, SSE-driven) | ✅ Marketing |
 | `package.json` | Tech stack (pinned versions) | ✅ Reference |
 | `tsconfig.json` | Strict TypeScript config | ✅ Reference |
-| `next.config.ts` | Next.js config (security headers, images) | ✅ Reference |
+| `next.config.ts` | Next.js config (6 security headers incl. CSP+HSTS, images) | ✅ Reference |
 | `.github/workflows/ci.yml` | CI quality gate (lint+typecheck+test+build) + e2e job (Playwright + Postgres 17, Sprint 3 T9) | ✅ CI/CD |
 | `src/app/api/projects/[id]/progress/route.ts` | SSE progress stream (maxDuration=800, rate-limited) | ✅ Performance |
 | `src/lib/rate-limit.ts` | Upstash Ratelimit (C3: auth/pipeline/SSE) | ✅ Security |
@@ -1136,6 +1167,15 @@ Prettier: single quotes, trailing commas, 100 char width, 2-space indent, `prett
 | `src/app/api/user/export/route.ts` | GDPR data export (GET — JSON bundle, Sprint 3 T3) | ✅ Security |
 | `src/features/auth/queries.ts` | getUserExportData + deleteUserAccount (Sprint 3 T3/T4 GDPR) | ✅ Auth |
 | `src/components/app/cookie-banner.tsx` | GDPR/CCPA consent banner, useSyncExternalStore (Sprint 3 T8) | ✅ Compliance |
+| `Dockerfile` | Production Docker image (multi-stage: deps → builder → runtime; `next start`; NF-1) | ✅ Deployment |
+| `docker-compose.prod.yml` | Production compose (web service only — Neon + Upstash external; NF-1) | ✅ Deployment |
+| `docs/DEPLOYMENT_RUNBOOK.md` | Full production deployment process + troubleshooting (NF-1) | ✅ Deployment |
+| `src/features/pipeline/inngest.ts` | 6-step pipeline with try/catch error handling on steps 1/4/5/6 (NF-6) | ✅ Pipeline |
+| `src/tests/unit/security-headers.test.ts` | NF-2: CSP + HSTS header verification (8 tests) | ✅ Testing |
+| `src/tests/unit/deployment.test.ts` | NF-1: production Dockerfile + compose + runbook + CI guard (18 tests) | ✅ Testing |
+| `src/tests/unit/pipeline-error-handling.test.ts` | NF-6: pipeline step error handling (6 tests) | ✅ Testing |
+| `src/tests/unit/dead-exports.test.ts` | NF-4: dead export cleanup verification (8 tests) | ✅ Testing |
+| `src/tests/unit/faq-style-consistency.test.ts` | NF-3: FAQ ↔ STYLE_CHIPS alignment (5 tests) | ✅ Testing |
 
 ---
 

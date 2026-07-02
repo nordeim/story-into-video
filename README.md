@@ -93,7 +93,7 @@ pnpm typecheck
 # Lint — must pass with zero warnings
 pnpm lint
 
-# Unit tests (Vitest) — 479 tests across 53 files
+# Unit tests (Vitest) — 524 tests across 58 files
 pnpm test
 
 # E2E tests (Playwright) — 48 tests, auto-starts dev server
@@ -120,7 +120,7 @@ pnpm build        # Production build (hybrid: static + dynamic)
 pnpm start        # Serve built output
 pnpm lint         # ESLint (flat config, next/core-web-vitals + typescript-eslint)
 pnpm typecheck    # tsc --noEmit (strict mode, noUncheckedIndexedAccess)
-pnpm test         # Vitest unit tests (jsdom env) — 479 tests across 53 files
+pnpm test         # Vitest unit tests (jsdom env) — 524 tests across 58 files
 pnpm test:e2e     # Playwright E2E tests (Chromium)
 pnpm format       # Prettier --write (auto-fix)
 pnpm format:check # Prettier --check (verify only)
@@ -371,7 +371,7 @@ src/
 │   ├── hooks/                              # 4 hooks (use-scrolled, use-reveal, use-reduced-motion, use-project-progress)
 │   ├── fonts.ts · utils.ts
 ├── tests/
-│   ├── unit/                     # 53 files, 479 tests
+│   ├── unit/                     # 58 files, 524 tests
 │   ├── e2e/                      # 9 files, 48 tests
 │   └── setup.ts                  # jest-dom + test env vars
 ├── types/index.ts                # 12 marketing interfaces
@@ -443,7 +443,7 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 
 ### Unit Tests (Vitest)
 
-479 tests across 53 files, all GREEN:
+524 tests across 58 files, all GREEN:
 
 **Marketing layer (inherited from clone):**
 
@@ -528,6 +528,16 @@ The hero background video (`public/hero-bg.mp4`, 46KB) was generated from `hero-
 | `style-chips.test.ts` | 9 | 8-chip spec fidelity: exact labels (Ghibli, Medieval, Oil Painting, Anime, Japanese animation, Realistic, Cyberpunk, Watercolor), uniqueness, regression guards against drifted labels (H3) |
 | `hero-headline.test.tsx` | 5 | 3-line cinematic H1 stack (2 `<br>` tags), Outfit weight 820 inline style, subtitle emphasizes OUTPUT ("finished video") over PROCESS ("subtitles, all generated") |
 
+**Audit-v2 Remediation (NF-1 through NF-6 — see `REMEDIATION_PLAN_v2.md` + `status_13.md`):**
+
+| Test file | Tests | What it covers |
+|---|---|---|
+| `security-headers.test.ts` | 8 | NF-2: `next.config.ts` emits 6 security headers (was 4) — `Content-Security-Policy` (`default-src 'self'`, `frame-ancestors 'none'`, `base-uri`, `form-action`, `object-src`, etc.) + `Strict-Transport-Security` (`max-age=63072000; includeSubDomains; preload`) |
+| `faq-style-consistency.test.ts` | 5 | NF-3: FAQ "visual-style" answer matches `STYLE_CHIPS` array — exact count (8), all 8 labels present, no "Comic" (regression guard), no "7+" drift |
+| `dead-exports.test.ts` | 8 | NF-4: `getProjectVideo` removed from `queries.ts`, `r2Client`/`BUCKET_MAP` not exported from `r2.ts`, `WHISPER_MODEL` is exported AND used in `align-subtitles.ts`, `getSignedUploadUrl` + `signOut` still exported (kept) |
+| `pipeline-error-handling.test.ts` | 6 | NF-6: steps 1 (analyze-story), 4 (synthesize-voiceover), 5 (align-subtitles), 6 (assemble-video) call `setProjectFailed` on error; the `complete` step does NOT (video is already in R2); happy path calls 0 `setProjectFailed` |
+| `deployment.test.ts` | 18 | NF-1: production `Dockerfile` exists (multi-stage, `next start`, `NODE_ENV=production`, ffmpeg, non-root user, healthcheck), `docker-compose.prod.yml` exists (no postgres/redis — managed services), CI workflow has `hmr-client` guard, `docs/DEPLOYMENT_RUNBOOK.md` exists with env var requirements |
+
 ### E2E Tests (Playwright)
 
 48 tests across 9 spec files, all GREEN (Chromium):
@@ -594,7 +604,7 @@ A meticulous code review (documented in `design_critique.md`) identified 5 inacc
 
 ### What's Implemented vs. Outstanding
 
-**✅ Fully implemented (code layer — 479 unit tests + 48 E2E tests, all GREEN):**
+**✅ Fully implemented (code layer — 524 unit tests + 48 E2E tests, all GREEN):**
 
 *Authentication & Authorization:*
 - Auth.js v5 (Google OAuth + Credentials, Drizzle adapter, JWT sessions, `trustHost: true` for reverse-proxy — T2)
@@ -676,9 +686,9 @@ A meticulous code review (documented in `design_critique.md`) identified 5 inacc
 - ~~**Production env var misconfiguration goes silently undetected**~~ → **Fixed (Sprint 3 T1 promotes warn to throw in prod; T2 surfaces configErrors via /api/health)**. Original note: `src/lib/env/index.ts:217-226` only emitted `console.warn` when `AUTH_URL` and `NEXT_PUBLIC_APP_URL` hosts differ. In production behind a reverse proxy, this warning was missed — causing the live `/dashboard` redirect to `http://localhost:3000` (ERR_CONNECTION_REFUSED). The T2 code fix IS deployed (proven by `/api/health` returning the H9 DB+FFmpeg check), but `NEXT_PUBLIC_APP_URL` on the production server is set to `http://localhost:3000` instead of `https://storyintovideo.jesspete.shop`. Fix: (a) set the env var correctly on the production host, (b) promote the warning to a thrown error in production, (c) surface env misconfigurations via `/api/health`.
 
 *High (degrades UX or introduces technical debt):*
-- **H5 — FFmpeg `/tmp` OOM risk** — `assemble-video.ts` writes to `/tmp` + reads into Buffer (**T12: temp files now use `crypto.randomUUID()` instead of `Date.now()` to prevent collision**). For large 4K videos, this can OOM the function. Stream-to-R2 via `@aws-sdk/lib-storage` `Upload` class deferred (dep installed but refactor not done).
+- **H5 — FFmpeg `/tmp` OOM risk** — `assemble-video.ts` writes to `/tmp` + reads into Buffer (**T12: temp files now use `crypto.randomUUID()` instead of `Date.now()` to prevent collision**). For large 4K videos, this can OOM the function. Stream-to-R2 via `@aws-sdk/lib-storage` `Upload` class deferred (**⚠️ The dep is NOT yet installed — `@aws-sdk/lib-storage` is not in `package.json`; the refactor requires both `pnpm add @aws-sdk/lib-storage` and rewriting `assemble-video.ts` to use the `Upload` class instead of `putObject`**).
 - **M3 — Character image R2 upload** — `referenceImageKey` currently stores Replicate CDN URLs, not R2 keys. Uploading to R2 matches the docs' intent but requires pipeline Step 2 refactor.
-- **Monitoring** — Sentry, Vercel Analytics, Axiom not integrated (env var `SENTRY_DSN` in schema)
+- **Monitoring** — Sentry, Vercel Analytics, Axiom not integrated. `SENTRY_DSN` is in env schema but `@sentry/nextjs` is NOT installed (run `pnpm add @sentry/nextjs` + wire `sentry.{client,server,edge}.config.ts` + wrap `next.config.ts` with `withSentryConfig`).
 - ~~**E2E tests in CI**~~ → **Fixed (Sprint 3 T9)** — Playwright E2E now runs in the GitHub Actions workflow via a Postgres service container + browser binaries + seeded data. The e2e job is set to `continue-on-error` so transient flakiness doesn't block the main quality gate.
 - ~~**Navbar + dashboard + hero use raw `<a href>` instead of `next/link`**~~ → **Fixed (Sprint 3 T5)**. Original note: `src/components/sections/navbar.tsx` (6 places), `src/app/(app)/dashboard/page.tsx` (2 places), `src/components/sections/hero.tsx` (1 place) used raw `<a href>` for internal routes, violating the "never use `<a>` for internal routes" rule and causing full-page reloads on every nav click. All internal `<a href>` now replaced with `<Link href>` from `next/link`.
 - ~~**No custom `not-found.tsx` page**~~ → **Fixed (Sprint 3 T7)**. Original note: Next.js default 404 inherited root layout metadata, making any unknown URL return 200 OK with the marketing page title. Bad for SEO, hides broken links. Confirmed on live site: `/pricing`, `/blog`, `/contact` all returned 200 with `StoryIntoVideo - Turn Stories Into Videos with AI` title. Now shipped: `src/app/not-found.tsx` returns a real 404 status.
@@ -766,6 +776,17 @@ A meticulous code review (documented in `design_critique.md`) identified 5 inacc
 - ~~No GDPR/CCPA cookie consent banner (Privacy Policy promised consent collection; only the policy + endpoints existed)~~ → Fixed (Sprint 3 T8: new `CookieBanner` component (`src/components/app/cookie-banner.tsx`) mounted in the root layout (`src/app/layout.tsx`); 8th app component — total app component count goes from 7 → 8)
 - ~~Playwright E2E not in CI (only the main lint/typecheck/test/build job ran on PRs)~~ → Fixed (Sprint 3 T9: GitHub Actions workflow now has a dedicated e2e job with a Postgres service container + browser binaries + seeded data; the e2e job is `continue-on-error` so transient flakiness doesn't block the main quality gate)
 
+**✅ Recently closed (audit v2 remediation — NF-1 through NF-6, see `REMEDIATION_PLAN_v2.md` + `status_13.md`):**
+
+Audit-v2 was triggered by a live-site behavioral smoke test at `https://storyintovideo.jesspete.shop/` that surfaced 6 findings NOT captured by audit-v1 or Sprint 3. All 6 remediated via TDD (479 → 524 tests, +45 new across 5 new test files).
+
+- ~~**NF-1 (Critical): Live site runs `next dev --turbopack` instead of `next start`**~~ → Fixed. Only `Dockerfile.dev` existed (runs `pnpm dev`). Created production `Dockerfile` (multi-stage: deps → builder → runtime; `node:24-alpine`; ffmpeg + curl; non-root user; healthcheck on `/api/health`; runs `pnpm start`). Created `docker-compose.prod.yml` + `docs/DEPLOYMENT_RUNBOOK.md`. Added CI guard in `.github/workflows/ci.yml` that greps `.next/` for `hmr-client` (dev-only chunk) and fails the build if found.
+- ~~**NF-2 (High): Missing `Content-Security-Policy` + `Strict-Transport-Security` headers**~~ → Fixed. `next.config.ts` `headers()` now returns 6 headers (was 4). CSP: `default-src 'self'`, `frame-ancestors 'none'`, `base-uri 'self'`, `form-action 'self'`, `object-src 'none'`, etc. HSTS: `max-age=63072000; includeSubDomains; preload`.
+- ~~**NF-3 (Medium): FAQ "7+ styles" copy drift vs 8-chip marquee**~~ → Fixed. FAQ answer now says "8 visual styles including Ghibli, Medieval, Oil Painting, Anime, Japanese animation, Realistic, Cyberpunk, and Watercolor" (was "7+" with wrong labels).
+- ~~**NF-4 (Medium): Dead/unused exports**~~ → Fixed. Removed `getProjectVideo` + `export` on `r2Client`/`BUCKET_MAP`. Kept `WHISPER_MODEL` and made it actually used in `align-subtitles.ts` (was hardcoded `'whisper-1'`).
+- ~~**NF-5 (Medium): Documentation inaccuracy**~~ → Fixed. Corrected CLAUDE.md/AGENTS.md (H5 `@aws-sdk/lib-storage` NOT installed; Sentry `@sentry/nextjs` NOT installed). Marked `remediation_execution_summary.md` as SUPERSEDED.
+- ~~**NF-6 (Medium): Pipeline steps lack error handling → ghost "in progress" projects**~~ → Fixed. Steps 1, 4, 5, 6 now wrap in try/catch with `setProjectFailed` + re-throw. The `complete` step logs-only (video is already in R2 — user can still download).
+
 See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 
 ### Known Issues
@@ -775,6 +796,10 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 - **Replicate IP-Adapter model hash is a placeholder default** — `REPLICATE_SDXL_IPADAPTER_MODEL` defaults to the SDXL base model hash (not IP-Adapter). Operators MUST set this env var to a real `lucataco/sdxl-ipadapter:<sha>` hash before character consistency will work. The env schema validates the `owner/model:sha` format to catch typos. (T4)
 - **FFmpeg on serverless** — Vercel's function timeout (60s Hobby / 300s Pro) may be exceeded for long videos. The SSE route's `maxDuration` is set to 800s (T6, corrected from 900 — Pro GA ceiling under Fluid Compute) to cover 5-15min pipelines, but the FFmpeg assembly step itself is bound by Inngest's function timeout (not the SSE route). The blueprint (ADR-006) specifies moving to Shotstack if this occurs.
 - **SSE on Vercel Hobby** — the `maxDuration = 800` (T6, corrected) is the Vercel Pro/Enterprise GA ceiling under Fluid Compute (now default on all plans). On Hobby, the cap is 300s; the client-side reconnect (also T6) will reopen the stream after the 300s drop, but the user will see a brief "Reconnecting…" message. NOTE: the previous value of 900 exceeded the Pro GA limit and silently fell back to the platform default — 800 is correct.
+- **H5 — FFmpeg `/tmp` OOM risk (deferred)** — `assemble-video.ts` writes to `/tmp` + reads into Buffer. For large 4K videos, this can OOM the function. Stream-to-R2 via `@aws-sdk/lib-storage` `Upload` class is the planned fix, but **the dep is NOT yet installed** (`@aws-sdk/lib-storage` is not in `package.json`). The refactor requires both `pnpm add @aws-sdk/lib-storage` and rewriting `assemble-video.ts` to use the `Upload` class instead of `putObject`. (NF-5 corrected the docs that previously claimed the dep was installed.)
+- **Sentry not integrated (deferred)** — `SENTRY_DSN` is in the env schema but `@sentry/nextjs` is NOT installed. To integrate: `pnpm add @sentry/nextjs` + wire `sentry.{client,server,edge}.config.ts` + wrap `next.config.ts` with `withSentryConfig`. (NF-5 corrected the docs that previously implied Sentry was ready.)
+- **CSP uses `'unsafe-inline'` (deferred hardening)** — NF-2 added a `Content-Security-Policy` header, but `script-src` includes `'unsafe-inline'` because Next.js App Router injects inline `<script>` chunks for router state. The production-hardened alternative is nonce-based CSP (per-request nonce via Next.js 16's built-in support). This is deferred to a future hardening sprint.
+- **Stripe `PRICE_IDS` are placeholders** — `src/lib/stripe/client.ts` exports `PRICE_IDS` with placeholder values (`price_creator_monthly`, etc.). Real Stripe products must be created in the Stripe Dashboard and the IDs updated before paid tiers can be purchased.
 
 ### Troubleshooting
 
@@ -819,13 +844,46 @@ See `PRODUCTION_READINESS_PLAN.md` §8 for the complete pre-launch checklist.
 | Project stuck in "pending" after Inngest outage | `inngest.send()` threw but the project row was already committed (M-2 bug, fixed in T7) | Fixed: `inngest.send()` is now wrapped in try/catch → `setProjectFailed()`. The project status will be 'failed' with an error message; the user can retry. |
 | `pnpm build` fails: "Functions cannot be passed directly to Client Components" | Server Action defined inline in a Server Component page (not in a `"use server"` module) (T1 lesson) | Move the Server Action to a module with `"use server"` at the top (e.g., `src/features/billing/actions.ts`). Import it into the page. |
 | `tsc` error: "Argument of type 'string \| undefined' is not assignable to parameter of type 'string'" inside a closure | TypeScript doesn't preserve `session.user.id` narrowing inside closures (T5 lesson) | Capture `const userId: string = session.user.id` BEFORE the closure so the type is narrowed. |
+| Live site shows `[HMR] connected` / `[Fast Refresh]` in browser console | Production is running `next dev` instead of `next start` (NF-1 bug, fixed) | **Fixed:** use the production `Dockerfile` — `docker compose -f docker-compose.prod.yml up -d --build`. The CI guard in `.github/workflows/ci.yml` now greps `.next/` for `hmr-client` and fails the build if found. Verify post-deploy: browser console should NOT emit HMR/Fast Refresh messages; JS chunk names should be content-hashed, not source-path names. See `docs/DEPLOYMENT_RUNBOOK.md`. |
+| Live site response headers missing `Content-Security-Policy` / `Strict-Transport-Security` | `next.config.ts` `headers()` didn't include CSP/HSTS (NF-2 bug, fixed) | **Fixed:** `headers()` now returns 6 headers (was 4). Verify: `curl -I https://storyintovideo.jesspete.shop/ \| grep -i "content-security-policy\|strict-transport"`. If missing, the `next.config.ts` change didn't deploy — rebuild. |
+| FAQ says "7+ visual styles" but the marquee shows 8 chips | FAQ copy drifted from `STYLE_CHIPS` array (NF-3 bug, fixed) | **Fixed:** FAQ now says "8 visual styles including Ghibli, Medieval, Oil Painting, Anime, Japanese animation, Realistic, Cyberpunk, and Watercolor". Regression test in `faq-style-consistency.test.ts` locks the alignment. |
+| Project stuck at "Synthesizing voiceover… 65%" forever (never completes, never fails) | Pipeline step 4 (or 1, 5, 6) threw an error but didn't call `setProjectFailed` — Inngest exhausted retries and the project row stayed in a non-terminal status (NF-6 bug, fixed) | **Fixed:** steps 1, 4, 5, 6 now wrap in try/catch with `setProjectFailed` + re-throw. To clean up existing ghosts: `UPDATE projects SET status = 'failed', error_message = 'Pipeline failed before NF-6 fix' WHERE status NOT IN ('completed', 'failed') AND created_at < '2026-07-02';` |
+| `tsc` error: "Module '@aws-sdk/lib-storage' has no exported member 'Upload'" | Trying to use H5 FFmpeg streaming refactor without installing the dep | The dep is NOT in `package.json`. Run `pnpm add @aws-sdk/lib-storage` first. (H5 is deferred — see Known Issues above.) |
+
+### Production Deployment
+
+**📖 Full deployment process:** see [`docs/DEPLOYMENT_RUNBOOK.md`](docs/DEPLOYMENT_RUNBOOK.md) for the complete guide.
+
+**Quick start:**
+```bash
+# 1. Configure .env.local (see .env.example for all 27+ required vars)
+cp .env.example .env.local
+# Edit .env.local with real production values
+
+# 2. Validate env vars before deploying
+node scripts/check-env.js
+
+# 3. Build and start the production container (uses the production Dockerfile, NOT Dockerfile.dev)
+docker compose -f docker-compose.prod.yml up -d --build
+
+# 4. Verify the deployment
+node scripts/verify-deployment.js
+```
+
+**⚠️ CRITICAL — never deploy with `next dev`:** The live site was previously running `next dev --turbopack` in production (NF-1 bug), causing 5–10× slower response times, source-code path leakage via chunk names, exposed HMR WebSocket, and uncacheable responses. Always use the production `Dockerfile` which runs `next start` via `pnpm start`. The CI guard in `.github/workflows/ci.yml` greps the build output for `hmr-client` (dev-only chunk) and fails the build if found.
+
+**Post-deploy verification:**
+1. `curl https://storyintovideo.jesspete.shop/api/health` → `{"status":"healthy","config":{"healthy":true,...}}`
+2. `curl -I https://storyintovideo.jesspete.shop/ | grep -i "content-security-policy\|strict-transport"` → both headers present (NF-2)
+3. Open the site in a browser → console should NOT show `[HMR] connected` or `[Fast Refresh]` messages (NF-1)
+4. JS chunk names should be content-hashed (e.g., `main-app-a1b2c3d4.js`), not source-path names (e.g., `src_app_layout_tsx_*`)
 
 ### Lessons Learned
 
 **Marketing layer (inherited):**
 1. **`suppressHydrationWarning` belongs on `<body>`, not just `<html>`** — Browser extensions like Grammarly inject attributes into `<body>` before React hydrates.
 2. **Workflow component needs `'use client'`** — Uses `useState` for poster→video fade-in choreography.
-3. **Test counts drift from plans** — The MEP planned 6 unit + 3 E2E; actual is now 479 unit + 48 E2E. Always verify against `pnpm test` output.
+3. **Test counts drift from plans** — The MEP planned 6 unit + 3 E2E; actual is now 524 unit + 48 E2E. Always verify against `pnpm test` output.
 4. **File structure evolves during implementation** — Update docs as you build.
 5. **Playwright requires browser binary installation** — `pnpm install` doesn't install browser binaries.
 
@@ -936,7 +994,7 @@ This project has a fixed marketing spec (`Project_Requirements_Document.md`) and
 
 1. `pnpm lint` — zero warnings
 2. `pnpm typecheck` — zero errors
-3. `pnpm test` — 479 unit tests pass
+3. `pnpm test` — 524 unit tests pass
 4. `pnpm test:e2e` — 48 E2E tests pass (requires Playwright browsers)
 5. `pnpm format:check` — all files use Prettier code style
 6. `pnpm build` — zero errors

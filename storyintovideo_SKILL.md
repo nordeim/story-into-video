@@ -1,6 +1,12 @@
 # StoryIntoVideo — Complete Project Skill
 
-> **Purpose:** This document is the definitive reference for any coding agent working on the StoryIntoVideo codebase. It distills every design decision, architectural pattern, hook implementation, anti-pattern, and lesson learned into a single actionable guide. Read it before writing any code.
+> **Version:** 9.0 (v9 — post-audit-v2 remediation)
+> **Last Updated:** 2026-07-02
+> **Status:** CANONICAL — supersedes all `storyintovideo_SKILL-v*.md` files
+> **Test count:** 524 unit (58 files) + 48 E2E (9 specs) = 572 total, all GREEN
+> **Route count:** 22 (13 static + 9 dynamic)
+
+This skill file distills the complete knowledge of the StoryIntoVideo codebase — design philosophy, tech stack, architecture, component patterns, hooks, accessibility, anti-patterns, debugging, lessons learned, and the exact tokens/interfaces/z-index map that a coding agent needs to replicate or extend this project with the same quality bar.
 
 ---
 
@@ -12,7 +18,7 @@
 4. [The Design System (Code-First)](#4-the-design-system-code-first)
 5. [Component Architecture & Patterns](#5-component-architecture--patterns)
 6. [Custom Hooks Deep Dive](#6-custom-hooks-deep-dive)
-7. [Content Management: Static Data Pattern](#7-content-management-static-data-pattern)
+7. [Content Management & Data Ingestion](#7-content-management--data-ingestion)
 8. [Accessibility (WCAG AAA) Implementation](#8-accessibility-wcag-aaa-implementation)
 9. [Anti-Patterns & Common Bugs](#9-anti-patterns--common-bugs)
 10. [Debugging Guide](#10-debugging-guide)
@@ -25,202 +31,204 @@
 17. [Responsive Breakpoint Reference](#17-responsive-breakpoint-reference)
 18. [Z-Index Layer Map](#18-z-index-layer-map)
 19. [Color Reference (Complete)](#19-color-reference-complete)
-20. [TypeScript Interface Reference](#20-typescript-interface-reference)
+20. [The Complete TypeScript Interface Reference](#20-the-complete-typescript-interface-reference)
+21. [Appendix A: ADRs (Architecture Decision Records)](#appendix-a-adrs)
+22. [Appendix B: 6-Step Pipeline Credit Costs](#appendix-b-6-step-pipeline-credit-costs)
+23. [Appendix C: Audit History (v1 + v2)](#appendix-c-audit-history)
 
 ---
 
 ## 1. Project Identity & Design Philosophy
 
-### What This Project Is
+### 1.1 What Is StoryIntoVideo?
 
-StoryIntoVideo is a production SaaS that transforms written stories into finished MP4 videos via a 6-step AI pipeline. Originally a pixel-accurate marketing clone of `storyintovideo.com`, it evolved into a hybrid Next.js 16 app with:
+StoryIntoVideo is a **production SaaS** that transforms a written story into a finished MP4 video via a 6-step async AI pipeline (moderate → analyze → characters → scenes → voiceover → subtitles → video assembly). It began as a pixel-accurate static marketing clone of `storyintovideo.com` (luxury-dark, cinematic) and evolved into a hybrid Next.js app with a full backend: Auth.js v5, Drizzle/PostgreSQL, Inngest, Stripe, Cloudflare R2, OpenAI/Replicate/ElevenLabs.
 
-- **Marketing layer** — 10 sections, statically prerendered, luxury-dark cinematic aesthetic
-- **Production app layer** — auth, dashboard, create wizard, project detail with SSE, billing
-- **AI pipeline** — Inngest-orchestrated: moderate → analyze → characters → scenes → voiceover → subtitles → video assembly
-- **Billing** — Stripe with credit metering + idempotent webhooks
+**Live site:** `https://storyintovideo.jesspete.shop/`
 
-### Design Philosophy: Luxury-Dark Cinematic
+### 1.2 The Design Philosophy: "Luxury-Dark Cinematic" + "Anti-Generic"
 
-The design language is **not** brutalist, minimalist, or generic. It is a deliberate **luxury-dark cinematic** aesthetic with these non-negotiable principles:
+The aesthetic is **luxury-dark cinematic** — not brutalist, not minimal, not corporate. It's the visual language of a high-end film studio's landing page: near-black backgrounds, a single rationed amber accent, cinematic typography, and CSS-only animation that feels like film transitions.
 
-1. **Amber is rationed** — `#febf00` is the ONLY hue permitted to assert itself. It appears on CTAs, focus rings, active states, and the singular eyebrow badge. It is NEVER used as a background fill except on the single Tier-4 CTA (FinalCTA section).
+**Anti-Generic Rules (non-negotiable):**
+- **No purple gradients** — the ONLY permitted purple on the entire site is the example-card hover gradient (`bg-gradient-to-r from-yellow-500 to-purple-500`). Every other use of purple is a bug.
+- **No "Inter/Roboto safety"** — body uses Geist Sans, display headings use Outfit weight 820 (NOT available from Google Fonts API — must self-host).
+- **No Framer Motion / GSAP** — all 13 animations are CSS `@keyframes`. This is critical for Lighthouse ≥95 and bundle size.
+- **Amber is rationed** — `#febf00` is the only hue permitted to assert itself. It appears on CTAs, active states, focus rings, and the eyebrow badge. It does NOT appear in body text, borders, or backgrounds (except the eyebrow glow).
+- **No template card grids** — the Features section uses a hairline grid, not shadow cards. The Examples section uses a portrait carousel, not a 3-column grid.
+- **No `amber-400`** — Tailwind's `amber-400` is `#fbbf24`, which is a DIFFERENT color from `#febf00`. Always use the custom `--color-primary` token. `brand-tokens.test.ts` enforces 0 violations.
 
-2. **The singular purple exception** — the yellow→purple gradient on example-card hover (`from-yellow-500 to-purple-500`) is the ONLY purple on the entire site. This is intentional — it signals "premium example content" and breaks the amber monopoly in one carefully chosen place.
+### 1.3 The "Engineered Soul" Component Philosophy
 
-3. **Background is `#020202`, NOT `#000000`** — the near-black has a warm-neutral undertone. Pure black looks flat; `#020202` has depth. This is field-verified from the live site.
+Every component has a purpose beyond aesthetics. The hierarchy is:
 
-4. **CSS-only animation** — no Framer Motion, no GSAP. All 13 keyframes are `@keyframes` in `globals.css`. This is critical for Lighthouse ≥95.
+1. **Purpose** — what problem does this solve? (e.g., Hero: capture the story input + communicate the value prop in 3 seconds)
+2. **Tone** — luxury-dark cinematic (not playful, not corporate, not minimal)
+3. **Differentiation** — what makes this UNFORGETTABLE? (e.g., the Hero's glass-input widget with backdrop-blur + amber focus glow)
+4. **Conceptual Direction** — execute with precision. Every pixel serves the cinematic direction.
 
-5. **Intentional minimalism** — whitespace is a structural element, not empty space. The 4-column feature grid uses continuous hairline borders, not boxed cards.
+### 1.4 CTA Hierarchy (4 Tiers — Deliberate)
 
-6. **Anti-generic enforcement** — no Bootstrap grids, no "Inter/Roboto safety", no purple-gradient-on-white clichés. Every pixel serves a purpose.
-
-### The CTA Hierarchy (4 Tiers)
-
-The call-to-action system is a deliberate hierarchy from restrained to assertive:
-
-| Tier | Component | Visual | Usage |
+| Tier | Component | Visual | Use Case |
 |---|---|---|---|
-| 1 (Ghost) | `CtaGhost` | Amber text, arrow translates on hover | Workflow steps, Features, Testimonials, UseCases |
-| 2 (Glass) | Hero "Start Creating" | Glass pill with amber text, gradient bg | Hero section only |
-| 3 (Gradient) | `CtaGradient` | Amber gradient pill (`from-primary to-primary`) | Examples "Clone this project" |
-| 4 (Solid) | `CtaAmber` | Solid amber pill, the ONLY `bg-primary` button | FinalCTA "Start Creating — It's Free" |
+| 1 (most restrained) | `CtaGhost` | Ghost link with animated arrow | Secondary navigation, "Sign in" |
+| 2 | Glass pill | Frosted glass with border | (used inline in Hero) |
+| 3 | `CtaGradient` | Amber gradient pill | Mid-priority conversion |
+| 4 (conversion crescendo) | `CtaAmber` | Solid amber pill with hover scale + glow | Primary CTA ("Start Creating") |
 
 ---
 
 ## 2. Tech Stack & Environment
 
-### Exact Versions (from `package.json`)
+### 2.1 Locked Versions (Never Downgrade Without Explicit Approval)
 
-| Layer | Technology | Version | Notes |
+| Layer | Technology | Version | Critical Constraint |
 |---|---|---|---|
-| Framework | Next.js (App Router, hybrid) | `^16.2.0` | Turbopack dev server |
-| UI | React | `^19.2.3` | ⚠️ CVE-2025-55182 floor — never downgrade below 19.2.3 |
-| Styling | Tailwind CSS | `^4.3.0` | CSS-first `@theme` block (no `tailwind.config.ts`) |
-| Components | shadcn/ui (hand-written) | — | 4 primitives: button, accordion, sheet, dropdown-menu |
-| Fonts | Geist Sans + Geist Mono + Outfit 820 | self-hosted | Via `next/font/local` for Outfit weight 820 |
-| Icons | Lucide React | `^0.460.0` | |
-| Auth | Auth.js v5 (NextAuth) | `5.0.0-beta.31` | + `@auth/drizzle-adapter` |
-| Database | PostgreSQL (Neon) + Drizzle ORM | `drizzle ^0.45.2` | 11 tables, 8 enums |
-| Job Queue | Inngest | `^4.11.0` | 6-step AI pipeline |
-| AI — LLM | OpenAI | `^6.45.0` | GPT-4o + Whisper + Moderation |
-| AI — Image | Replicate | `^1.4.0` | SDXL + IP-Adapter |
-| AI — TTS | ElevenLabs | `^1.59.0` | |
-| Storage | Cloudflare R2 | `@aws-sdk/client-s3 ^3.1075` | 3 private buckets |
-| Billing | Stripe | `^22.3.0` | Checkout + Portal + Webhooks |
-| Validation | Zod | `^4.4.3` | Env + all Server Action inputs |
-| Video | FFmpeg | system binary | `FFMPEG_PATH` env var (default `/usr/bin/ffmpeg`) |
-| Rate Limiting | Upstash Ratelimit + Redis | `^2.0.8` / `^1.38.0` | auth, pipeline, SSE |
+| Framework | Next.js (App Router, hybrid) | `^16.2.0` | Turbopack dev; `proxy.ts` (renamed from `middleware.ts` in Next.js 16) |
+| UI Runtime | React (strict TypeScript) | `^19.2.3` | ⚠️ **CVE-2025-55182 floor — never downgrade below 19.2.3** ("React2Shell" RCE, CVSS 10.0) |
+| Language | TypeScript | `^5.9.0` | `strict: true`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`, `noImplicitOverride`, `noUnusedLocals`, `noUnusedParameters` |
+| Styling | Tailwind CSS (CSS-first `@theme`) | `^4.3.0` | **No `tailwind.config.ts`** — all tokens in `globals.css` `@theme` block |
+| Components | shadcn/ui (Radix, hand-written) | — | 4 primitives only (button, accordion, sheet, dropdown-menu) — CLI timed out |
+| Fonts | Geist Sans + Geist Mono + Outfit 820 | self-hosted | Outfit 820 NOT available via `next/font/google` — must use `next/font/local` |
+| Icons | Lucide React | `^0.460.0` | Tree-shakable, consistent stroke width |
+| Auth | Auth.js v5 (NextAuth) + `@auth/drizzle-adapter` | `5.0.0-beta.31` / `^1.11.2` | `trustHost: true` for reverse-proxy; JWT sessions |
+| Database | PostgreSQL (Neon) + Drizzle ORM | `drizzle-orm ^0.45.2` / `postgres ^3.4.9` | Pooled `DATABASE_URL` + unpooled `DATABASE_URL_UNPOOLED` for migrations |
+| Job Queue | Inngest | `^4.11.0` | v4 `createFunction` uses `triggers` array in config (not 2nd arg) |
+| AI — LLM | OpenAI GPT-4o + Whisper + Moderation | `openai ^6.45.0` | JSON mode analysis, Whisper ASR, content moderation |
+| AI — Image | Replicate SDXL + IP-Adapter | `replicate ^1.4.0` | ⚠️ `REPLICATE_SDXL_IPADAPTER_MODEL` must be set to `lucataco/sdxl-ipadapter:<sha>` (default is placeholder) |
+| AI — TTS | ElevenLabs | `^1.59.0` | Returns `Readable`, not `ReadableStream`; chunk text at 4500 chars |
+| Storage | Cloudflare R2 (S3-compatible) | `@aws-sdk/client-s3 ^3.1075.0` | 3 buckets (`siv-uploads`, `siv-generated`, `siv-videos`); `MAX_PUT_OBJECT_BYTES = 500 MB` |
+| Billing | Stripe | `^22.3.0` | "Basil" API (2025-03-31) — `current_period_end` moved to `items.data[0]` |
+| Validation | Zod (env + Server Action inputs) | `^4.4.3` | Zod v4 `.url()` accepts any scheme → compose with `.refine()` for protocol restriction |
+| Video | FFmpeg (system binary) | `fluent-ffmpeg ^2.1.3` | `FFMPEG_PATH` env var (default `/usr/bin/ffmpeg`); `@ffmpeg-installer/ffmpeg` REMOVED (Turbopack-incompatible) |
+| Rate Limiting | Upstash Ratelimit + Redis | `@upstash/ratelimit ^2.0.8` | 3 limiters: auth 10/15min/IP, pipeline 5/min/user, SSE slot pattern |
+| Hashing | bcryptjs | `^3.0.3` | Cost factor 12 |
+| Testing (unit) | Vitest + jsdom | `vitest ^4.0.0` | 524 tests across 58 files |
+| Testing (E2E) | Playwright | `^1.61.0` | Chromium only; 48 tests across 9 spec files |
+| Quality | ESLint (flat config) | `^9.0.0` | `@typescript-eslint/no-explicit-any: error`; zero warnings before commit |
 | Package Manager | pnpm | `>=10.26.0` | `allowBuilds` syntax floor |
 | Node | — | `>=20.0.0` | |
+| CI/CD | GitHub Actions | `.github/workflows/ci.yml` | `quality-gate` job + `e2e` job (Postgres 17 service container) |
 
-### TypeScript Configuration (`tsconfig.json`)
+### 2.2 Known Dependency Notes
 
-Maximum strictness is enforced:
-
-```json
-{
-  "strict": true,
-  "noUncheckedIndexedAccess": true,
-  "noImplicitOverride": true,
-  "noUnusedLocals": true,
-  "noUnusedParameters": true,
-  "verbatimModuleSyntax": true,
-  "forceConsistentCasingInFileNames": true,
-  "moduleResolution": "bundler",
-  "target": "ES2022",
-  "jsx": "react-jsx",
-  "paths": { "@/*": ["./src/*"] }
-}
-```
-
-**Critical rules enforced by this config:**
-- `noUncheckedIndexedAccess` — array access returns `T | undefined`, forcing null checks
-- `verbatimModuleSyntax` — `import type` is mandatory for type-only imports
-- `noUnusedLocals` / `noUnusedParameters` — dead code is a compile error, not a warning
-
-### ESLint Configuration (`eslint.config.mjs`)
-
-Flat config (ESLint 9+), no `FlatCompat`:
-
-```javascript
-// Key rules (errors, not warnings):
-'@typescript-eslint/no-explicit-any': 'error',
-'@typescript-eslint/consistent-type-imports': 'error',
-'react-hooks/exhaustive-deps': 'warn',
-// Ignores: node_modules, .next, skills, docs, scripts, public
-```
-
-**`next lint` is deprecated in Next.js 16** — run `eslint .` directly.
-
-### Prettier Configuration (`.prettierrc.json`)
-
-```json
-{
-  "semi": true,
-  "singleQuote": true,
-  "trailingComma": "all",
-  "printWidth": 100,
-  "tabWidth": 2,
-  "useTabs": false,
-  "arrowParens": "always",
-  "plugins": ["prettier-plugin-tailwindcss"]
-}
-```
-
-### pnpm Workspace (`pnpm-workspace.yaml`)
-
-```yaml
-packages:
-  - '.'
-allowBuilds:
-  esbuild: true
-  protobufjs: true
-  sharp: true
-  unrs-resolver: true
-```
-
-**Critical:** `allowBuilds` (pnpm 10.26+) replaced `onlyBuiltDependencies` (removed in pnpm 11). The engine floor is `>=10.26.0` to enforce this syntax.
+- **`next-auth@5.0.0-beta.31`** — Auth.js v5 is technically beta. Pin the exact version; test on every upgrade.
+- **`postcss <8.5.10`** — moderate vuln (GHSA-qx2v-qp2m-jg93, transitive via `next`). Not exploitable. `pnpm audit --audit-level=high` passes clean.
+- **`@aws-sdk/lib-storage`** — NOT installed (NF-5 corrected the docs that claimed it was). The H5 FFmpeg streaming refactor requires `pnpm add @aws-sdk/lib-storage` first.
+- **`@sentry/nextjs`** — NOT installed. `SENTRY_DSN` is in the env schema only.
 
 ---
 
 ## 3. Bootstrapping & Configuration
 
-### Recreating This Project From Scratch
+### 3.1 From Scratch (Recreating the Environment)
 
 ```bash
-# 1. Scaffold Next.js 16 with TypeScript + Tailwind v4
+# 1. Create the Next.js 16 app with src/ directory
 pnpm create next-app@latest story-into-video \
   --typescript \
   --tailwind \
   --eslint \
   --app \
   --src-dir \
+  --import-alias "@/*" \
   --use-pnpm
 
-# 2. Install core dependencies
-pnpm add next-auth@5.0.0-beta.31 @auth/drizzle-adapter
-pnpm add drizzle-orm postgres
-pnpm add @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
-pnpm add inngest openai replicate elevenlabs
-pnpm add stripe @upstash/ratelimit @upstash/redis
-pnpm add bcryptjs zod lucide-react class-variance-authority clsx tailwind-merge
-pnpm add geist fluent-ffmpeg
+cd story-into-video
+
+# 2. Install runtime dependencies
+pnpm add next-auth@5.0.0-beta.31 @auth/drizzle-adapter \
+  drizzle-orm postgres \
+  inngest \
+  openai replicate elevenlabs \
+  @aws-sdk/client-s3 @aws-sdk/s3-request-presigner \
+  stripe \
+  zod \
+  bcryptjs \
+  fluent-ffmpeg \
+  @upstash/ratelimit @upstash/redis \
+  geist lucide-react \
+  class-variance-authority clsx tailwind-merge \
+  @radix-ui/react-accordion @radix-ui/react-dialog @radix-ui/react-dropdown-menu @radix-ui/react-slot \
+  react@^19.2.3 react-dom@^19.2.3
 
 # 3. Install dev dependencies
-pnpm add -D drizzle-kit @playwright/test vitest @vitejs/plugin-react
-pnpm add -D jsdom @testing-library/react @testing-library/jest-dom @testing-library/user-event
-pnpm add -D typescript-eslint eslint-plugin-react eslint-plugin-react-hooks @next/eslint-plugin-next
-pnpm add -D prettier prettier-plugin-tailwindcss
-pnpm add -D husky lint-staged dotenv-cli tsx
-pnpm add -D @types/bcryptjs @types/fluent-ffmpeg
+pnpm add -D drizzle-kit tsx \
+  vitest @vitejs/plugin-react jsdom \
+  @testing-library/react @testing-library/jest-dom @testing-library/user-event \
+  @playwright/test \
+  eslint-config-next typescript-eslint eslint-plugin-react eslint-plugin-react-hooks \
+  prettier prettier-plugin-tailwindcss \
+  husky lint-staged \
+  @types/bcryptjs @types/fluent-ffmpeg @types/node @types/react @types/react-dom \
+  dotenv dotenv-cli
 
-# 4. Install Playwright browsers (separate step — pnpm install doesn't do this)
-pnpm exec playwright install chromium
+# 4. Configure pnpm workspace (pnpm 10.26+ syntax)
+cat > pnpm-workspace.yaml << 'EOF'
+packages: ['.']
+allowBuilds:
+  esbuild: true
+  protobufjs: true
+  sharp: true
+  unrs-resolver: true
+EOF
 
-# 5. Download the Outfit variable font (weight 820 access)
-# Source: https://github.com/google/fonts/raw/main/ofl/outfit/Outfit%5Bwght%5D.ttf
-# Convert to woff2 via fonttools → public/fonts/Outfit-VariableFont.woff2 (45KB)
+# 5. Install Playwright browsers
+pnpm exec playwright install --with-deps chromium
+
+# 6. Activate husky
+pnpm install  # runs `prepare: husky || true`
 ```
 
-### Critical Configuration Files
+### 3.2 Critical Configuration Files
 
-**`postcss.config.mjs`** — Tailwind v4 PostCSS plugin (replaces `tailwindcss` + `autoprefixer`):
-```javascript
-const config = {
-  plugins: {
-    '@tailwindcss/postcss': {},
+#### `tsconfig.json` (strict mode — maximum)
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "incremental": true,
+    "paths": { "@/*": ["./src/*"] }
   },
-};
-export default config;
+  "include": ["next-env.d.ts", "**/*.{ts,tsx}", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", "skills", "docs"]
+}
 ```
 
-**`next.config.ts`** — Security headers + image formats + dev origins:
+#### `next.config.ts` (6 security headers — NF-2)
 ```typescript
+import type { NextConfig } from 'next';
+
+const CSP_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",   // Next.js App Router requires inline
+  "style-src 'self' 'unsafe-inline'",     // Tailwind v4
+  "img-src 'self' data: https:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "media-src 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join('; ');
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  allowedDevOrigins: ['storyintovideo.jesspete.shop'],
   images: { formats: ['image/avif', 'image/webp'] },
   async headers() {
     return [{
@@ -230,55 +238,62 @@ const nextConfig: NextConfig = {
         { key: 'X-Content-Type-Options', value: 'nosniff' },
         { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
         { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+        { key: 'Content-Security-Policy', value: CSP_POLICY },        // NF-2
+        { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' }, // NF-2
       ],
     }];
   },
 };
+export default nextConfig;
 ```
 
-**`drizzle.config.ts`** — Uses `DATABASE_URL_UNPOOLED` (direct connection for DDL):
+#### `eslint.config.mjs` (flat config — direct plugin imports, no FlatCompat)
+```javascript
+// Key rules:
+// @typescript-eslint/no-explicit-any: error
+// @typescript-eslint/consistent-type-imports: error
+// react/react-in-jsx-scope: off
+// react-hooks/exhaustive-deps: warn
+// Ignores: node_modules, .next, skills, docs, scripts
+```
+
+#### `postcss.config.mjs` (Tailwind v4 — single plugin)
+```javascript
+export default { plugins: { '@tailwindcss/postcss': {} } };
+```
+
+#### `vitest.config.ts`
 ```typescript
 export default defineConfig({
-  schema: './src/lib/db/schema/index.ts',
-  out: './drizzle',
-  dialect: 'postgresql',
-  dbCredentials: { url: process.env.DATABASE_URL_UNPOOLED! },
-  verbose: true,
-  strict: true,
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/tests/setup.ts'],
+    include: ['src/tests/unit/**/*.test.{ts,tsx}'],
+    coverage: { provider: 'v8', include: ['src/lib/**/*.{ts,tsx}', 'src/components/**/*.{ts,tsx}'] },
+  },
+  resolve: { alias: { '@': './src' } },
 });
 ```
 
-**`components.json`** (shadcn config):
-```json
-{
-  "style": "new-york",
-  "rsc": true,
-  "tsx": true,
-  "tailwind": { "css": "src/app/globals.css", "baseColor": "zinc", "cssVariables": true },
-  "aliases": { "components": "@/components", "utils": "@/lib/utils", "ui": "@/components/ui" },
-  "iconLibrary": "lucide"
-}
-```
+### 3.3 Environment Variables (27 required + 3 optional = 30 total)
 
-### Environment Setup
+All env vars are validated by a Zod schema in `src/lib/env/index.ts`. **Never read `process.env.*` directly** — always import `env` from `@/lib/env`.
 
-```bash
-cp .env.example .env.local
-# Fill in 27 required env vars + 3 optional (Google OAuth)
-pnpm drizzle-kit generate    # Create migration SQL from schema
-pnpm drizzle-kit migrate     # Apply to Neon (needs DATABASE_URL_UNPOOLED)
-pnpm dev                     # Start dev server (Turbopack, port 3000)
-```
+**Critical env behavior:**
+- **Build-context fallback:** When `NEXT_PHASE=phase-production-build` or `NODE_ENV=test`, the schema returns placeholder values so `next build` succeeds without real secrets.
+- **T1 host-mismatch throw:** In production runtime, if `AUTH_URL` host ≠ `NEXT_PUBLIC_APP_URL` host, the app **REFUSES TO BOOT** with a thrown error. In dev/test, it only `console.warn`s.
+- **`IMAGE_MODERATION_FAIL_OPEN`** defaults to `'false'` (fail-closed) in production, `'true'` in dev/test (H8 fix).
 
-**Env validation is fail-fast at module load.** The Zod schema in `src/lib/env/index.ts` validates all 30 vars. Missing/invalid vars throw at boot with a descriptive error. Build context (`NEXT_PHASE=phase-production-build` or `NODE_ENV=test`) returns placeholders so `next build` succeeds without real secrets.
+See `.env.example` for the full list with format validation rules.
 
 ---
 
 ## 4. The Design System (Code-First)
 
-### The `@theme` Block (Tailwind v4 CSS-First)
+### 4.1 The `@theme` Block (Tailwind v4 CSS-First)
 
-All design tokens live in `src/app/globals.css` inside `@theme { ... }`. There is **no `tailwind.config.ts`**. This is the Tailwind v4 CSS-first convention.
+All design tokens live in `src/app/globals.css` inside a single `@theme { ... }` block. There is **no `tailwind.config.ts`**. The `@source` directives handle content scanning:
 
 ```css
 @import 'tailwindcss';
@@ -287,299 +302,243 @@ All design tokens live in `src/app/globals.css` inside `@theme { ... }`. There i
 @source '../lib/**/*.{ts,tsx}';
 
 @theme {
-  /* ── Color Palette (field-verified from live site) ── */
-  --color-background: #020202;
-  --color-foreground: #f8f8f8;
-  --color-card: #060607;
-  --color-card-foreground: #f8f8f8;
-  --color-popover: #0b0b0d;
-  --color-popover-foreground: #f8f8f8;
-  --color-primary: #febf00;
-  --color-primary-foreground: #020202;
-  --color-secondary: #111114;
-  --color-secondary-foreground: #f8f8f8;
-  --color-muted: #1a1a1d;
-  --color-muted-foreground: #8e8e95;
-  --color-accent: #febf00;
-  --color-accent-foreground: #020202;
-  --color-destructive: #ff2d39;
-  --color-destructive-foreground: #f8f8f8;
-  --color-border: #1a1a1d;
-  --color-input: #0b0b0d;
-  --color-ring: #febf0080;
-
-  /* ── Typography ── */
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
-  --font-heading: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
-
-  /* ── Border Radius ── */
-  --radius: 0.75rem;
-  --radius-sm: calc(0.75rem - 4px);
-  --radius-md: calc(0.75rem - 2px);
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.25rem;
-
-  /* ── Shadows ── */
-  --shadow-hero-input: 0 20px 80px rgba(0, 0, 0, 0.6);
-  --shadow-eyebrow-glow: 0 0 30px rgba(234, 179, 8, 0.1);
-  --shadow-cta-glow: 0 0 40px rgba(251, 191, 36, 0.3);
+  /* Colors, typography, radius, shadows, animations, keyframes — all here */
 }
 ```
 
-### ⚠️ Critical Color Rule
+### 4.2 Color Tokens (Field-Verified from Live DOM)
 
-`#febf00` ≠ Tailwind's `amber-400` (`#fbbf24`). These are different colors. **Always use the custom `--color-primary` token**, never `amber-400`. The `brand-tokens.test.ts` CI guard enforces zero `amber-300/400/500/600` and `bg-zinc-950/900/black` violations across all source files.
-
-### Typography Hierarchy
-
-| Element | Font | Weight | Key Class |
+| Token | Hex | Usage | WCAG Contrast |
 |---|---|---|---|
-| H1 (hero) | Outfit | **820** | `font-heading text-[4.5rem] tracking-[-0.04em]` + `style={{ fontWeight: 820 }}` |
-| H2 (sections) | Outfit | 700 | `font-heading text-4xl lg:text-6xl tracking-[-0.03em]` |
-| Body | Geist Sans | 400 | `font-sans text-lg` |
-| Ratio toggles | Geist Mono | 400 | `font-mono text-[10px]` |
-| Eyebrow | Geist Sans | 600 | `text-[11px] tracking-widest uppercase` |
+| `--color-background` | `#020202` | Page background (near-black, warm-neutral — NOT pure #000) | — |
+| `--color-foreground` | `#f8f8f8` | Default foreground (headings) | 18.1:1 on background (AAA) |
+| `--color-card` | `#060607` | Card surfaces | — |
+| `--color-card-foreground` | `#f8f8f8` | Text on cards | 18.0:1 on card (AAA) |
+| `--color-popover` | `#0b0b0d` | Dropdown/sheet backgrounds | — |
+| `--color-primary` (amber) | `#febf00` | CTAs, active states, focus rings, eyebrow | 14.5:1 on background (AAA) |
+| `--color-primary-foreground` | `#020202` | Text on amber CTAs | 14.5:1 on primary (AAA) |
+| `--color-secondary` | `#111114` | Secondary surfaces | — |
+| `--color-muted` | `#1a1a1d` | Muted backgrounds | — |
+| `--color-muted-foreground` | `#8e8e95` | Secondary text (zinc-400 equivalent) | 6.4:1 on background (AA) |
+| `--color-accent` | `#febf00` | Same as primary (alias) | — |
+| `--color-destructive` | `#ff2d39` | Error states | — |
+| `--color-border` | `#1a1a1d` | Default borders | — |
+| `--color-input` | `#0b0b0d` | Input backgrounds | — |
+| `--color-ring` | `#febf0080` | Focus ring (50% opacity amber) | — |
 
-**Outfit weight 820** is self-hosted via `next/font/local` because Google Fonts API only serves discrete weights (100, 200, ..., 900). The variable font file (`Outfit-VariableFont.woff2`, 45KB) supports the full 100-900 range including 820.
+**Body text** uses `#d4d4d8` (zinc-300) — **12.6:1 contrast on `#020202`** (WCAG AAA).
 
-### The 13 Keyframes (All Kebab-Case)
+⚠️ **`#febf00` ≠ Tailwind's `amber-400` (`#fbbf24`)** — these are different colors. Always use the custom `--color-primary` token. `brand-tokens.test.ts` enforces 0 violations of `amber-300/400/500/600` or `bg-zinc-950/900/black` in non-test source.
 
-```css
-/* Inside @theme so Tailwind v4 picks them up as --animate-* utilities */
-fade-in-up, float, glow-pulse, border-glow, composite-pulse-text,
-shimmer, btn-shimmer, grid-shimmer, grid-sweep-h, grid-sweep-v,
-scanline-scroll, lang-dropdown-in, marquee-scroll
+### 4.3 Typography Hierarchy
+
+| Role | Font | Weight | Class | Tracking |
+|---|---|---|---|---|
+| Display H1 (hero desktop) | Outfit | **820** | `font-heading text-[4.5rem]` | `-0.04em` |
+| Display H1 (hero mobile) | Outfit | 820 | `text-4xl` | scales with `em` |
+| H2 (sections) | Outfit | 700 | `font-heading text-4xl lg:text-6xl` | `-0.03em` |
+| Body / UI | Geist Sans | 400–600 | `font-sans text-lg` | normal |
+| Accents / toggles | Geist Mono | 400 | `font-mono text-[10px]` | — |
+
+**Why Outfit weight 820 via `next/font/local`:** Google Fonts API only serves discrete weights (100, 200, ..., 900); weight 820 is NOT one of them. Self-hosting the variable font woff2 (`public/fonts/Outfit-VariableFont.woff2`, 45KB) is the ONLY way to access weight 820.
+
+**Font wiring (`src/lib/fonts.ts`):**
+```typescript
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
+import localFont from 'next/font/local';
+
+const outfit = localFont({
+  src: '../../public/fonts/Outfit-VariableFont.woff2',
+  weight: '100 900',           // variable font range
+  variable: '--font-outfit',
+  display: 'swap',
+});
+
+export const fontVariables: string = [GeistSans.variable, GeistMono.variable, outfit.variable].join(' ');
 ```
 
-**Usage pattern:** `animate-[fade-in-up_0.6s_ease-out_0.1s_both]` (arbitrary value syntax in className).
+Applied in `layout.tsx`: `<html lang="en" className={fontVariables} suppressHydrationWarning>`
 
-### Custom `@utility` Classes
+### 4.4 The 13 Keyframes (All Kebab-Case)
 
-Tailwind v4 replaces `@layer components` + `@layer utilities` with `@utility`:
+All animation is CSS `@keyframes` only — **no Framer Motion, no GSAP**. Keyframes live INSIDE the `@theme` block so Tailwind v4 picks them up.
+
+| # | Keyframe | Purpose | Duration |
+|---|---|---|---|
+| 1 | `fade-in-up` | Entrance: opacity 0→1, translateY 20px→0 | 0.6s ease-out both |
+| 2 | `float` | Ambient: translateY 0→-12px→0 | 6s ease-in-out infinite |
+| 3 | `glow-pulse` | Amber box-shadow pulse | 3s ease-in-out infinite |
+| 4 | `border-glow` | Border color pulse (0.08→0.2 opacity) | 4s ease-in-out infinite |
+| 5 | `composite-pulse-text` | Text opacity pulse (0.7→1) | 2s ease-in-out infinite |
+| 6 | `shimmer` | Background-position sweep (200%→-200%) | 3s linear infinite |
+| 7 | `btn-shimmer` | Button highlight sweep (translate -100%→100%) | 1.5s ease-in-out infinite |
+| 8 | `grid-shimmer` | Grid texture drift | 8s ease-in-out infinite |
+| 9 | `grid-sweep-h` | Horizontal light sweep (translate -600px→100vw) | 8s linear infinite |
+| 10 | `grid-sweep-v` | Vertical light sweep | 10s linear infinite |
+| 11 | `scanline-scroll` | Scanline background-position-x (0→30px) | 1s linear infinite |
+| 12 | `lang-dropdown-in` | Dropdown entrance (opacity+scale+translateY) | 0.15s ease-out |
+| 13 | `marquee-scroll` | Style chip marquee (translateX 0→-50%) | 40s linear infinite (30s on mobile) |
+
+### 4.5 Custom `@utility` Classes (7)
+
+Tailwind v4 uses `@utility` (single-purpose helpers) instead of v3's `@layer components` + `@layer utilities`:
 
 | Utility | Purpose |
 |---|---|
 | `scrollbar-hide` | Hide scrollbar for carousels (cross-browser) |
-| `marquee-mask` | Edge fade mask for the style chips marquee |
-| `marquee-track` | Infinite horizontal scroll, pauses on hover |
-| `glass-input` | Hero textarea wrapper — backdrop-blur + amber focus glow |
-| `eyebrow` | Amber pill badge with ambient glow |
-| `section-heading` | Outfit H2, fluid `clamp(2rem, 5vw, 3rem)` |
-| `cta-amber` | Solid amber pill, hover scale 1.02 + glow |
+| `marquee-mask` | Edge fade mask for style chip marquee |
+| `marquee-track` | Infinite horizontal scroll, pauses on hover, 30s on mobile |
+| `glass-input` | Hero textarea wrapper — backdrop-blur(16px) + amber focus-within glow |
+| `eyebrow` | Amber pill badge with ambient glow (uppercase, 11px, 0.1em tracking) |
+| `section-heading` | H2 with Outfit + fluid `clamp(2rem, 5vw, 3rem)` size |
+| `cta-amber` | Tier-4 CTA — solid amber pill with hover scale(1.02) + glow |
 
-### Scroll Reveal Pattern (CSS + JS Data Attributes)
+### 4.6 Border Radius Scale
 
-```css
-/* globals.css */
-[data-reveal] {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
-  transition-delay: var(--reveal-delay, 0s);
-}
-[data-reveal][data-revealed='true'] {
-  opacity: 1;
-  transform: translateY(0);
-}
-```
+| Token | Value | Usage |
+|---|---|---|
+| `--radius` | `0.75rem` (12px) | Default |
+| `--radius-sm` | `calc(0.75rem - 4px)` = 8px | Small elements |
+| `--radius-md` | `calc(0.75rem - 2px)` = 10px | Medium elements |
+| `--radius-lg` | `0.75rem` = 12px | Large elements |
+| `--radius-xl` | `1rem` = 16px | Extra large |
+| `--radius-2xl` | `1.25rem` = 20px | Glass input, cards |
 
-The `useReveal` hook flips `data-revealed` from `'false'` to `'true'` when the element enters the viewport via `IntersectionObserver`. Staggered delays are set via `style={{ '--reveal-delay': '${delay}ms' }}`.
+### 4.7 Shadows
+
+| Token | Value |
+|---|---|
+| `--shadow-hero-input` | `0 20px 80px rgba(0, 0, 0, 0.6)` |
+| `--shadow-eyebrow-glow` | `0 0 30px rgba(234, 179, 8, 0.1)` |
+| `--shadow-cta-glow` | `0 0 40px rgba(251, 191, 36, 0.3)` |
 
 ---
 
 ## 5. Component Architecture & Patterns
 
-### The 5-Layer Architecture (Golden Rule)
+### 5.1 The 5-Layer Architecture (Golden Rule)
 
 ```
 Layer 0: src/proxy.ts             — Cookie check, redirect. NO DB. NO logic. Edge runtime.
+                                    (Renamed from middleware.ts in Next.js 16.)
 Layer 1: src/app/                 — Route structure, metadata, Suspense. Layouts must NOT fetch data.
-Layer 2: src/features/            — UI composition, data binding, mutations (auth, projects, pipeline, billing)
-Layer 3: src/features/*/domain/   — Pure business logic. No Next.js or DB runtime imports (import type only)
-Layer 4: src/lib/                 — Infrastructure: Drizzle, Auth.js, Inngest, R2, Stripe, AI providers. Side effects only.
+Layer 2: src/features/            — UI composition, data binding, mutations
+                                    (auth, projects, pipeline, billing)
+Layer 3: src/features/*/domain/   — Pure business logic. No Next.js or DB runtime imports
+                                    (import type only).
+Layer 4: src/lib/                 — Infrastructure: Drizzle, Auth.js, Inngest, R2, Stripe,
+                                    AI providers. Side effects only.
 ```
 
-**Golden Rule:** A lower layer may never import from a higher layer. Domain may import types from Infrastructure but never runtime code.
+**Golden Rule:** A lower layer may never import from a higher layer. Domain may import *types* from Infrastructure but never runtime code.
 
-### Server vs Client Component Decision Tree
+### 5.2 Component Inventory
 
-```
-Does the component need:
-├── Browser APIs (window, document, localStorage)?
-│   └── YES → 'use client'
-├── React state (useState, useEffect, useRef)?
-│   └── YES → 'use client'
-├── Event handlers (onClick, onChange)?
-│   └── YES → 'use client'
-├── Browser-only hooks (useScrolled, useReveal, useReducedMotion, useProjectProgress)?
-│   └── YES → 'use client'
-└── None of the above?
-    └── Server Component (default — static HTML, better SEO, no JS bundle)
-```
-
-**Client components in this codebase (7 app + 6 marketing):**
-
-| Component | Location | Why `'use client'` |
+#### `src/components/ui/` (4 shadcn primitives — Radix-based, hand-written)
+| File | Lines | Purpose |
 |---|---|---|
-| **AuthForm** | `components/app/auth-form.tsx` | `useState` for form mode toggle, `signIn()` from next-auth |
-| **CreateWizard** | `app/(app)/create/page.tsx` | `useState` for form state, story textarea |
-| **Providers** | `components/app/providers.tsx` | React Context + `SessionProvider` from next-auth |
-| **ProjectProgressPanel** | `components/app/project-progress-panel.tsx` | `useProjectProgress` SSE hook |
-| **ProjectDownloadButton** | `components/app/project-download-button.tsx` | Click-time fetch to `/api/projects/[id]/download` |
-| **ProjectShareButton** | `components/app/project-share-button.tsx` | Web Share API + clipboard |
-| **CookieBanner** | `components/app/cookie-banner.tsx` | `useSyncExternalStore` for localStorage (T8) |
-| **Navbar** | `components/sections/navbar.tsx` | `useScrolled` + mobile Sheet toggle |
-| **Hero** | `components/sections/hero.tsx` | `useState` for story text, style chips, ratio toggles |
-| **Examples** | `components/sections/examples.tsx` | Carousel scroll controls |
-| **Faq** | `components/sections/faq.tsx` | Radix Accordion (client interactivity) |
-| **Workflow** | `components/sections/workflow.tsx` | `useState` for video loading choreography |
-| **ScrollReveal** | `components/primitives/scroll-reveal.tsx` | `useReveal` + `IntersectionObserver` |
+| `button.tsx` | 55 | CVA-styled Button — 6 variants × 4 sizes, `asChild` slot support |
+| `accordion.tsx` | 63 | Radix Accordion wrapper (Root/Item/Trigger/Content) |
+| `sheet.tsx` | 131 | Radix Dialog-based Sheet (top/right/bottom/left slide-in) |
+| `dropdown-menu.tsx` | 224 | Radix DropdownMenu full wrapper (14 sub-components) |
 
-**Server components (default, no `'use client'` needed):**
-
-| Component | Location | Notes |
-|---|---|---|
-| **Features** | `components/sections/features.tsx` | Static 4×2 grid, no interactivity |
-| **Testimonials** | `components/sections/testimonials.tsx` | Static 3×2 grid |
-| **UseCases** | `components/sections/use-cases.tsx` | Static 2×2 grid with links |
-| **FinalCTA** | `components/sections/final-cta.tsx` | Static CTA section |
-| **Footer** | `components/sections/footer.tsx` | Static links grid |
-| **Dashboard** | `app/(app)/dashboard/page.tsx` | Suspense + async data fetch |
-| **Create page** | `app/(app)/create/page.tsx` | Server wrapper around CreateWizard |
-| **Project detail** | `app/(app)/projects/[id]/page.tsx` | LEFT JOINs videos for download button |
-| **Billing** | `app/(app)/billing/page.tsx` | 4-tier plan table |
-| **Legal pages** | `app/(legal)/` | Privacy, Terms, Pricing, Blog, Contact |
-| **`not-found.tsx`** | `app/not-found.tsx` | Custom 404 (T7) |
-
-### The `queries.ts` Boundary
-
-All DB access goes through feature-level `queries.ts` files. Components never call `db` directly.
-
-```
-src/features/
-├── auth/{actions,queries,domain/verify-session}.ts
-├── projects/{queries,actions}.ts
-├── pipeline/{queries,inngest,domain/}.ts
-├── billing/{queries,actions,domain/}.ts
-```
-
-**Pattern:**
-```typescript
-// src/features/projects/queries.ts
-import { eq } from 'drizzle-orm';
-import { db } from '@/lib/db';
-import { projects } from '@/lib/db/schema';
-
-export async function getUserProjects(userId: string) {
-  return db.select().from(projects).where(eq(projects.userId, userId));
-}
-```
-
-### Auth Pattern: `verifySession()` vs `auth()`
-
-| Context | Use | Behavior |
-|---|---|---|
-| Server Components / Server Actions | `verifySession()` | Throws `NEXT_REDIRECT` → redirects to `/sign-in` |
-| API routes (JSON, SSE) | `auth()` | Returns `null` → return 401 JSON |
-
-**CRITICAL:** Never wrap `verifySession()` in try/catch — it throws `NEXT_REDIRECT` which must propagate. Never use `verifySession()` in API routes — it would produce a 307 redirect instead of a 401 JSON.
-
-```typescript
-// Server Component pattern
-import { verifySession } from '@/features/auth/domain/verify-session';
-
-async function DashboardPage() {
-  const session = await verifySession({ redirectTo: '/dashboard' });
-  const userId = session.user?.id;
-  // ...
-}
-
-// API route pattern
-import { auth } from '@/lib/auth';
-
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  // ...
-}
-```
-
-### Marketing Page Composition (10 Sections, Fixed Order)
-
-```typescript
-// src/app/page.tsx
-<Navbar />     {/* fixed, scroll-aware */}
-<Hero />       {/* video bg + glass input + style marquee */}
-<Examples />   {/* carousel */}
-<Workflow />   {/* 4 alternating media/text rows */}
-<Features />   {/* 4×2 hairline grid */}
-<Testimonials />
-<UseCases />   {/* 2×2 grid */}
-<Faq />        {/* Radix Accordion */}
-<FinalCTA />   {/* solid amber pill */}
-<Footer />
-```
-
-### CTA Primitive Components
-
-All 3 CTA primitives are **Server Components** (pure presentation, hover via CSS `group` utility). They use `next/link`'s `<Link>`, not `<a>`.
-
-| Component | Tier | Visual | Props |
+#### `src/components/primitives/` (7 hand-written marketing primitives)
+| File | Lines | Purpose | CTA Tier |
 |---|---|---|---|
-| `CtaGhost` | 1 | Amber text, arrow translates on hover | `children, href, className` |
-| `CtaGradient` | 3 | Amber gradient pill | `children, href, className` |
-| `CtaAmber` | 4 | Solid amber pill, hover scale + glow | `children, href, className, onClick?` |
+| `cta-amber.tsx` | 41 | Solid amber pill CTA with hover scale + glow | 4 (conversion crescendo) |
+| `cta-gradient.tsx` | 35 | Amber gradient pill CTA | 3 |
+| `cta-ghost.tsx` | 38 | Ghost link CTA with animated arrow | 1 (most restrained) |
+| `eyebrow.tsx` | 17 | Amber eyebrow badge (uses `@utility eyebrow`) |
+| `section-heading.tsx` | 24 | Outfit-font H2 with tracking |
+| `scroll-reveal.tsx` | 42 | Client component wrapping `useReveal` for IntersectionObserver-driven reveal |
+| `style-chip.tsx` | 44 | Marquee chip — `<button>` (interactive) or `<div>` (decorative) |
 
-### EmptyState Pattern
+#### `src/components/sections/` (10 marketing sections)
+| File | Lines | Type | Purpose |
+|---|---|---|---|
+| `navbar.tsx` | 177 | Client | Sticky nav with scroll-aware bg (`useScrolled`), mobile Sheet, language dropdown (decorative) |
+| `hero.tsx` | 202 | Client | Story textarea, style chip marquee, ratio toggle, character counter |
+| `examples.tsx` | 127 | Client | 6-card portrait carousel |
+| `workflow.tsx` | 99 | Client | 4 alternating media/text rows with looping MP4s |
+| `features.tsx` | 86 | Server | 8-feature 4×2 hairline grid |
+| `testimonials.tsx` | 64 | Server | 6 testimonial cards in 3×2 grid |
+| `use-cases.tsx` | 72 | Server | 4 use-case cards in 2×2 grid |
+| `faq.tsx` | 65 | Client | Radix Accordion with 6 items |
+| `final-cta.tsx` | 56 | Server | Conversion section using `CtaAmber` |
+| `footer.tsx` | 92 | Server | 3-column footer with brand + copyright |
 
+#### `src/components/app/` (8 app components)
+| File | Lines | Purpose |
+|---|---|---|
+| `providers.tsx` | 11 | Client `SessionProvider` wrapper |
+| `cookie-banner.tsx` | 127 | GDPR banner using `useSyncExternalStore` (SSR-safe) |
+| `auth-form.tsx` | 177 | Sign-in/sign-up form, calls `signUpAction` for sign-up |
+| `create-wizard.tsx` | 208 | Story textarea + style chips + ratio toggle + character counter |
+| `empty-state.tsx` | 53 | Reusable presentational empty-list state |
+| `project-progress-panel.tsx` | 82 | Subscribes to SSE via `useProjectProgress`, shows progress bar |
+| `project-download-button.tsx` | 127 | Click-time URL signing via fetch to `/api/projects/[id]/download` |
+| `project-share-button.tsx` | 57 | Web Share API with clipboard fallback |
+
+### 5.3 Component Patterns
+
+**Pattern 1: Server Components by default**
+- Add `'use client'` ONLY when using `useState`, `useEffect`, event handlers, or browser APIs.
+- Server components: Features, Testimonials, UseCases, FinalCta, Footer, all legal pages, dashboard, billing.
+
+**Pattern 2: Named function exports (never default)**
 ```typescript
-<EmptyState
-  icon={<Film className="h-6 w-6" aria-hidden="true" />}
-  title="No projects yet"
-  description="Create your first AI-generated video from a story."
-  ctaLabel="Create your first video"
-  ctaHref="/create"
-/>
+// ✅ Correct
+export function Hero() { ... }
+
+// ❌ Wrong — default export
+export default function Hero() { ... }
 ```
 
-Uses the luxury-dark design system: `bg-white/[0.02]` surface, `border-white/[0.06]` border, `text-primary` CTA.
+**Pattern 3: `interface` for all props**
+- Object shapes: `interface`
+- Unions/intersections: `type`
+- Props interfaces in `src/types/index.ts` or co-located
 
-### Suspense Pattern (Next.js 16 `cacheComponents`)
-
+**Pattern 4: `cn()` utility for conditional classes**
 ```typescript
-// Dashboard page — async data fetcher wrapped in Suspense
-function DashboardSkeleton() {
-  return <div className="animate-pulse rounded-2xl bg-white/[0.02]" />;
-}
-
-export default function DashboardPage() {
-  return (
-    <main>
-      <Suspense fallback={<DashboardSkeleton />}>
-        <ProjectList />
-      </Suspense>
-    </main>
-  );
-}
-
-async function ProjectList() {
-  const session = await verifySession({ redirectTo: '/dashboard' });
-  // ... fetch and render
-}
+import { cn } from '@/lib/utils';
+<div className={cn('base-classes', condition && 'conditional-class')} />
 ```
+
+**Pattern 5: `suppressHydrationWarning` on `<html>` AND `<body>`**
+- Browser extensions (Grammarly) inject attributes before React hydrates.
+- `<html>` alone is insufficient — must also be on `<body>`.
+
+**Pattern 6: Scroll reveal via data attributes**
+```tsx
+<ScrollReveal data-reveal delay={200}>
+  <div data-revealed={revealed ? 'true' : 'false'}>...</div>
+</ScrollReveal>
+```
+CSS handles the transition: `[data-reveal] { opacity: 0; }` → `[data-revealed='true'] { opacity: 1; }`
+
+**Pattern 7: Radix accordion animation (grid-template-rows trick)**
+```css
+.radix-accordion-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 300ms ease-out;
+}
+.radix-accordion-content[data-state='open'] { grid-template-rows: 1fr; }
+```
+Modern GPU-accelerated alternative to `max-height` animation. Supported in Chrome 117+, Firefox 118+, Safari 17.4+.
 
 ---
 
 ## 6. Custom Hooks Deep Dive
 
-### `useScrolled(threshold)` — Scroll-Aware Navbar
+### 6.1 `useScrolled(threshold = 10): boolean`
+
+**Location:** `src/lib/hooks/use-scrolled.ts` (23 lines)
+**Purpose:** Returns `true` when `window.scrollY` exceeds the threshold. Used by the Navbar to toggle its scroll-aware background.
 
 ```typescript
-// src/lib/hooks/use-scrolled.ts
 export function useScrolled(threshold = 10): boolean {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -592,41 +551,43 @@ export function useScrolled(threshold = 10): boolean {
 }
 ```
 
-**Usage:** `<Navbar>` toggles between `bg-transparent` and `bg-background/70 backdrop-blur-[24px] border-b border-white/10`.
+**Key details:**
+- `passive: true` on the scroll listener — prevents `preventDefault()` blocking.
+- Initializes on mount (`onScroll()` called immediately) — avoids a flash of the unscrolled state if the user lands mid-page.
+- Cleanup removes the listener on unmount.
 
-**Key detail:** `{ passive: true }` on the scroll listener — prevents blocking the main thread during scroll. The `onScroll()` call on mount ensures the initial state is correct (in case the page loads scrolled).
+### 6.2 `useReveal<T extends HTMLElement>(options): { ref, revealed }`
 
-### `useReveal<T>(options)` — IntersectionObserver Reveal
+**Location:** `src/lib/hooks/use-reveal.ts` (57 lines)
+**Purpose:** Wraps `IntersectionObserver` to trigger a one-shot reveal flag when an element enters the viewport. The `data-reveal` / `data-revealed` CSS attributes handle the visual transition.
 
 ```typescript
-// src/lib/hooks/use-reveal.ts
 interface UseRevealOptions {
   threshold?: number;      // default 0.15
   rootMargin?: string;     // default '0px 0px -50px 0px' (triggers 50px before entering)
   once?: boolean;          // default true (disconnect after first intersection)
 }
-
-export function useReveal<T extends HTMLElement = HTMLDivElement>(
-  options: UseRevealOptions = {},
-): { ref: React.RefObject<T | null>; revealed: boolean } {
-  // ... IntersectionObserver implementation
-}
 ```
 
-**Usage:** The `ScrollReveal` primitive wraps this hook and sets `data-reveal` / `data-revealed` attributes. The CSS in `globals.css` handles the opacity + translateY transition.
+**Key details:**
+- Generic `<T extends HTMLElement>` — caller specifies the element type (default `HTMLDivElement`).
+- `once: true` (default) disconnects the observer after first intersection — one-shot reveal.
+- `once: false` toggles `revealed` back to `false` when the element leaves the viewport — repeating reveal.
+- `rootMargin: '0px 0px -50px 0px'` — triggers 50px BEFORE the element enters the bottom of the viewport (feels more natural than exact intersection).
+- Cleanup disconnects the observer on unmount.
 
-**Staggered animation pattern:** Section components wrap each card in `<ScrollReveal delay={Math.min(idx * 80, 400)}>` — 80ms stagger per card, capped at 400ms.
+### 6.3 `useReducedMotion(): boolean`
 
-### `useReducedMotion()` — OS-Level Motion Preference
+**Location:** `src/lib/hooks/use-reduced-motion.ts` (27 lines)
+**Purpose:** Returns `true` when the user has OS-level reduced-motion preference enabled. For cases where JS needs to know the preference (e.g., skipping a video autoplay).
 
 ```typescript
-// src/lib/hooks/use-reduced-motion.ts
 export function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     const onChange = () => setReduced(mediaQuery.matches);
-    onChange();
+    onChange(); // Initialize on mount
     mediaQuery.addEventListener('change', onChange);
     return () => mediaQuery.removeEventListener('change', onChange);
   }, []);
@@ -634,11 +595,16 @@ export function useReducedMotion(): boolean {
 }
 ```
 
-**Dual-layer approach:** The global CSS `@media (prefers-reduced-motion: reduce)` block handles most cases declaratively (disables all animations, hides autoplay videos, forces `[data-reveal]` to visible). This hook is for JS-conditional cases (e.g., skipping a programmatic animation).
+**Key details:**
+- The global CSS `@media (prefers-reduced-motion: reduce)` block in `globals.css` handles most cases declaratively (disables all animations). This hook is for JS-level decisions.
+- Initializes on mount (`onChange()` called immediately).
+- Listens for `change` events so the hook updates if the user toggles the preference while the page is open.
+- SSR-safe: starts as `false` on the server (no `window`), updates on mount.
 
-### `useProjectProgress(projectId)` — SSE with Exponential Backoff
+### 6.4 `useProjectProgress(projectId): ProjectProgressState`
 
-This is the most complex hook — it subscribes to a Server-Sent Events stream for live pipeline progress, with automatic reconnection.
+**Location:** `src/lib/hooks/use-project-progress.ts` (138 lines)
+**Purpose:** Subscribes to the SSE progress stream for a project. Opens an `EventSource` on `/api/projects/[id]/progress`, parses JSON events, and exposes the latest status/progress.
 
 ```typescript
 export interface ProjectProgressState {
@@ -648,72 +614,49 @@ export interface ProjectProgressState {
   errorMessage: string | null;
   connectionState: 'connecting' | 'open' | 'closed' | 'error' | 'reconnecting';
 }
-
-export function useProjectProgress(projectId: string): ProjectProgressState
 ```
 
-**Key implementation details:**
+**Key details:**
+- **Exponential backoff reconnect** (T6 fix): on error, waits 1s → 2s → 4s (3 attempts max), then shows "error" state.
+- **Terminal status auto-close:** when `status ∈ {completed, failed}`, the EventSource is closed and set to `null` (T12/L-2 fix: prevents double-close in cleanup).
+- **`isCancelled` flag:** prevents reconnect after unmount (cleanup sets `isCancelled = true`).
+- **`reconnectAttempt` reset on successful open** — if the stream drops and reconnects, the counter resets.
+- Vercel Fluid Compute caps SSE at 300s (Hobby) or 800s (Pro/Enterprise GA). The pipeline runs 5-15min, so reconnect is essential.
 
-1. **EventSource lifecycle:** Opens on mount, closes on unmount or terminal status (`completed`/`failed`).
-
-2. **Exponential backoff reconnection:** On error, waits 1s → 2s → 4s (3 attempts max). Vercel Fluid Compute caps SSE at 300s (Hobby) or 800s (Pro/Enterprise GA); the pipeline runs 5-15min, so a single connection may not survive.
-
-3. **Double-close guard:** After closing on terminal status, sets `eventSource = null` so the cleanup function's `if (eventSource)` guard skips the redundant close.
-
-4. **Cancellation flag:** `isCancelled` prevents reconnect attempts after unmount — without it, a reconnect timer could fire after the component is gone.
-
-5. **Counter reset on success:** `onopen` resets `reconnectAttempt = 0` — a successful connection after a reconnect doesn't count toward the attempt cap.
-
+**Reconnect backoff formula:**
 ```typescript
-// Reconnect logic
-const openStream = () => {
-  if (isCancelled) return;
-  eventSource = new EventSource(`/api/projects/${projectId}/progress`);
-  eventSource.onopen = () => { reconnectAttempt = 0; /* ... */ };
-  eventSource.onmessage = (event) => { /* parse + update state */ };
-  eventSource.onerror = () => {
-    eventSource?.close();
-    if (isCancelled) return;
-    if (reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
-      setState((prev) => ({ ...prev, connectionState: 'error' }));
-      return;
-    }
-    const delay = BASE_BACKOFF_MS * Math.pow(2, reconnectAttempt);
-    reconnectAttempt += 1;
-    setState((prev) => ({ ...prev, connectionState: 'reconnecting' }));
-    reconnectTimer = setTimeout(() => openStream(), delay);
-  };
-};
+const BASE_BACKOFF_MS = 1000;
+function backoffDelay(attempt: number): number {
+  return BASE_BACKOFF_MS * Math.pow(2, attempt);  // 1000, 2000, 4000
+}
 ```
 
 ---
 
-## 7. Content Management: Static Data Pattern
+## 7. Content Management & Data Ingestion
 
-Unlike Vite-based projects that use `import.meta.glob`, this Next.js project uses **static TypeScript data files** in `src/lib/data/`. This provides type safety, tree-shaking, and no runtime file-system access.
+### 7.1 Static Data Files (10 files in `src/lib/data/`)
 
-### File Structure
+Unlike Vite-based projects that use `import.meta.glob`, Next.js uses direct TypeScript imports. All marketing content lives in typed data files:
 
-```
-src/lib/data/
-├── nav-links.ts          # NAV_LINKS (4 items) + NAV_LANGUAGES
-├── footer-links.ts       # FOOTER_COLUMNS (3 columns) + FOOTER_BRAND + FOOTER_COPYRIGHT
-├── story-seeds.ts        # STORY_SEEDS (4 seeds) + DEFAULT_STORY_EXAMPLES
-├── style-chips.ts        # STYLE_CHIPS (8 chips — the spec set)
-├── examples.ts           # EXAMPLE_CARDS (6 portrait cards)
-├── workflow-steps.ts     # WORKFLOW_STEPS (4 alternating media/text rows)
-├── features.ts           # FEATURES (8 items, 4×2 grid)
-├── testimonials.ts       # TESTIMONIALS (6 cards)
-├── use-cases.ts          # USE_CASES (4 cards, 2×2 grid)
-├── faq-items.ts          # FAQ_ITEMS (6 accordion items)
-```
+| File | Export | Type | Count |
+|---|---|---|---|
+| `nav-links.ts` | `NAV_LINKS`, `NAV_LANGUAGES` | `NavLink[]`, decorative | 4 links, 3 languages |
+| `footer-links.ts` | `FOOTER_COLUMNS`, `FOOTER_BRAND`, `FOOTER_COPYRIGHT` | `FooterColumn[]` | 3 columns |
+| `story-seeds.ts` | `STORY_SEEDS`, `DEFAULT_STORY_EXAMPLES` | `Map<string, StoryExample>`, derived array | 4 seeds |
+| `style-chips.ts` | `STYLE_CHIPS` | `StyleChip[]` | **8 chips (locked by spec)** |
+| `features.ts` | `FEATURES` | `Feature[]` | 8 features (4×2 grid) |
+| `examples.ts` | `EXAMPLE_CARDS` | `ExampleCard[]` | 6 portrait cards |
+| `use-cases.ts` | `USE_CASES` | `UseCase[]` | 4 cards (2×2 grid) |
+| `workflow-steps.ts` | `WORKFLOW_STEPS` | `WorkflowStep[]` | 4 alternating rows |
+| `testimonials.ts` | `TESTIMONIALS` | `Testimonial[]` | 6 cards (3×2 grid) |
+| `faq-items.ts` | `FAQ_ITEMS` | `FAQItem[]` | 6 Q&A items |
 
-### Pattern: Typed Data Constants
+### 7.2 The `STYLE_CHIPS` Spec Lock (Critical)
+
+The 8-chip set is **locked by spec** and protected by regression tests. Do NOT add `Comic` or `Futuristic neon` — they were a prior drift that was deliberately removed.
 
 ```typescript
-// src/lib/data/style-chips.ts
-import type { StyleChip } from '@/types';
-
 export const STYLE_CHIPS: StyleChip[] = [
   { label: 'Ghibli' },
   { label: 'Medieval' },
@@ -721,63 +664,86 @@ export const STYLE_CHIPS: StyleChip[] = [
   { label: 'Anime' },
   { label: 'Japanese animation' },
   { label: 'Realistic' },
-  { label: 'Cyberpunk', sublabel: 'Futuristic neon' },
+  { label: 'Cyberpunk' },
   { label: 'Watercolor' },
 ];
 ```
 
-**The 8-chip spec set is locked** — `style-chips.test.ts` enforces exact labels + uniqueness. Any drift (e.g., "Comic" instead of "Medieval") fails CI.
+**Regression tests (`style-chips.test.ts`):**
+- Asserts exactly 8 chips.
+- Asserts verbatim labels in order.
+- Asserts `Comic` and `Futuristic neon` are NOT present.
+- **NF-3 fix:** `faq-style-consistency.test.ts` asserts the FAQ answer count matches `STYLE_CHIPS.length` and all labels appear.
 
-### Adding New Content
+### 7.3 Adding New Content
 
-1. Add the data object to the appropriate file in `src/lib/data/`
-2. Ensure the TypeScript type in `src/types/index.ts` matches
-3. The consuming component imports it and renders via `.map()`
-4. If it's a new data category, create a new file + interface + test
+To add a new testimonial:
+1. Add the entry to `TESTIMONIALS` in `src/lib/data/testimonials.ts`.
+2. The `Testimonials` component (`src/components/sections/testimonials.tsx`) maps over the array — no component changes needed.
+3. Run `pnpm test` — the existing tests verify the array shape.
 
-### Why Not `import.meta.glob`?
+To add a new style chip:
+1. ⚠️ **Do NOT add to `STYLE_CHIPS`** without updating: the DB enum (`visual_style`), the Zod schema in `createProjectAction`, the `STYLE_PROMPTS` maps in `generate-character.ts` and `generate-scene.ts`, AND the `style-chips.test.ts` (which asserts the exact 8-label set).
+2. The DB enum currently has 9 values (includes `comic` which is NOT in `STYLE_CHIPS`). This is intentional — `comic` is a valid enum value the UI doesn't expose.
 
-This is a **Next.js App Router** project, not Vite. Next.js uses:
-- Static imports for type-safe, tree-shakeable data
-- Server Components for data fetching (async server functions)
-- The `queries.ts` boundary for DB access
+### 7.4 Media Assets
 
-`import.meta.glob` is a Vite-specific API that doesn't exist in Next.js. Attempting to use it will cause a build error.
+| Directory | Contents |
+|---|---|
+| `public/examples/` | 6 WebP thumbnails (520×924 portrait) for the Examples carousel |
+| `public/workflow/` | 4 MP4 demos + 4 WebP posters for the Workflow section |
+| `public/fonts/` | `Outfit-VariableFont.woff2` (45KB, weight 100-900) |
+| `public/og-image.png` | Open Graph image (1200×630) |
+| `public/hero-bg.mp4` | Hero background video (46KB, 10s, 1920×1080, H.264) |
+| `public/hero-poster.webp` | Hero video poster |
+
+**Asset scripts:**
+- `scripts/download-assets.sh` — downloads workflow MP4s + posters from R2 (idempotent).
+- `scripts/generate-thumbnails.sh` — generates example thumbnails via z-ai CLI + ffmpeg (idempotent).
 
 ---
 
 ## 8. Accessibility (WCAG AAA) Implementation
 
-### Focus Rings
+### 8.1 Color Contrast (AAA Where Possible)
 
-```css
-/* globals.css — global focus-visible */
-:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-```
+| Text | Color | Background | Ratio | Level |
+|---|---|---|---|---|
+| Body text | `#d4d4d8` (zinc-300) | `#020202` | 12.6:1 | **AAA** |
+| Headings | `#f8f8f8` | `#020202` | 18.1:1 | **AAA** |
+| Primary CTA text | `#020202` | `#febf00` (amber) | 14.5:1 | **AAA** |
+| Muted text | `#8e8e95` | `#020202` | 6.4:1 | AA (AAA requires 7:1 for normal text) |
 
-All interactive components use `focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2` (NOT `outline-amber-400` — that's the wrong color).
+### 8.2 Skip-to-Content Link
 
-### Skip-to-Content Link
-
-```typescript
-// src/app/layout.tsx
+The first focusable element in `layout.tsx`:
+```tsx
 <a
   href="#main"
-  className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50
-    focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:font-medium focus:text-zinc-950"
+  className="focus:bg-primary sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:px-4 focus:py-2 focus:font-medium focus:text-zinc-950 focus:shadow-lg"
 >
   Skip to content
 </a>
 ```
+- `sr-only` by default (visually hidden).
+- `focus:not-sr-only` makes it visible when focused via keyboard.
+- `focus:z-50` ensures it's above all other content.
 
-Visually hidden by default, appears on focus. The `#main` target must exist on every page (add `id="main"` to the `<main>` element).
+### 8.3 Focus Rings
 
-### Reduced Motion (Dual-Layer)
+Global `:focus-visible` style in `globals.css`:
+```css
+:focus-visible {
+  outline: 2px solid var(--color-primary);  /* #febf00 */
+  outline-offset: 2px;
+}
+```
+- Uses `:focus-visible` (not `:focus`) — only shows for keyboard navigation, not mouse clicks.
+- Amber outline matches the brand.
 
-**Layer 1 — CSS (global):**
+### 8.4 Reduced Motion (`prefers-reduced-motion: reduce`)
+
+Global CSS block in `globals.css` disables ALL animations:
 ```css
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -792,973 +758,757 @@ Visually hidden by default, appears on focus. The `#main` target must exist on e
 }
 ```
 
-**Layer 2 — JS hook:** `useReducedMotion()` for programmatic decisions.
+The `useReducedMotion()` hook is for JS-level decisions (e.g., conditionally rendering a video vs. a poster).
 
-### Touch Targets
+### 8.5 FAQ Accordion Accessibility
 
-All interactive elements have minimum 44×44px touch targets on mobile:
+The Radix Accordion (`src/components/ui/accordion.tsx`) provides:
+- `aria-expanded` on the trigger button.
+- `aria-controls` linking trigger to content.
+- `data-state="open|closed"` for CSS styling.
+- Keyboard: Enter/Space to toggle, Tab to navigate.
 
-```typescript
-// Hero ratio toggle buttons
-<button
-  className="flex min-h-[44px] min-w-[44px] items-center justify-center"
-  aria-pressed={isActive}
->
-```
+### 8.6 Mobile Sheet (Navbar) Accessibility
 
-### Color Contrast
+The Radix Dialog-based Sheet (`src/components/ui/sheet.tsx`) provides:
+- Focus trap (focus stays inside the sheet while open).
+- `aria-modal="true"`.
+- Focus restored to the trigger button on close.
+- Escape key closes the sheet.
 
-| Combination | Ratio | Standard |
-|---|---|---|
-| zinc-300 (#d4d4d8) on zinc-950 (#09090b) | 12.6:1 | WCAG AAA |
-| primary (#febf00) on background (#020202) | 14.8:1 | WCAG AAA |
-| zinc-500 (#8e8e95) on background (#020202) | 6.4:1 | WCAG AA |
+### 8.7 Cookie Banner Accessibility
 
-### ARIA Patterns
-
-- **Accordion:** Radix UI `Accordion` with `aria-labelledby` on each item
-- **Carousel:** `role="region"` + `aria-label="Example videos carousel"` on the scroll container
-- **Mobile nav:** Radix `Sheet` with `SheetTitle` (required for `aria-label`)
-- **Active state:** `aria-pressed={isActive}` on toggle buttons (ratio toggles, style chips)
-
-### Hero Video Accessibility
-
-```typescript
-<video
-  autoPlay
-  muted
-  loop
-  playsInline
-  preload="metadata"
-  poster="/hero-poster.webp"
-  aria-hidden="true"  // Decorative, no audio
->
-```
-
-The hero video is decorative — it has no audio and provides no information. `aria-hidden="true"` removes it from the accessibility tree.
+- `role="region"` with `aria-label`.
+- Dismissible via keyboard (Enter/Space on the "Got it" button).
+- `useSyncExternalStore` for SSR-safe localStorage read (no hydration mismatch).
 
 ---
 
 ## 9. Anti-Patterns & Common Bugs
 
-### 1. Using `amber-400` Instead of `--color-primary`
+### 9.1 NF-1: Deploying with `next dev` Instead of `next start` (🔴 CRITICAL)
 
-**Bug:** `text-amber-400` renders as `#fbbf24` (Tailwind's default amber), not `#febf00` (the brand amber). These are different colors.
+**Symptom:** Live site shows `[HMR] connected`, `[Fast Refresh]` in browser console; JS chunk names are source-path-based (`src_app_layout_tsx_*`); `/sign-up` takes 18s (cold compile); `cache-control: no-cache`.
 
-**Fix:** Always use `text-primary`, `bg-primary`, `border-primary`. The `brand-tokens.test.ts` CI guard enforces zero `amber-300/400/500/600` violations.
+**Root cause:** Only `Dockerfile.dev` existed (runs `pnpm dev`). No production Dockerfile.
 
-### 2. Using `bg-zinc-950` Instead of `bg-background`
+**Fix:** Created production `Dockerfile` (multi-stage, `pnpm start`). Added CI guard in `.github/workflows/ci.yml` that greps `.next/` for `hmr-client` (dev-only chunk). See `docs/DEPLOYMENT_RUNBOOK.md`.
 
-**Bug:** `bg-zinc-950` is `#09090b`, not `#020202` (the brand background). The 7-digit difference is visible.
+**Lesson:** Always ship a production Dockerfile separate from `Dockerfile.dev`. Add a CI guard that checks build output for dev-only chunks.
 
-**Fix:** Always use `bg-background`. The `brand-tokens.test.ts` CI guard enforces zero `bg-zinc-950/900/black` violations.
+### 9.2 NF-2: Missing CSP + HSTS Headers (🟠 HIGH)
 
-### 3. Importing `r2.ts` in Client Components
+**Symptom:** `curl -I` shows only 4 security headers (no `Content-Security-Policy`, no `Strict-Transport-Security`).
 
-**Bug:** `import { getSignedDownloadUrl } from '@/lib/storage/r2'` in a `'use client'` file crashes the browser — `r2.ts` imports `env` which validates 30 server-only env vars at module load. In the browser, only `NEXT_PUBLIC_*` vars exist.
+**Root cause:** `next.config.ts` `headers()` returned 4 headers but omitted CSP + HSTS.
 
-**Fix:** Server Component signs the URL, passes as prop to client component. Or client component fetches a `/api/...` route that signs at click time (the H4 pattern).
+**Fix:** Added CSP (`default-src 'self'`, `frame-ancestors 'none'`, etc.) + HSTS (`max-age=63072000; includeSubDomains; preload`). 8 new tests in `security-headers.test.ts`.
 
-### 4. Using `verifySession()` in API Routes
+**Lesson:** CSP `'unsafe-inline'` is required for Next.js App Router (inline `<script>` chunks for router state). Ship it first, upgrade to nonce-based later.
 
-**Bug:** `verifySession()` throws `NEXT_REDIRECT` — wrong for JSON/SSE endpoints that should return 401.
+### 9.3 NF-3: Three-Way Drift (DB Enum / UI Array / FAQ Copy) (🟡 MEDIUM)
 
-**Fix:** API routes use `auth()` directly:
-```typescript
-const session = await auth();
-if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-```
+**Symptom:** FAQ says "7+ visual styles including Ghibli, Oil Painting, Anime, Realistic, Cyberpunk, Watercolor, and Comic" but the marquee directly above shows 8 chips (no Comic, includes Medieval + Japanese animation).
 
-### 5. Using `<a href>` for Internal Routes
+**Root cause:** Three independent sources of truth (DB enum, `STYLE_CHIPS` array, FAQ copy) were never reconciled.
 
-**Bug:** Causes full-page reloads, degrading UX + Lighthouse.
+**Fix:** Updated FAQ to match `STYLE_CHIPS` exactly. Added `faq-style-consistency.test.ts` regression test.
 
-**Fix:** Use `<Link>` from `next/link` for all internal routes. Keep `<a>` for `mailto:`, hash anchors (`#main`), and external URLs. The `cta-routes.test.ts` source-reading test enforces `<Link` usage across 9 files.
+**Lesson:** When a user-facing count appears in copy, derive it from the source-of-truth array OR add a regression test that asserts the copy matches the array.
 
-### 6. Vitest Mock Factory Hoisting
+### 9.4 NF-4: Dead/Unused Exports (🟡 MEDIUM)
 
-**Bug:** `vi.mock()` factories are hoisted above imports. Referencing an outer `const mockFn = vi.fn()` inside the factory throws `Cannot access 'mockFn' before initialization`.
+**Symptom:** `getProjectVideo` exported but only in a test mock; `WHISPER_MODEL` exported but the call site hardcoded `'whisper-1'`.
 
-**Fix:** Use `vi.hoisted()`:
-```typescript
-const { mockFn } = vi.hoisted(() => ({ mockFn: vi.fn() }));
-vi.mock('module', () => ({ x: mockFn }));
-```
+**Fix:** Removed `getProjectVideo` + `export` on `r2Client`/`BUCKET_MAP`. Kept `WHISPER_MODEL` and made it actually used in `align-subtitles.ts`.
 
-### 7. Mock Constructors Need `class` Syntax
+**Lesson:** Every export should have at least one importer. If a constant is declared, USE it at the call site.
 
-**Bug:** `vi.fn().mockImplementation(() => ({ ... }))` returns an arrow function that can't be `new`-ed. Real code does `new S3Client(...)`.
+### 9.5 NF-6: Pipeline Steps Without try/catch → Ghost Projects (🟡 MEDIUM)
 
-**Fix:** Use `class` syntax:
-```typescript
-class MockS3Client { send = sendMock; }
-```
+**Symptom:** Projects stuck at "Synthesizing voiceover… 65%" forever — never complete, never fail.
 
-### 8. `.tsx` Extension Required for JSX Tests
+**Root cause:** Steps 1, 4, 5, 6 had no try/catch. If Inngest exhausted retries, the project row stayed in a non-terminal status.
 
-**Bug:** `render(<Component />)` in a `*.test.ts` file produces `[PARSE_ERROR] Expected '>' but found 'Identifier'` from oxc.
+**Fix:** Wrapped steps 1, 4, 5, 6 in try/catch with `setProjectFailed` + re-throw. The `complete` step logs-only (video is already in R2).
 
-**Fix:** Rename to `*.test.tsx`. The transformer needs the `.tsx` extension to parse JSX.
+**Lesson:** Every pipeline step that can throw must (a) catch, (b) call `setProjectFailed`, (c) re-throw. Exception: the final "mark complete" step — if that fails, the work is done, don't mark it failed.
 
-### 9. `fetch()` in Pipeline Tests Hits Real DNS
+### 9.6 Historical Bugs (Audit-v1 T1–T12, All Closed)
 
-**Bug:** Steps 5 and 6 download audio/SRT from R2 via `fetch(signedUrl)`. In tests, the signed URL is `https://r2.example.com/...` which fails with `ENOTFOUND`.
+| ID | Bug | Fix |
+|---|---|---|
+| C-1 | Billing buttons POST to non-existent route | T1: `billingCheckoutAction` Server Action |
+| C-2 | Protected routes ERR_CONNECTION_REFUSED | T2: proxy uses `env.NEXT_PUBLIC_APP_URL` |
+| H-1 | Orphan project rows on insufficient credits | T3: `db.transaction()` via `debitCreditsTx` |
+| H-2 | Stripe webhook idempotency lost updates | T4: INSERT after side effects + pre-check SELECT |
+| H-3 | SSE rate limit never released on disconnect | T5: `claimSseSlot`/`releaseSseSlot` Redis slot pattern |
+| M-1 | Download route generic 500 | T6: error classification 502/504/500 |
+| M-2 | `inngest.send()` failure orphaned projects | T7: try/catch → `setProjectFailed()` |
+| M-3 | `appendVideo` set `status='completed'` before MP4 | T8: `status='rendering'` at insert |
+| M-4 | `FAIL_OPEN` read at module load | T9: `getFailOpen()` reads per-call |
+| M-5 | Dead `buildFfmpegCommand` export | T10: deleted |
+| M-6 | Brand color bypassed 122+ times | T11: `sed` sweep + `brand-tokens.test.ts` enforces 0 |
+| L-2/3/4 | Double-close + `Date.now()` collisions + hardcoded `metadataBase` | T12: `eventSource=null` guard, `crypto.randomUUID()`, `env.NEXT_PUBLIC_APP_URL` |
 
-**Fix:** Stub `fetch` globally:
-```typescript
-const fetchMock = vi.fn().mockResolvedValue({ arrayBuffer: ..., text: ... });
-vi.stubGlobal('fetch', fetchMock);
-```
+### 9.7 Common React/Next.js Anti-Patterns Avoided
 
-### 10. `NODE_ENV` is Read-Only in Tests
-
-**Bug:** `process.env.NODE_ENV = 'test'` silently fails (read-only property).
-
-**Fix:** `vi.stubEnv('NODE_ENV', 'test')`.
-
-### 11. Source-Reading Tests Must Strip Comments
-
-**Bug:** When asserting "code does not contain X" via regex on source, docblock comments that mention the old pattern trigger false positives.
-
-**Fix:**
-```typescript
-const stripped = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-expect(stripped).not.toMatch(/pattern/);
-```
-
-### 12. `Date.now()` Temp File Names Collide Under Concurrency
-
-**Bug:** Two Inngest pipeline runs finishing at the same millisecond write to the same `/tmp/siv-srt-<ts>.srt` file.
-
-**Fix:** Use `crypto.randomUUID()` for temp file names.
-
-### 13. `EventSource.close()` is Idempotent but Sloppy
-
-**Bug:** Calling `close()` twice doesn't crash, but it's sloppy. The cleanup function's `if (eventSource)` guard would still try to close.
-
-**Fix:** Set `eventSource = null` after `close()`:
-```typescript
-eventSource?.close();
-eventSource = null;
-```
-
-### 14. `pnpm-workspace.yaml` Missing `packages:` Field
-
-**Bug:** Fresh clones with pnpm 9+ fail with `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION packages field missing or empty`.
-
-**Fix:** Add `packages: ['.']` to `pnpm-workspace.yaml`.
-
-### 15. `esbuild` Build Scripts Need Approval
-
-**Bug:** `pnpm install` skips esbuild's postinstall (drizzle-kit, vitest, tsx depend on it).
-
-**Fix:** Add `esbuild: true` to the `allowBuilds` map in `pnpm-workspace.yaml` (pnpm 10.26+ syntax).
-
-### 16. AUTH_URL ↔ NEXT_PUBLIC_APP_URL Host Mismatch (Sprint 3 T1)
-
-**Bug:** When `AUTH_URL` and `NEXT_PUBLIC_APP_URL` point to different hosts, auth-protected routes redirect to the wrong host.
-
-**Fix:** The env module now **THROWS** at boot in production runtime (Sprint 3 T1). Dev/test keep the warn-only behavior. Set both env vars to the same production host.
-
-### 17. `/api/health` `config.healthy=false` Does NOT Trigger 503 (Sprint 3 T2)
-
-**Bug:** Monitoring that checks only HTTP status misses env misconfigurations.
-
-**Fix:** Monitoring must inspect the JSON body's `config.healthy` field, not just HTTP 200/503. The `config` + `configErrors` fields are observability, not liveness.
-
-### 18. CookieBanner Must Use `useSyncExternalStore`, Not `useState` (Sprint 3 T8)
-
-**Bug:** `useState` + `useEffect` to read `localStorage` triggers the `react-hooks/set-state-in-effect` lint rule.
-
-**Fix:** Use `useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)`. Server snapshot returns `false` (no banner during SSR → no hydration mismatch).
-
-### 19. R2 Key Collection Must Happen BEFORE DB CASCADE (Sprint 3 T4)
-
-**Bug:** If you delete the user row first, the projects table is wiped by CASCADE, making it impossible to find the R2 keys — orphaning media forever.
-
-**Fix:** `deleteUserAccount()` first SELECTs all R2 keys across the user's projects, THEN deletes the user row (CASCADE handles children), THEN best-effort `deleteUserMedia(keys[])`.
-
-### 20. `deleteUserMedia` Blasts All 3 R2 Buckets Per Key (Sprint 3 T4)
-
-**Bug:** A given key exists in exactly one bucket, but we don't know which without listing. Listing + deleting is 3× round-trips.
-
-**Fix:** `DeleteObjectsCommand` silently ignores missing keys, so calling it against all 3 buckets is safe and avoids 3× list-then-delete round-trips. Errors are logged but don't throw (DB deletion is the source of truth).
+- **`suppressHydrationWarning` on `<body>`, not just `<html>`** — Grammarly injects `<body>` attributes.
+- **Workflow is `'use client'`** — uses `useState` for video loading choreography. Don't assume server components for "mostly static" sections.
+- **`verifySession()` never wrapped in try/catch** — it throws `NEXT_REDIRECT` which must propagate.
+- **Client components never import `r2.ts`** — env validation crashes in the browser.
+- **`next/font/google` can't serve Outfit 820** — must use `next/font/local`.
+- **`@ffmpeg-installer/ffmpeg` is Turbopack-incompatible** — use system FFmpeg via `FFMPEG_PATH`.
+- **`next lint` is deprecated in Next.js 16** — use `eslint .` directly.
 
 ---
 
 ## 10. Debugging Guide
 
-### Build Fails: "Invalid environment variables"
+### 10.1 Build Failures
 
-**Cause:** Real env vars not set in `.env.local`.
+| Error | Cause | Fix |
+|---|---|---|
+| `Invalid environment variables` | Real env vars not in `.env.local` | Copy `.env.example` → `.env.local`, fill in real values |
+| `Failed to collect page data for /api/auth/[...nextauth]` | Auth route tries to prerender DrizzleAdapter | Ensure `export const dynamic = 'force-dynamic'` in the route handler |
+| `Functions cannot be passed directly to Client Components` | Server Action defined inline in a Server Component | Move to a `"use server"` module (e.g., `src/features/billing/actions.ts`) |
+| `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION packages field missing` | `pnpm-workspace.yaml` missing `packages:` | Add `packages: ['.']` (already done) |
+| CI guard fails: `hmr-client chunks found` | Build output contains dev-only chunks | Ensure `NODE_ENV=production` + `NEXT_PHASE=phase-production-build` in the build step |
 
-**Fix:** Copy `.env.example` → `.env.local`, fill in real values. The build-context fallback only applies when `NEXT_PHASE=phase-production-build` or `NODE_ENV=test`.
+### 10.2 Runtime Errors
 
-### Build Fails: "Failed to collect page data for /api/auth/[...nextauth]"
+| Error | Cause | Fix |
+|---|---|---|
+| Auth redirects to `http://localhost:3000` in production | `AUTH_URL` or `NEXT_PUBLIC_APP_URL` set to localhost | Set both to the production HTTPS URL. T1 now throws at boot if hosts differ. |
+| `/dashboard` returns ERR_CONNECTION_REFUSED | Proxy used `nextUrl.origin` (resolves to `http://` behind reverse proxy) | Fixed (T2): proxy uses `env.NEXT_PUBLIC_APP_URL`. Verify the env var is set correctly. |
+| `putObject` throws `PayloadTooLargeError` | Body exceeds 500 MB | Use multipart upload (`CreateMultipartUploadCommand`) for larger files |
+| Replicate scene generation 404s | `REPLICATE_SDXL_IPADAPTER_MODEL` is the placeholder | Set to a real `lucataco/sdxl-ipadapter:<sha>` hash |
+| `assemble-video` can't find FFmpeg | System FFmpeg not installed | `sudo apt install ffmpeg` (Ubuntu) or `brew install ffmpeg` (macOS). Set `FFMPEG_PATH`. |
+| Project stuck at "Synthesizing… 65%" forever | Pre-NF-6: step threw but didn't call `setProjectFailed` | Fixed (NF-6). To clean up ghosts: `UPDATE projects SET status='failed' WHERE status NOT IN ('completed','failed') AND created_at < '2026-07-02';` |
 
-**Cause:** Auth route tries to prerender DrizzleAdapter.
+### 10.3 Test Failures
 
-**Fix:** Ensure `export const dynamic = 'force-dynamic'` in the route handler.
+| Error | Cause | Fix |
+|---|---|---|
+| `Cannot find module 'next/server'` | jsdom can't load Next.js server modules | Mock `next-auth`, `next/navigation`, `@/lib/db` in tests |
+| `Cannot access 'X' before initialization` | `vi.mock()` factory references outer `vi.fn()` | Use `vi.hoisted()`: `const { mockFn } = vi.hoisted(() => ({ mockFn: vi.fn() }))` |
+| `X is not a constructor` | Mock factory returns arrow fn, real code does `new X()` | Use `class` syntax: `class MockS3Client { send = sendMock; }` |
+| `Expected '>' but found 'Identifier'` | Test file has JSX but `.test.ts` extension | Rename to `*.test.tsx` |
+| `fetch failed: ENOTFOUND r2.example.com` | Steps 5 & 6 use `fetch()` for R2 downloads | `vi.stubGlobal('fetch', fetchMock)` |
+| SSE route returns 307 instead of 401 JSON | Used `verifySession()` (redirects) instead of `auth()` | API routes use `auth()` directly: returns null → 401 JSON |
 
-### Production App Refuses to Boot: "❌ Host mismatch in environment variables"
+### 10.4 Visual / Styling Issues
 
-**Cause:** Sprint 3 T1 — `AUTH_URL` and `NEXT_PUBLIC_APP_URL` hosts differ in production runtime.
+| Issue | Cause | Fix |
+|---|---|---|
+| Tailwind classes not applying | Missing `@source` directives | Check `globals.css` has `@source '../components/**/*.{ts,tsx}'` |
+| Outfit weight 820 not rendering | Used `next/font/google` (only serves discrete weights) | Must use `next/font/local` with the woff2 file |
+| Amber color looks wrong | Used Tailwind's `amber-400` (`#fbbf24`) instead of `#febf00` | Use `bg-primary` / `text-primary` tokens. `brand-tokens.test.ts` catches this. |
+| Cross-origin dev resource blocked | Next.js blocks `/_next/webpack-hmr` from non-localhost | Add origin to `allowedDevOrigins` in `next.config.ts` |
+| Hydration mismatch console error | Grammarly extension injects `<body>` attributes | `suppressHydrationWarning` on both `<html>` and `<body>` (already applied) |
 
-**Fix:** Set both env vars to the same production host (e.g., `https://storyintovideo.jesspete.shop`). Dev/test keep the warn-only behavior.
+### 10.5 Live-Site Verification Commands
 
-### `/api/health` Returns 200 but `config.healthy: false`
+```bash
+# Health check (DB + FFmpeg + config)
+curl -s https://storyintovideo.jesspete.shop/api/health | jq
 
-**Cause:** AUTH_URL ↔ NEXT_PUBLIC_APP_URL host mismatch (T2 surfaces it).
+# Security headers (should show 6 headers incl. CSP + HSTS)
+curl -I https://storyintovideo.jesspete.shop/ | grep -iE "x-frame|x-content|referrer|permissions|content-security|strict-transport"
 
-**Fix:** Check the `configErrors` array in the JSON response. Fix the env vars. NOTE: this does NOT return 503 — monitoring must check `config.healthy`, not HTTP status.
+# Protected route redirect (should 307 to same-host /sign-in)
+curl -sI https://storyintovideo.jesspete.shop/dashboard | grep -i location
 
-### Auth Redirects to `http://localhost:3000` in Production
+# Custom 404 (should return 404, not 200)
+curl -sI https://storyintovideo.jesspete.shop/nonexistent | head -1
 
-**Cause:** `AUTH_URL` or `NEXT_PUBLIC_APP_URL` env var set to localhost.
-
-**Fix:** Set both to the production URL. With Sprint 3 T1 deployed, the app would have refused to boot — so if you're seeing this, T1's fail-fast may have been disabled.
-
-### Nav Clicks Cause Full-Page Reloads
-
-**Cause:** Raw `<a href>` instead of `<Link>` (Sprint 3 T5 fixed this across 9 files).
-
-**Fix:** Use `<Link>` from `next/link`. The `cta-routes.test.ts` test enforces this. `mailto:` and hash anchors (`#main`) intentionally stay as `<a>`.
-
-### Tests Fail: "Cannot find module 'next/server'"
-
-**Cause:** jsdom can't load Next.js server modules.
-
-**Fix:** Mock `next-auth`, `next/navigation`, and `@/lib/db` in tests that transitively import them.
-
-### Tests Fail: "Cannot access 'X' before initialization"
-
-**Cause:** `vi.mock()` factory references a `vi.fn()` defined in the test body.
-
-**Fix:** Use `vi.hoisted()`:
-```typescript
-const { mockFn } = vi.hoisted(() => ({ mockFn: vi.fn() }));
+# Verify production mode (no dev chunks)
+# In browser console: should NOT see [HMR] connected or [Fast Refresh]
+# JS chunk names should be content-hashed, not source-path names
 ```
-
-### Tests Fail: "X is not a constructor"
-
-**Cause:** Mock factory returns an arrow function, but real code does `new X()`.
-
-**Fix:** Use `class` syntax in the mock factory.
-
-### Tests Fail: "[PARSE_ERROR] Expected '>' but found 'Identifier'"
-
-**Cause:** Test file uses JSX but has `.test.ts` extension.
-
-**Fix:** Rename to `*.test.tsx`.
-
-### Pipeline Tests Fail: "fetch failed: ENOTFOUND r2.example.com"
-
-**Cause:** Steps 5 & 6 download audio/SRT via `fetch()` which hits real DNS.
-
-**Fix:** Stub global `fetch`:
-```typescript
-vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ arrayBuffer: ..., text: ... }));
-```
-
-### `pnpm install` Fails: "ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION"
-
-**Cause:** `pnpm-workspace.yaml` missing `packages:` field.
-
-**Fix:** Add `packages: ['.']` to `pnpm-workspace.yaml`.
-
-### `pnpm install` Warns: "Ignored build scripts: esbuild"
-
-**Cause:** `pnpm-workspace.yaml` missing esbuild approval.
-
-**Fix:** Add `esbuild: true` to the `allowBuilds` map in `pnpm-workspace.yaml`.
-
-### Replicate Scene Generation 404s
-
-**Cause:** `REPLICATE_SDXL_IPADAPTER_MODEL` is the SDXL base placeholder (not IP-Adapter).
-
-**Fix:** Set `REPLICATE_SDXL_IPADAPTER_MODEL` env var to a real `lucataco/sdxl-ipadapter:<sha>` hash from replicate.com/explorer.
-
-### `DELETE /api/user` Returns 200 but R2 Media Still Exists
-
-**Cause:** T4's `deleteUserMedia` is best-effort — R2 errors are logged but don't fail the request.
-
-**Fix:** Check server logs for `[r2] deleteUserMedia: batch failed in bucket <name>:`. The DB CASCADE has already succeeded; orphaned R2 keys are inert. Re-run a manual R2 cleanup if needed.
-
-### CookieBanner Flashes Open Then Disappears
-
-**Cause:** SSR snapshot returns `false` (banner hidden), client snapshot reads localStorage — if the user already acknowledged, there's a brief render before `useSyncExternalStore` resolves.
-
-**Fix:** This is the documented `useSyncExternalStore` SSR pattern. Verify `getServerSnapshot` returns `false` and `if (!shouldShow) return null` is the first statement.
-
-### E2E Tests in CI Fail: "Cannot connect to the database"
-
-**Cause:** Postgres 17 service container not ready when `drizzle:migrate` runs.
-
-**Fix:** The `services.postgres.options` health check (`pg_isready`) should block. Verify retries (5 × 10s = 50s timeout) are sufficient for cold starts.
 
 ---
 
 ## 11. Pre-Ship Checklist
 
-### Before Every Commit
+Before claiming any task is complete, verify ALL of the following:
 
+### 11.1 Quality Gate (must pass clean)
 ```bash
-pnpm lint          # ESLint — 0 warnings, 0 errors
-pnpm typecheck     # tsc --noEmit — 0 errors
-pnpm test          # Vitest — 479 unit tests pass (53 files)
-pnpm test:e2e      # Playwright — 48 E2E tests pass (9 specs, requires Playwright browsers)
-pnpm build         # next build — 0 errors, 22 routes compiled
+pnpm lint           # 0 warnings (ESLint flat config)
+pnpm typecheck      # 0 errors (tsc --noEmit, strict + noUncheckedIndexedAccess)
+pnpm test           # 524 unit tests pass (58 files)
+pnpm test:e2e       # 48 E2E tests pass (9 specs, requires Playwright browsers)
+pnpm format:check   # All files pass Prettier
+pnpm build          # 0 errors (hybrid: static + dynamic)
 ```
 
-**Pre-commit chain:**
+### 11.2 CI Guard
+- The `quality-gate` job in `.github/workflows/ci.yml` runs all 6 commands above.
+- The CI guard step "Verify build output contains no dev-only chunks (hmr-client)" must pass — greps `.next/` for `hmr-client`.
+
+### 11.3 Pre-Deployment Env Validation
 ```bash
-pnpm lint && pnpm typecheck && pnpm test && pnpm build
+node scripts/check-env.js
+# Checks: host-mismatch, AUTH_SECRET ≥32 chars, placeholder API keys, missing required vars
 ```
 
-All four must pass with zero warnings/errors. **husky + lint-staged** automatically run ESLint + Prettier on staged `.ts/.tsx` files via `.husky/pre-commit`. Run the full chain manually before pushing — lint-staged only checks staged files.
+### 11.4 Post-Deployment Verification
+```bash
+node scripts/verify-deployment.js
+# 9 checks: /api/health, /dashboard redirect, /pricing+/blog+/contact 200, /sign-in, 404, /privacy+/terms
+```
 
-### Before Every Deploy
+### 11.5 Visual Verification
+- [ ] Marketing page visually indistinguishable from `storyintovideo.com` at 1440×900
+- [ ] Lighthouse ≥95 across Performance, Accessibility, Best Practices, SEO (marketing page)
+- [ ] All 14 marketing CTAs wired to real routes
+- [ ] FAQ accordion single-open behavior works
+- [ ] Mobile hamburger Sheet opens with 6 links
+- [ ] Cookie banner is dismissible via keyboard
+- [ ] Skip-to-content link appears on first Tab press
 
-1. **Database (Neon)** — Create DB, get `DATABASE_URL` (pooled) + `DATABASE_URL_UNPOOLED` (direct), run `pnpm drizzle:generate && pnpm drizzle:migrate`
-2. **Auth (Google OAuth)** — Create OAuth 2.0 credentials in Google Cloud Console → get `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`
-3. **AI Providers** — OpenAI (`OPENAI_API_KEY`), Replicate (`REPLICATE_API_TOKEN` + set `REPLICATE_SDXL_IPADAPTER_MODEL` to a real `lucataco/sdxl-ipadapter:<sha>` hash), ElevenLabs (`ELEVENLABS_API_KEY`)
-4. **Cloudflare R2** — Create 3 private buckets (`R2_BUCKET_UPLOADS`, `R2_BUCKET_GENERATED`, `R2_BUCKET_VIDEOS`), get API credentials
-5. **Stripe** — Create products, get `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-6. **Inngest** — Create project, get `INNGEST_EVENT_KEY` + `INNGEST_SIGNING_KEY`
-7. **Upstash** — Create Redis DB, get `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`
-8. **Set `AUTH_URL` AND `NEXT_PUBLIC_APP_URL`** to the same production URL (T1 throws if they differ — set to `https://your-app.com`)
-9. **Run `pnpm install`** to activate husky pre-commit hook
-10. **Post-deploy smoke test:**
-   - `GET /api/health` → assert HTTP 200 + `status === 'healthy'` + `config.healthy === true` + empty `configErrors`
-   - `GET /dashboard` (unauthenticated) → expect 307 redirect to `/sign-in` on the SAME host (NOT `localhost:3000`)
-   - `GET /pricing`, `/blog`, `/contact` → expect 200 with proper metadata
-   - `GET /nonexistent` → expect 404 with custom not-found page
+### 11.6 Security Verification
+- [ ] `curl -I` shows 6 security headers (incl. CSP + HSTS)
+- [ ] Browser console does NOT show `[HMR] connected` or `[Fast Refresh]` (production mode)
+- [ ] JS chunk names are content-hashed (not source-path names)
+- [ ] No `amber-300/400/500/600` or `bg-zinc-950/900/black` violations (`brand-tokens.test.ts` passes)
 
-### CI Verification
-
-The `.github/workflows/ci.yml` workflow runs two jobs on every PR:
-
-1. **`quality-gate`** — lint + typecheck + test + build (blocking)
-2. **`e2e`** — Playwright with Postgres 17 service container (`continue-on-error: true` initially — flip to required once stable)
-
-### Lighthouse Targets (Marketing Page)
-
-| Category | Target |
-|---|---|
-| Performance | ≥ 95 |
-| Accessibility | ≥ 95 |
-| Best Practices | ≥ 95 |
-| SEO | ≥ 95 |
+### 11.7 Pre-Launch External Services
+- [ ] Neon database provisioned + migrations applied
+- [ ] Google OAuth credentials configured (optional)
+- [ ] OpenAI / Replicate / ElevenLabs API keys set
+- [ ] `REPLICATE_SDXL_IPADAPTER_MODEL` set to real `lucataco/sdxl-ipadapter:<sha>`
+- [ ] Stripe products created + `PRICE_IDS` updated (currently placeholders)
+- [ ] Cloudflare R2 (3 buckets) provisioned
+- [ ] Inngest + Upstash + Resend accounts configured
+- [ ] `AUTH_URL` and `NEXT_PUBLIC_APP_URL` both set to the production HTTPS URL (T1 will throw if they differ)
 
 ---
 
 ## 12. Lessons Learnt & How to Avoid Them
 
-### Architecture
-
-1. **5-layer architecture prevents circular dependencies** — proxy → app → features → domain → lib. Lower layers never import higher. Domain is pure (no Next.js, no DB runtime).
-
-2. **`queries.ts` boundary keeps DB access centralized** — components never call `db` directly. All access goes through feature-level `queries.ts` files.
-
-3. **Hybrid rendering (no `force-static`)** — marketing page is static-prerendered; app routes are dynamic; API routes are `force-dynamic`. Don't add `force-static` to app routes.
-
-### Auth
-
-4. **`trustHost: true` is mandatory for reverse-proxy deployments** — without it, Auth.js falls back to `AUTH_URL` which may be `localhost:3000` if the dev default leaked to production.
-
-5. **AUTH_URL ↔ NEXT_PUBLIC_APP_URL host mismatch is a leading indicator of misconfiguration** — the env module now THROWS in production runtime (Sprint 3 T1). Dev/test warn-only.
-
-6. **API routes use `auth()`, not `verifySession()`** — `verifySession()` throws `NEXT_REDIRECT` (wrong for JSON). `auth()` returns null → 401 JSON.
-
-### Testing
-
-7. **Vitest mock hoisting is the #1 test bug** — use `vi.hoisted()` for any `vi.fn()` referenced inside `vi.mock()` factories.
-
-8. **Mock constructors must be `class`, not arrow fns** — `new S3Client(...)` requires the mock to be `new`-able.
-
-9. **`.tsx` extension is mandatory for JSX tests** — oxc throws `[PARSE_ERROR]` for JSX in `*.test.ts`.
-
-10. **Source-reading tests must strip comments** — docblocks that mention old patterns trigger false positives.
-
-11. **`fetch()` in tests hits real DNS** — stub `fetch` globally for tests that exercise the Inngest pipeline.
-
-12. **`NODE_ENV` is read-only** — use `vi.stubEnv('NODE_ENV', 'test')`.
-
-### Pipeline
-
-13. **TDD exposed 4 latent defects in `assemble-video.ts`** — placeholder Buffer, missing SRT file, missing input options, brittle filter extraction. All discovered by writing tests first.
-
-14. **Image moderation via Replicate's safety output is preferred** — parsing `safety_concept` adds zero latency vs. a second OpenAI vision API call.
-
-15. **`putObject` for pipeline vs. `getSignedUploadUrl` for client uploads** — pipeline has Buffer in memory (direct PUT); client uploads use presigned URLs.
-
-### Infrastructure
-
-16. **`postgres()` doesn't connect until a query runs** — eager db instantiation is safe for build-time.
-
-17. **DrizzleAdapter validates the db object's structure** — Proxy-based lazy db is rejected. Use a real Drizzle client.
-
-18. **Inngest v4 changed `createFunction` signature** — trigger is in `triggers: [{ event: '...' }]`, not a second argument.
-
-19. **Stripe "Basil" API (2025-03-31) moved `current_period_end`** — field removed from top-level Subscription, moved to `subscription.items.data[0].current_period_end`.
-
-20. **ElevenLabs `textToSpeech.convert()` returns a `Readable`**, not `ReadableStream` — the `streamToBuffer` helper duck-types both.
-
-### Sprint 3 (T1–T9)
-
-21. **`console.warn` is insufficient for env misconfigurations** — production misconfigs should fail fast (throw) OR be surfaced via `/api/health`. T1 throws; T2 surfaces.
-
-22. **Legal pages must not promise features the code doesn't implement** — Privacy Policy §4/§6 now match the code (T3/T4 GDPR endpoints).
-
-23. **`<a href>` vs `<Link>` drift is easy to miss in source-reading tests** — tests should assert both the route AND the component type.
-
-24. **Next.js default 404 inherits root layout metadata** — always ship a custom `not-found.tsx` (T7).
-
-25. **`useSyncExternalStore` is the SSR-safe way to read `localStorage`** — avoids the `react-hooks/set-state-in-effect` lint rule (T8).
-
-26. **R2 cleanup on account deletion is best-effort** — DB cascade always succeeds; R2 errors are logged but don't fail the GDPR request (T4).
-
-27. **CI e2e needs Postgres service container** — `pg_isready` health check, `DATABASE_URL` pointing at `localhost:5432`, `drizzle:migrate` before `test:e2e` (T9).
-
-### Remediation Sprint 1 (Pipeline Wiring + UX)
-
-28. **`inngest.send()` must be wrapped in try/catch** — when Inngest is unreachable, `setProjectFailed()` prevents orphan `pending` projects (T7).
-
-29. **Image moderation via Replicate's safety output is preferred** — parsing `safety_concept` adds zero latency vs. a second OpenAI vision API call (ADR-011).
-
-30. **`putObject` for pipeline vs. `getSignedUploadUrl` for client uploads** — pipeline has Buffer in memory (direct PUT); client uploads use presigned URLs (M3).
-
-### Remediation Sprint 2 (Post-Review Hardening)
-
-31. **`trustHost: true` is mandatory for reverse-proxy deployments** — without it, Auth.js falls back to `AUTH_URL` which may be `localhost:3000` if the dev default leaked to production. This was a P0 production outage (T2).
-
-32. **Hardcoded third-party model IDs are an operational liability** — the placeholder `SDXL_IPADAPTER_MODEL` hash was a UUID-format string, not Replicate's 64-char hex SHA. Scene generation would have 404'd. Model IDs are now env-configurable with format validation (T4).
-
-33. **SSE needs both server-side and client-side resilience** — `maxDuration = 800` (corrected from 900) is the Vercel Pro/Enterprise GA ceiling under Fluid Compute; the previous value of 900 exceeded the GA limit (T6).
-
-34. **`putObject` needs a size guard** — `MAX_PUT_OBJECT_BYTES = 500 MB` + `PayloadTooLargeError`. R2's hard limit is 5 GB, but function memory is the real constraint (T7).
-
-35. **`pnpm-workspace.yaml` requires `packages:` field** — pnpm 9+ enforces this even for single-package repos. Fresh clones fail with `ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION` (T0).
-
-### Remediation Sprint 3 (Revenue Integrity + Auth + Security + Design)
-
-36. **Sign-up was completely broken** — `AuthForm` called `signIn('credentials')` for BOTH sign-in and sign-up modes. The Credentials provider's `authorize()` only checks existing users — no user-creation logic existed. Fixed via `signUpAction` in `src/features/auth/actions.ts` (C1).
-
-37. **Steps 2 & 3 never debited credits (60% revenue leak)** — a 60% revenue leak. `FULL_PIPELINE_COST = 131` credits assumes all 6 steps debit, but only 4 did (5+15+3+30=53). Now all 6 steps call `debitCredits()` with per-entity idempotency keys (C6).
-
-38. **`FFMPEG_PATH` violated the "never `process.env.*`" rule** — `assemble-video.ts:20` read `process.env.FFMPEG_PATH` directly. Now goes through the Zod env schema (`env.FFMPEG_PATH`) (H1).
-
-39. **Brand color system fully replaced** — `sed` sweep across 45 files replaced `amber-300/400/500/600` → `primary`, `bg-zinc-950` → `bg-background`, `bg-zinc-900` → `bg-card`, `bg-black` → `bg-background`. `brand-tokens.test.ts` now ENFORCES 0 violations (H2 + T11).
-
-40. **Host Header Injection risk** — `trustHost: true` makes Auth.js trust `X-Forwarded-Host`. Without edge validation, an attacker behind a misconfigured reverse proxy can inject `evil.com` to steal magic-link tokens. `proxy.ts` now validates the Host header against a whitelist (H6).
-
-41. **Stripe webhook idempotency was a TOCTOU race** — the old SELECT-then-INSERT pattern on `metadata` (no UNIQUE index) allowed concurrent webhooks to both pass the check. Now uses INSERT-first `ON CONFLICT (idempotency_key) DO NOTHING` (H7).
-
-42. **Download button stale-tab 403** — `SignedDownloadWrapper` signed the R2 URL at SSR time, baking the 1h-expiry URL into the RSC payload. Users who left tabs open >1h got 403. Now: `ProjectDownloadButton` fetches `/api/projects/[id]/download` at click time → gets a fresh URL (H4).
-
-43. **Style chip enum mismatch (H3)** — clicking "Medieval" or "Japanese animation" set `style='medieval'` / `'japanese-animation'` which were NOT in the backend enum → Zod rejected the submission after the user typed a 100+ char story. Fixed by adding both values to `visualStyleEnum` + Zod + `STYLE_PROMPTS` (migration `0004`).
-
-44. **Health endpoint was bare** — returned `{ status: 'ok' }` unconditionally. Now checks DB (`SELECT 1`) + FFmpeg (`fs.accessSync`), returns 503 when unhealthy (H9).
-
-45. **Row lock untested** — `.for('update')` now test-verified via source-reading + concurrency test (H10).
-
-### Audit v1 (T1–T12)
-
-46. **Billing upgrade buttons POST to non-existent `/api/stripe/checkout` route** — fixed via `billingCheckoutAction` Server Action in `billing/actions.ts` (T1).
-
-47. **All protected routes return `ERR_CONNECTION_REFUSED`** — proxy redirect used `nextUrl.origin` which resolves to `http://` behind TLS-terminating reverse proxy. Fixed: proxy uses `new URL('/sign-in', env.NEXT_PUBLIC_APP_URL)` (T2).
-
-48. **Orphan project rows on insufficient credits** — `createProjectAction` inserted the project before debiting credits; InsufficientCreditsError left an orphan row. Fixed: INSERT + debit now wrapped in `db.transaction()` via `debitCreditsTx` (T3).
-
-49. **Stripe webhook idempotency INSERT-before-handler lost updates** — idempotency INSERT happened BEFORE the event handler; retries hit `onConflictDoNothing` and returned `{ duplicate: true }` without re-processing. Fixed: idempotency INSERT now happens AFTER side effects succeed + pre-check SELECT (T4).
-
-50. **SSE rate limit never released on disconnect** — `sseRateLimit.fixedWindow(1, '1 m')` never released the counter on disconnect. Fixed: SSE now uses `claimSseSlot`/`releaseSseSlot`/`refreshSseSlot` Redis slot pattern (SET NX EX 30 + DEL on abort) (T5).
-
-51. **Download route generic 500 for all R2 failures** — Single catch block didn't distinguish error types. Fixed: download route now classifies errors — S3/NoSuchKey/NoSuchBucket → 502, Timeout/Networking/Connection → 504, other → 500 (T6).
-
-52. **`inngest.send()` failure orphaned projects** — `inngest.send()` threw but the project row was already committed. Fixed: `inngest.send()` is now wrapped in try/catch → `setProjectFailed()` (T7).
-
-53. **`appendVideo` set `status='completed'` before MP4 existed** — Fixed: `status='rendering'` at insert, `updateVideo` sets `'completed'` (T8).
-
-54. **`FAIL_OPEN` read at module load, not testable per-call** — `getFailOpen()` now reads inside the function body (was module-load const) (T9).
-
-55. **Dead `buildFfmpegCommand` export** — deleted (T10).
-
-56. **Brand color system bypassed 122+ times across 28 files** — `sed` sweep across 45 files → `primary`/`background`/`card` tokens; `brand-tokens.test.ts` enforces 0 violations (T11).
-
-57. **`useProjectProgress` double-close risk + `Date.now()` temp file collisions + hardcoded `metadataBase` placeholder** — Fixed: `eventSource=null` guard, `crypto.randomUUID()`, `env.NEXT_PUBLIC_APP_URL` (T12).
-
-### Post-Audit-v1 Validation (2026-06-29)
-
-58. **`console.warn` is insufficient for env misconfigurations in production** — the AUTH_URL ↔ NEXT_PUBLIC_APP_URL host-mismatch warning only emits `console.warn`. The live site exhibited the failure (redirect to `localhost:3000`). The T2 code fix WAS deployed (proven by `/api/health` returning the H9 check), but the env var was wrong. Lesson: production env misconfigurations should fail fast (throw at module load) OR be surfaced via `/api/health`. **RESOLVED in Sprint 3 T1+T2: env module now THROWS in production runtime; /api/health surfaces config errors.**
-
-59. **Legal pages must not promise features the code doesn't implement** — the Privacy Policy publicly states GDPR rights (Erasure + Portability) that don't exist. **RESOLVED in Sprint 3 T3+T4: both endpoints now exist.**
-
-60. **`<a href>` vs `<Link>` drift is easy to miss** — navbar, dashboard, and hero all used raw `<a href>` for internal routes. **RESOLVED in Sprint 3 T5: 9 files converted to `<Link>`.**
+### Marketing Layer (Inherited)
+
+1. **`suppressHydrationWarning` on `<body>`, not just `<html>`** — Browser extensions inject attributes before React hydrates. `<html>` alone is insufficient.
+2. **Workflow is `'use client'`** — Uses `useState` for video loading choreography. Don't assume server components for "mostly static" sections.
+3. **Test counts drift from plans** — MEP planned 6+3, actual is 524 unit + 48 E2E. Always verify against `pnpm test` output.
+4. **File structure evolves** — `features/`, `lib/db/`, `lib/ai/`, `lib/auth/`, `lib/storage/`, `lib/inngest/`, `lib/stripe/`, `lib/env/` were created during production build. Update docs as you build.
+5. **Playwright needs separate install** — `pnpm install` doesn't install browser binaries.
+6. **Zod v4 `.url()` accepts any scheme** — compose `.url()` with `.refine()` for protocol restriction.
+7. **Env validation needs build-context fallback** — without it, `next build` fails during page-data collection.
+8. **`postgres()` defers connection until first query** — allows eager db instantiation without breaking the build.
+9. **DrizzleAdapter validates db object structure** — a Proxy-based lazy db was rejected; use a real Drizzle client.
+10. **Inngest v4 changed `createFunction` signature** — trigger is now in the config object, not a second argument.
+11. **Auth unit tests must mock `next-auth` + `next/navigation`** — jsdom can't load `next/server`.
+12. **Source-reading tests are valid** for server-only modules (auth config, middleware, route handlers) that can't be rendered in jsdom.
+
+### Production App Layer
+
+13. **`verifySession()` throws `NEXT_REDIRECT`** — never wrap in try/catch; the redirect must propagate.
+14. **API routes use `auth()`, not `verifySession()`** — `auth()` returns null → 401 JSON. `verifySession()` redirects (wrong for JSON responses).
+15. **Client components never import `r2.ts`** — env validation crashes in the browser.
+16. **`trustHost: true` is required for reverse-proxy deployments** — Auth.js v5 uses the request's Host header instead of `AUTH_URL`.
+17. **Stripe "Basil" API (2025-03-31) moved `current_period_end`** — from top-level to `items.data[0].current_period_end`. The `extractSubscriptionPeriodEnd()` helper handles both shapes.
+18. **`debitCredits()` must be idempotent** — uses `ON CONFLICT (idempotency_key) DO NOTHING` + `.for('update')` row lock. Returns `DebitResult { idempotent, eventId, creditsRemaining }`.
+19. **`createProjectAction` must insert BEFORE debiting** — if the insert fails, the user loses nothing. The INSERT + debit are wrapped in `db.transaction()` via `debitCreditsTx`.
+20. **`IMAGE_MODERATION_FAIL_OPEN` defaults to `'false'` in production** (H8) — fail-closed is the secure default. `'true'` in dev/test for convenience.
+
+### Audit-v2 Lessons (2026-07-02)
+
+21. **`next dev` in production is a silent failure mode** (NF-1) — symptoms: 5-10× slower, source paths leak, HMR WebSocket exposed, `cache-control: no-cache`. Unit tests can't catch this — it's operational. Lesson: always ship a production Dockerfile + CI guard that greps for `hmr-client`.
+22. **CSP `'unsafe-inline'` is required for Next.js App Router** (NF-2) — Next.js injects inline `<script>` chunks for router state. Ship `'unsafe-inline'` first (better than no CSP), upgrade to nonce-based later.
+23. **Three-way drift between DB enum, UI array, and marketing copy is easy to miss** (NF-3) — derive user-facing counts from the source-of-truth array OR add a regression test.
+24. **Dead exports accumulate silently across sprints** (NF-4) — every export should have at least one importer. If a constant is declared, USE it at the call site.
+25. **Docs claiming "dep installed" when it isn't is a real bug** (NF-5) — verify doc claims against `package.json` at doc-writing time.
+26. **Pipeline steps without try/catch create ghost "in progress" projects** (NF-6) — every step that can throw must catch + `setProjectFailed` + re-throw. Exception: the final "mark complete" step (work is done, don't mark it failed).
+
+### Additional Lessons (27–60 from prior sprints, summarized)
+
+27. **`console.warn` is insufficient for env misconfigurations in production** — throw at module load OR surface via `/api/health`.
+28. **Legal pages must not promise features the code doesn't implement** — every right promised in legal copy must trace to a working endpoint.
+29. **`<a href>` vs `<Link>` drift is easy to miss in source-reading tests** — assert both the route AND the component type.
+30. **Next.js default 404 inherits root layout metadata** — always ship a custom `not-found.tsx`.
+31. **Live-site behavioral testing catches what unit tests can't** — add a smoke test after every deploy.
+32–60. *(See CLAUDE.md "Lessons Learned" section 32–60 for the full list covering T1–T12 audit-v1 remediation lessons — includes R2 error classification, EventSource double-close, `Date.now()` collisions, `metadataBase` placeholders, host header injection, Stripe webhook idempotency, SSE slot release, and more.)*
 
 ---
 
 ## 13. Pitfalls to Avoid
 
-### TypeScript
+### 13.1 Architecture Pitfalls
 
-- **Never use `any`** — use `unknown`. ESLint enforces `@typescript-eslint/no-explicit-any: error`.
-- **Use `interface` for object shapes, `type` for unions/intersections.**
-- **Always `import type` for type-only imports** — `verbatimModuleSyntax` is enabled.
-- **`noUncheckedIndexedAccess` means `arr[0]` returns `T | undefined`** — always null-check.
+- **Do NOT add `tailwind.config.ts`** — all tokens belong in `globals.css` `@theme`.
+- **Do NOT use `next/font/google` for Outfit** — it can't serve weight 820.
+- **Do NOT use Framer Motion or GSAP** — all animation is CSS-only.
+- **Do NOT use camelCase keyframes** — kebab-case is the modern convention.
+- **Do NOT read `process.env.*` directly** — use the Zod-validated `env` module.
+- **Do NOT wrap `verifySession()` in try/catch** — it throws `NEXT_REDIRECT` which must propagate.
+- **Do NOT put DB access in components** — use the `queries.ts` boundary.
+- **Do NOT put DB access in middleware/proxy** — Edge runtime can't access DB.
+- **Do NOT make R2 buckets public** — use signed URLs.
+- **Do NOT skip content moderation** — every story input must be moderated (ADR-011).
+- **Do NOT use `force-static` on app routes** — only the marketing page can be static.
+- **Do NOT use `any`** — ESLint will error. Use `unknown` or proper types.
+- **Do NOT add CDN links** — all assets are self-hosted.
+- **Do NOT use default exports for components** — use named exports.
+- **Do NOT skip the verification chain** — `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
+- **Do NOT use `db push` in production** — always `drizzle-kit generate` + `migrate`.
+- **Do NOT deploy with `next dev`** — always use the production `Dockerfile` (`next start`). (NF-1)
+- **Do NOT ship a pipeline step without try/catch** — every step must call `setProjectFailed` on error. Exception: the `complete` step. (NF-6)
 
-### Next.js 16
+### 13.2 Dependency Pitfalls
 
-- **`next lint` is deprecated** — use `eslint .` directly.
-- **`middleware.ts` renamed to `proxy.ts`** — file convention changed in Next.js 16.
-- **Async `params` / `searchParams` / `cookies()`** — all three are `Promise<T>` in Next.js 16. Always `await` them.
-- **`force-static` on app routes is forbidden** — only the marketing page can be static.
-- **Layouts must NOT fetch data** — use Suspense + async Server Components instead.
+- **Do NOT install `@ffmpeg-installer/ffmpeg`** — Turbopack-incompatible. Use system FFmpeg.
+- **Do NOT claim `@aws-sdk/lib-storage` is installed** — it is NOT in `package.json`. (NF-5)
+- **Do NOT claim `@sentry/nextjs` is installed** — it is NOT. `SENTRY_DSN` is env-schema-only. (NF-5)
+- **Do NOT downgrade React below 19.2.3** — CVE-2025-55182 (React2Shell RCE).
+- **Do NOT use `onlyBuiltDependencies` in `pnpm-workspace.yaml`** — use `allowBuilds` (pnpm 10.26+ syntax).
 
-### React 19
+### 13.3 Testing Pitfalls
 
-- **Named function exports only** — `export function ComponentName()`, never default exports for components.
-- **`'use client'` only when needed** — `useState`, `useEffect`, event handlers, browser APIs.
-- **`suppressHydrationWarning` on `<html>` and `<body>`** — Grammarly extension compatibility.
-- **Handle all UI states** — loading, error, empty, success.
-
-### Tailwind CSS v4
-
-- **No `tailwind.config.ts`** — all tokens in `@theme` block in `globals.css`.
-- **`@source` directives required** — `@source '../components/**/*.{ts,tsx}'` and `@source '../lib/**/*.{ts,tsx}'`.
-- **`@utility` replaces `@layer components`** — Tailwind v4 idiom.
-- **Kebab-case keyframes only** — not camelCase.
-
-### Database
-
-- **Never use `db push` in production** — always `drizzle-kit generate` + `migrate`.
-- **Migrations need `DATABASE_URL_UNPOOLED`** — pooled connections + DDL is unreliable.
-- **All FKs from `users` are `onDelete: 'cascade'`** — GDPR deletion relies on this.
-
-### Storage (R2)
-
-- **Never make buckets public** — use signed URLs (1-hour expiry).
-- **Never import `@/lib/storage/r2` in client components** — env validation crashes in browser.
-- **`putObject` has a 500MB cap** — use multipart upload for larger files.
-
-### Security
-
-- **Never read `process.env.*` directly** — always import `env` from `@/lib/env`.
-- **Never wrap `verifySession()` in try/catch** — `NEXT_REDIRECT` must propagate.
-- **Stripe webhook: use `await req.text()` (not `.json()`)** — signature verification needs raw body.
+- **Do NOT use `vi.fn()` directly in `vi.mock()` factory** — use `vi.hoisted()` to avoid "Cannot access X before initialization".
+- **Do NOT return arrow functions from mock factories** when the real code does `new X()` — use `class` syntax.
+- **Do NOT forget to add `WHISPER_MODEL` to `@/lib/ai/openai` mocks** — `align-subtitles.ts` imports it. (NF-4)
+- **Do NOT forget `vi.stubGlobal('fetch', fetchMock)`** — Steps 5 & 6 use `fetch()` for R2 downloads.
+- **Do NOT use `.test.ts` for files with JSX** — rename to `.test.tsx`.
 
 ---
 
 ## 14. Best Practices
 
-### Code Organization
+### 14.1 TypeScript
+- `strict: true` + `noUncheckedIndexedAccess` + `verbatimModuleSyntax` + `noImplicitOverride`
+- `interface` for object shapes, `type` for unions/intersections
+- Explicit `type` imports: `import type { Metadata } from 'next'`
+- Early returns over deeply nested conditionals
+- Composition over inheritance
+- Never use `any` — use `unknown` if the type is truly unknown
 
-- **Co-locate tests in `src/tests/`** — not alongside components.
-- **Feature-level `queries.ts` for all DB access** — components never call `db`.
-- **Domain isolation** — pure business logic in `src/features/*/domain/` (no Next.js, no DB runtime).
-- **Static data in `src/lib/data/`** — typed constants, not runtime file reads.
+### 14.2 React / Next.js
+- Server Components by default; `'use client'` only when needed
+- Named function exports (never default)
+- `interface` for all props
+- `cn()` utility for conditional class merging
+- `suppressHydrationWarning` on `<html>` AND `<body>`
+- Handle all UI states: loading, error, empty, success
+- `next/link` for all internal navigation (never `<a>`)
+- `next/image` for all raster images
+- `next/font` for all fonts
+- Async `params` / `searchParams` / `cookies()` — always `await` them (Next.js 16)
 
-### Component Design
+### 14.3 Tailwind CSS v4
+- CSS-first `@theme` block in `globals.css` (no `tailwind.config.ts`)
+- `@source` directives for content scanning
+- `@utility` for single-purpose helpers (replaces v3 `@layer components`)
+- Kebab-case keyframes
+- Hex color tokens preserved verbatim (no OKLCH conversion)
+- Custom `--color-primary: #febf00` (NOT Tailwind's `amber-400`)
 
-- **Server Components by default** — add `'use client'` only when necessary.
-- **`cn()` utility for conditional classes** — `clsx` + `tailwind-merge`.
-- **`<Link>` for all internal navigation** — never `<a href>`.
-- **Brand tokens only** — `bg-background`, `text-primary`, `border-primary/20`, never `bg-zinc-950` or `text-amber-400`.
+### 14.4 Security
+- Zod env validation (never `process.env.*` directly)
+- `verifySession()` first in every Server Action
+- `auth()` in API routes (returns null → 401 JSON)
+- Stripe webhook signature verification
+- R2 buckets private; signed URLs only
+- bcrypt cost factor 12
+- Rate limiting on auth (10/15min/IP), pipeline (5/min/user), SSE (slot pattern)
+- 6 security headers incl. CSP + HSTS (NF-2)
+- Host header validation in proxy (H6)
 
-### Testing
+### 14.5 Testing (TDD)
+- RED (failing test) → GREEN (minimum fix) → REFACTOR → VERIFY
+- Source-reading tests for server-only modules (strip comments before regex)
+- Factory pattern for test data: `getMockX(overrides)`
+- `vi.hoisted()` for mock functions referenced in `vi.mock()` factories
+- Test behavior, not implementation
+- Run `pnpm test` before every commit
 
-- **TDD: RED → GREEN → REFACTOR** — write failing test first, minimum fix, then refactor.
-- **Mock AI provider SDKs** — never make real API calls in tests.
-- **Mock `@/lib/db` in tests that transitively import Drizzle** — jsdom can't reach Postgres.
-- **Mock `next-auth`, `next/navigation`** — jsdom can't load `next/server`.
-- **`vi.hoisted()` for shared mock state** — when a mock factory needs to reference a `vi.fn()`.
-- **Strip comments before regex in source-reading tests** — avoid false positives.
-
-### Performance
-
-- **CSS-only animations** — no Framer Motion, no GSAP (Lighthouse ≥95).
-- **`next/font` for all fonts** — self-hosted, no CDN links.
-- **`next/image` for all images** — AVIF + WebP formats, lazy loading.
-- **`preload="metadata"` on videos** — don't download full video until played.
-- **`loading="lazy"` on images below the fold.**
-
-### Accessibility
-
-- **WCAG AAA contrast** — zinc-300 on zinc-950 = 12.6:1.
-- **44×44px touch targets** on mobile.
-- **`focus-visible:outline-primary`** — not `outline-amber-400`.
-- **`prefers-reduced-motion: reduce`** disables all animations.
-- **`aria-hidden="true"` on decorative videos.**
+### 14.6 Pipeline (Inngest)
+- Every step is idempotent (deterministic idempotency keys)
+- `debitCredits` uses `ON CONFLICT DO NOTHING` + `.for('update')` row lock
+- `append*` queries use `onConflictDoNothing` on unique indexes
+- Every step wraps in try/catch with `setProjectFailed` + re-throw (NF-6)
+- The `complete` step logs-only (video is already in R2)
+- `createProjectAction` wraps INSERT + debit in `db.transaction()`
 
 ---
 
 ## 15. Coding Patterns
 
-### Server Action Pattern
-
+### 15.1 Server Action Pattern
 ```typescript
-// src/features/billing/actions.ts
+// src/features/projects/actions.ts
 'use server';
 
-import { z } from 'zod';
 import { verifySession } from '@/features/auth/domain/verify-session';
-
-const Schema = z.object({ planId: z.string() });
-
-export async function checkoutAction(input: z.infer<typeof Schema>) {
-  const session = await verifySession(); // Auth-first
-  const parsed = Schema.safeParse(input); // Zod validation
-  if (!parsed.success) throw new Error('Invalid input');
-
-  // ... business logic
-}
-```
-
-### Queries.ts Boundary Pattern
-
-```typescript
-// src/features/projects/queries.ts
-import { eq } from 'drizzle-orm';
+import { pipelineRateLimit } from '@/lib/rate-limit';
+import { CreateProjectSchema } from './schema';
 import { db } from '@/lib/db';
-import { projects } from '@/lib/db/schema';
 
-export async function getProject(projectId: string, userId: string) {
-  const [row] = await db.select().from(projects)
-    .where(eq(projects.id, projectId)).limit(1);
-
-  // Owner check — returns null if not owner (treated as 404 by caller)
-  if (row && row.userId !== userId) return null;
-
-  return row;
+export async function createProjectAction(input: unknown) {
+  const session = await verifySession();  // 1. Auth first (throws NEXT_REDIRECT if unauthenticated)
+  await pipelineRateLimit.limit(session.user.id);  // 2. Rate limit
+  
+  const parsed = CreateProjectSchema.safeParse(input);  // 3. Zod validation
+  if (!parsed.success) return { success: false, code: 'VALIDATION' };
+  
+  // 4. Business logic...
+  return { success: true };
 }
 ```
 
-### API Route Pattern (auth() not verifySession)
-
+### 15.2 API Route Pattern (force-dynamic)
 ```typescript
 // src/app/api/projects/[id]/download/route.ts
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-): Promise<NextResponse> {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { id } = await params; // Next.js 16 async params
-  // ... business logic
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },  // Next.js 16: params is Promise
+) {
+  const session = await auth();  // NOT verifySession() — returns null → 401 JSON
+  if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  
+  const { id } = await params;  // await the Promise
+  
+  // Owner check, business logic...
+  return Response.json({ url: signedUrl });
 }
 ```
 
-### ScrollReveal Stagger Pattern
-
+### 15.3 Domain Function Pattern (Pure)
 ```typescript
-{ITEMS.map((item, idx) => (
-  <ScrollReveal key={item.id} delay={Math.min(idx * 80, 400)}>
-    {/* card content */}
-  </ScrollReveal>
-))}
-```
+// src/features/pipeline/domain/align-subtitles.ts
+import { openai, WHISPER_MODEL } from '@/lib/ai/openai';
 
-### SSE Route Pattern
+export interface AlignSubtitlesInput {
+  audioBuffer: Buffer;
+  language?: string;
+}
 
-```typescript
-// src/app/api/projects/[id]/progress/route.ts
-export const dynamic = 'force-dynamic';
-export const maxDuration = 800; // Vercel Pro/Enterprise GA ceiling
-
-export async function GET(req: NextRequest, { params }) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    async start(controller) {
-      // Poll DB every 2s, enqueue `data: JSON\n\n` messages
-      // Close on terminal status (completed/failed)
-    },
+export async function alignSubtitles(input: AlignSubtitlesInput) {
+  // Pure function — no Next.js imports, no DB imports
+  // Can import types from @/lib/ai/openai but not runtime code
+  const language = input.language ?? 'en';
+  const transcription = await openai.audio.transcriptions.create({
+    file: new File([new Uint8Array(input.audioBuffer)], 'voiceover.mp3', { type: 'audio/mp3' }),
+    model: WHISPER_MODEL,  // NF-4: use the constant, don't hardcode
+    language,
+    response_format: 'verbose_json',
+    timestamp_granularities: ['word'],
   });
-
-  return new Response(stream, {
-    headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
-  });
+  // ... pure logic
 }
 ```
 
-### GDPR Endpoint Pattern (Sprint 3 T3/T4)
-
+### 15.4 Idempotent Credit Debit Pattern
 ```typescript
-// src/app/api/user/export/route.ts — T3
-export const dynamic = 'force-dynamic';
-
-export async function GET(): Promise<NextResponse> {
-  const session = await auth(); // NOT verifySession — API pattern
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+// C5 fix: ON CONFLICT DO NOTHING + SELECT FOR UPDATE
+export async function debitCreditsTx(
+  tx: db, // transaction handle from caller
+  userId: string,
+  amount: number,
+  operationType: UsageEventType,
+  idempotencyKey: string,
+  projectId?: string,
+): Promise<DebitResult> {
+  // 1. Insert idempotency row FIRST (ON CONFLICT DO NOTHING)
+  const [idempotencyRow] = await tx.insert(usageEvents)
+    .values({ userId, projectId, type: operationType, cost: amount, idempotencyKey })
+    .onConflictDoNothing({ target: usageEvents.idempotencyKey })
+    .returning();
+  
+  if (!idempotencyRow) return { idempotent: true, eventId: null, creditsRemaining: null };
+  
+  // 2. SELECT FOR UPDATE on the subscription row (row lock)
+  const [subscription] = await tx.select().from(subscriptions)
+    .where(eq(subscriptions.userId, userId)).for('update');
+  
+  if (subscription.creditsRemaining < amount) {
+    throw new InsufficientCreditsError(amount, subscription.creditsRemaining);
   }
-
-  const exportData = await getUserExportData(session.user.id); // queries.ts boundary
-  if (!exportData) return NextResponse.json({ error: 'User not found' }, { status: 404 });
-
-  return NextResponse.json(exportData, { status: 200 });
+  
+  // 3. Update the balance
+  await tx.update(subscriptions).set({
+    creditsRemaining: subscription.creditsRemaining - amount,
+  }).where(eq(subscriptions.userId, userId));
+  
+  return { idempotent: false, eventId: idempotencyRow.id, creditsRemaining: subscription.creditsRemaining - amount };
 }
 ```
 
-### CookieBanner Pattern (Sprint 3 T8)
-
+### 15.5 SSE Slot Pattern (T5 fix)
 ```typescript
-// useSyncExternalStore — SSR-safe localStorage read
-const subscribe = (listener: () => void) => {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-};
-
-const getServerSnapshot = () => false; // No banner during SSR
-const getClientSnapshot = () => {
-  try { return localStorage.getItem(KEY) !== 'acknowledged'; }
-  catch { return true; }
-};
-
-export function CookieBanner() {
-  const shouldShow = useSyncExternalStore(subscribe, getClientSnapshot, getServerSnapshot);
-  if (!shouldShow) return null;
-  // ... render banner
-}
+// claimSseSlot / releaseSseSlot / refreshSseSlot
+// Uses Redis SET NX EX 30 (exclusive lock with 30s TTL)
+// On disconnect: DEL the key (immediate release)
+// On poll: EXPIRE the key (refresh TTL)
+// If server crashes: key auto-expires after 30s
 ```
 
-### Custom `@utility` Class Pattern
-
-```css
-/* globals.css — Tailwind v4 @utility */
-@utility glass-input {
-  position: relative;
-  border-radius: var(--radius-2xl);
-  background-color: rgb(9 9 11 / 0.6);
-  backdrop-filter: blur(16px);
-  /* ... */
-
-  &:hover { border-color: rgb(255 255 255 / 0.12); }
-  &:focus-within {
-    border-color: rgb(251 191 36 / 0.3);
-    box-shadow: var(--shadow-hero-input), 0 0 30px rgb(251 191 36 / 0.1);
+### 15.6 Pipeline Step with Error Handling (NF-6)
+```typescript
+await step.run('synthesize-voiceover', async () => {
+  await updateProjectProgress(projectId, 'synthesizing_voice', 'Synthesizing voiceover…', 65);
+  try {
+    // ... step logic ...
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await setProjectFailed(projectId, `Voiceover synthesis failed: ${message}`);
+    throw err;  // Re-throw so Inngest still retries
   }
-}
+});
+
+// The complete step is special — logs-only, NO setProjectFailed
+await step.run('complete', async () => {
+  try {
+    await updateProjectProgress(projectId, 'completed', 'Your video is ready!', 100);
+  } catch (err) {
+    console.error(`[pipeline] Failed to mark project ${projectId} as completed (video is in R2):`, err);
+    // Do NOT call setProjectFailed — the video is already in R2, user can still download
+  }
+});
 ```
 
 ---
 
 ## 16. Coding Anti-Patterns
 
-- **Do not add `tailwind.config.ts`** — all tokens in `@theme` block
-- **Do not use `next/font/google` for Outfit** — can't serve weight 820
-- **Do not use Framer Motion or GSAP** — all animation is CSS-only
-- **Do not use camelCase keyframes** — kebab-case only
-- **Do not read `process.env.*` directly** — use the Zod-validated `env` module
-- **Do not wrap `verifySession()` in try/catch** — `NEXT_REDIRECT` must propagate
-- **Do not put DB access in components** — use the `queries.ts` boundary
-- **Do not put DB access in proxy/middleware** — Edge runtime, no DB
-- **Do not make R2 buckets public** — use signed URLs
-- **Do not skip content moderation** — every story input must be moderated
-- **Do not use `force-static` on app routes** — only marketing page can be static
-- **Do not use `any`** — ESLint will error. Use `unknown` or proper types
-- **Do not add CDN links** — all assets are self-hosted
-- **Do not use default exports for components** — use named exports
-- **Do not skip the verification chain** — `pnpm lint && pnpm typecheck && pnpm test && pnpm build`
-- **Do not use `db push` in production** — always `drizzle-kit generate` + `migrate`
-- **Do not use `<a href>` for internal routes** — use `<Link>` from `next/link`
-- **Do not import `@/lib/storage/r2` in client components** — env validation crashes in browser
-- **Do not use `amber-400`** — use `text-primary` (the custom `#febf00` token)
-- **Do not use `bg-zinc-950`** — use `bg-background` (the custom `#020202` token)
-- **Do not collect R2 keys AFTER DB CASCADE** — CASCADE wipes the projects table; collect keys BEFORE deletion
-- **Do not use `useState` + `useEffect` for localStorage** — use `useSyncExternalStore` (avoids `react-hooks/set-state-in-effect` lint error)
+### 16.1 TypeScript Anti-Patterns
+```typescript
+// ❌ DON'T: use any
+function process(data: any) { ... }
+
+// ✅ DO: use unknown + narrow
+function process(data: unknown) {
+  if (typeof data === 'string') { ... }
+}
+
+// ❌ DON'T: default export for components
+export default function Hero() { ... }
+
+// ✅ DO: named export
+export function Hero() { ... }
+
+// ❌ DON'T: type for object shapes
+type User = { id: string; name: string };
+
+// ✅ DO: interface for object shapes
+interface User { id: string; name: string }
+```
+
+### 16.2 React Anti-Patterns
+```tsx
+// ❌ DON'T: wrap verifySession in try/catch
+try {
+  await verifySession();
+} catch (e) {
+  // This swallows the NEXT_REDIRECT — breaks auth!
+}
+
+// ❌ DON'T: import r2.ts in client components
+'use client';
+import { getSignedDownloadUrl } from '@/lib/storage/r2'; // Crashes in browser!
+
+// ❌ DON'T: use <a> for internal routes
+<a href="/dashboard">Dashboard</a>  // Full-page reload
+
+// ✅ DO: use <Link>
+<Link href="/dashboard">Dashboard</Link>  // Client-side nav
+
+// ❌ DON'T: forget suppressHydrationWarning
+<html lang="en" className={fontVariables}>  // Grammarly causes hydration mismatch
+
+// ✅ DO: add to both html and body
+<html lang="en" className={fontVariables} suppressHydrationWarning>
+  <body suppressHydrationWarning>
+```
+
+### 16.3 Tailwind Anti-Patterns
+```tsx
+// ❌ DON'T: use Tailwind's amber-400 (it's #fbbf24, not #febf00)
+<button className="bg-amber-400 text-black">
+
+// ✅ DO: use the custom primary token
+<button className="bg-primary text-primary-foreground">
+
+// ❌ DON'T: add tailwind.config.ts
+// ✅ DO: use @theme block in globals.css
+
+// ❌ DON'T: use camelCase keyframes
+@keyframes fadeInUp { ... }
+
+// ✅ DO: use kebab-case
+@keyframes fade-in-up { ... }
+```
+
+### 16.4 Pipeline Anti-Patterns
+```typescript
+// ❌ DON'T: debit before insert (orphan rows on failure)
+await debitCredits(userId, 5, 'analysis', key);
+await db.insert(projects).values({...});  // If this fails, user lost credits
+
+// ✅ DO: insert + debit in a transaction
+await db.transaction(async (tx) => {
+  const [project] = await tx.insert(projects).values({...}).returning();
+  await debitCreditsTx(tx, userId, 5, 'analysis', `${project.id}:analysis`);
+});
+
+// ❌ DON'T: ship a step without try/catch (ghost projects)
+await step.run('analyze-story', async () => {
+  return analyzeStory(project.story);  // If this throws, project stuck at 10% forever
+});
+
+// ✅ DO: wrap in try/catch with setProjectFailed (NF-6)
+await step.run('analyze-story', async () => {
+  try {
+    return await analyzeStory(project.story);
+  } catch (err) {
+    await setProjectFailed(projectId, `Analysis failed: ${err.message}`);
+    throw err;
+  }
+});
+```
 
 ---
 
 ## 17. Responsive Breakpoint Reference
 
-| Token | Min Width | Target |
+The project uses Tailwind's default breakpoints (no custom config):
+
+| Prefix | Min-width | Usage in this project |
 |---|---|---|
-| (default) | 0 | Mobile portrait 375px |
-| `sm` | 640px | Mobile landscape |
-| `md` | 768px | Tablet portrait |
-| `lg` | 1024px | Tablet landscape / laptop |
-| `xl` | 1280px | Desktop (matches `max-w-7xl`) |
-| `2xl` | 1536px | Large desktop |
+| (default) | 0px | Mobile-first base styles |
+| `sm:` | 640px | Hero padding increase, hero margin-top increase |
+| `md:` | 768px | (rarely used — jump from sm to lg) |
+| `lg:` | 1024px | H2 font-size jump (`text-4xl lg:text-6xl`), grid column changes |
+| `xl:` | 1280px | Max-width containers |
+| `2xl:` | 1536px | (rarely used) |
 
-### Key Responsive Patterns
+**Key responsive patterns:**
+- **Hero H1:** `text-4xl` on mobile → `text-[4.5rem]` on desktop (inline style for the 820 weight)
+- **Section H2:** `text-4xl lg:text-6xl` with `clamp(2rem, 5vw, 3rem)` via `@utility section-heading`
+- **Marquee speed:** 40s on desktop → 30s on mobile (`@media (max-width: 640px)` in `@utility marquee-track`)
+- **Navbar:** Desktop shows inline links; mobile shows hamburger → Sheet
+- **Glass input padding:** `1.25rem` on mobile → `1.5rem` on `sm:` (`@utility glass-input`)
+- **Workflow section:** Desktop alternates media left/right; mobile always stacks media-above-text
 
-```typescript
-// Hero H1 — fluid sizing
-className="text-4xl sm:text-5xl md:text-6xl lg:text-[4.5rem]"
-
-// Section heading — fluid clamp
-@utility section-heading {
-  font-size: clamp(2rem, 5vw, 3rem);
-}
-
-// Grid — 1 col mobile → 2 col tablet → 4 col desktop
-className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
-
-// Hide on mobile, show on desktop
-className="hidden sm:flex"
-
-// Max width container
-className="mx-auto max-w-7xl"
-```
+**Mobile testing:** Use `agent-browser set device "iPhone 14"` for consistent mobile verification.
 
 ---
 
 ## 18. Z-Index Layer Map
 
-| Z-Index | Element | Location |
-|---|---|---|
-| `z-50` | Navbar (fixed) | `src/components/sections/navbar.tsx` |
-| `z-50` | Skip-to-content link (on focus) | `src/app/layout.tsx` |
-| `z-40` | CookieBanner (fixed bottom) | `src/components/app/cookie-banner.tsx` |
-| `z-10` | Hero content (above video bg) | `src/components/sections/hero.tsx` |
-| `z-0` | Hero background video | `src/components/sections/hero.tsx` |
-| `-z-10` | Examples hover glow | `src/components/sections/examples.tsx` |
+| Z-Index | Element | Location | Purpose |
+|---|---|---|---|
+| `z-50` | Navbar (fixed) | `navbar.tsx:39` | Stays above page content on scroll |
+| `z-50` | Skip-to-content link (on focus) | `layout.tsx:71` | Visible above all content when focused |
+| `z-50` | Sheet overlay (Radix Dialog backdrop) | `sheet.tsx:29` | Mobile nav backdrop |
+| `z-50` | Sheet content (Radix Dialog panel) | `sheet.tsx:53` | Mobile nav panel |
+| `z-50` | Dropdown menu content (Radix) | `dropdown-menu.tsx:30,200` | Language dropdown |
+| `z-40` | Cookie banner (fixed bottom) | `cookie-banner.tsx:93` | Above page content, below nav/sheets |
+| `z-10` | Hero content (relative to bg video) | `hero.tsx:63,180` | Above the hero background video |
+| `z-10` | Final CTA content | `final-cta.tsx:40` | Above background effects |
+| `-z-10` | Example card hover gradient | `examples.tsx:88` | Behind the card content |
 
-### Radix / shadcn Portal Z-Index
+**Radix portal elements** (rendered to `document.body`, so they're above everything):
+- Sheet overlay + content
+- Dropdown menu content
+- (Radix manages z-index internally for these)
 
-Radix primitives (used by our hand-written shadcn components) create their own stacking context via portals. They render outside the normal DOM tree, so their z-index is relative to the document root, not the parent component.
-
-| Component | Default Z-Index | Notes |
-|---|---|---|
-| `Sheet` (mobile nav) | `z-50` | Radix `Dialog` primitive — full-screen overlay |
-| `DropdownMenu` (language switcher) | `z-50` | Radix `DropdownMenu` — sits above all content |
-| `Accordion` (FAQ) | — | No explicit z-index — stays in document flow |
-| `Dialog` (if used) | `z-50` | Full-screen overlay |
-| `Popover` (if used) | `z-50` | Floating layer above content |
-
-**Rule of thumb:** Never use `z-index` above `50` in component code. The `z-50` tier is reserved for: (1) fixed navigation, (2) skip-to-content, (3) Radix portalled overlays. Everything else should be `z-40` or below.
-
-### Z-Index Conflict Resolution
-
-If you need a new overlay component (e.g., a custom modal):
-
-```typescript
-// ❌ BAD — arbitrary z-index, will clash
-<div className="z-[9999]">
-
-// ✅ GOOD — use the established hierarchy
-<div className="z-40">        {/* below z-50 overlays */}
-  {/* content */}
-</div>
-```
-
-For custom modals that need to appear above shadcn components, wrap with Radix `Dialog` (which handles the portal + z-50 automatically) rather than hand-rolling a z-index solution.
-
-### Radix Portal Z-Index
-
-Radix components (Sheet, DropdownMenu, Accordion) use their own stacking context. The `Sheet` (mobile nav) renders at `z-50` by default via Radix's `Dialog` primitive.
+**Rule of thumb:** `z-50` for fixed/sticky UI (nav, sheets, dropdowns, skip-link), `z-40` for banners, `z-10` for content above background media, `-z-10` for decorative backgrounds.
 
 ---
 
 ## 19. Color Reference (Complete)
 
-### Brand Tokens (from `@theme` in `globals.css`)
+### 19.1 Semantic Tokens (from `@theme` in `globals.css`)
 
-| Token | Hex | Usage |
-|---|---|---|
-| `--color-background` | `#020202` | Page background (near-black, warm-neutral — NOT pure #000) |
-| `--color-foreground` | `#f8f8f8` | Default foreground text |
-| `--color-card` | `#060607` | Card surfaces |
-| `--color-card-foreground` | `#f8f8f8` | Text on cards |
-| `--color-popover` | `#0b0b0d` | Dropdown menus, language switcher |
-| `--color-popover-foreground` | `#f8f8f8` | Text in popovers |
-| `--color-primary` | `#febf00` | CTAs, active states, focus rings (NOT Tailwind amber-400 #fbbf24) |
-| `--color-primary-foreground` | `#020202` | Text on primary fills |
-| `--color-secondary` | `#111114` | Secondary surfaces |
-| `--color-secondary-foreground` | `#f8f8f8` | Text on secondary |
-| `--color-muted` | `#1a1a1d` | Muted backgrounds |
-| `--color-muted-foreground` | `#8e8e95` | Secondary text (zinc-400 equivalent) |
-| `--color-accent` | `#febf00` | Same as primary |
-| `--color-accent-foreground` | `#020202` | Text on accent |
-| `--color-destructive` | `#ff2d39` | Error states |
-| `--color-destructive-foreground` | `#f8f8f8` | Text on destructive |
-| `--color-border` | `#1a1a1d` | Default border color |
-| `--color-input` | `#0b0b0d` | Input backgrounds |
-| `--color-ring` | `#febf0080` | Focus ring (50% opacity primary) |
+| Token | Hex | RGB | Tailwind Class | Usage |
+|---|---|---|---|---|
+| `--color-background` | `#020202` | `2, 2, 2` | `bg-background` | Page background |
+| `--color-foreground` | `#f8f8f8` | `248, 248, 248` | `text-foreground` | Default foreground (headings) |
+| `--color-card` | `#060607` | `6, 6, 7` | `bg-card` | Card surfaces |
+| `--color-card-foreground` | `#f8f8f8` | `248, 248, 248` | `text-card-foreground` | Text on cards |
+| `--color-popover` | `#0b0b0d` | `11, 11, 13` | `bg-popover` | Dropdown/sheet backgrounds |
+| `--color-popover-foreground` | `#f8f8f8` | `248, 248, 248` | `text-popover-foreground` | Text in popovers |
+| `--color-primary` | `#febf00` | `254, 191, 0` | `bg-primary` / `text-primary` | CTAs, active states, focus rings |
+| `--color-primary-foreground` | `#020202` | `2, 2, 2` | `text-primary-foreground` | Text on amber CTAs |
+| `--color-secondary` | `#111114` | `17, 17, 20` | `bg-secondary` | Secondary surfaces |
+| `--color-secondary-foreground` | `#f8f8f8` | `248, 248, 248` | `text-secondary-foreground` | Text on secondary |
+| `--color-muted` | `#1a1a1d` | `26, 26, 29` | `bg-muted` | Muted backgrounds |
+| `--color-muted-foreground` | `#8e8e95` | `142, 142, 149` | `text-muted-foreground` | Secondary text |
+| `--color-accent` | `#febf00` | `254, 191, 0` | `bg-accent` | Same as primary (alias) |
+| `--color-accent-foreground` | `#020202` | `2, 2, 2` | `text-accent-foreground` | Text on accent |
+| `--color-destructive` | `#ff2d39` | `255, 45, 57` | `bg-destructive` | Error states |
+| `--color-destructive-foreground` | `#f8f8f8` | `248, 248, 248` | `text-destructive-foreground` | Text on destructive |
+| `--color-border` | `#1a1a1d` | `26, 26, 29` | `border-border` | Default borders |
+| `--color-input` | `#0b0b0d` | `11, 11, 13` | `bg-input` | Input backgrounds |
+| `--color-ring` | `#febf0080` | `254, 191, 0, 50%` | `ring-ring` | Focus ring (50% opacity amber) |
 
-### Chart Palette (reserved for future dashboard)
+### 19.2 Chart Palette (Reserved for Future Dashboard)
 
 | Token | Hex |
 |---|---|
-| `--color-chart-1` | `#febf00` |
-| `--color-chart-2` | `#00aa6f` |
-| `--color-chart-3` | `#8d92f9` |
-| `--color-chart-4` | `#f14d4c` |
-| `--color-chart-5` | `#7bc27e` |
+| `--color-chart-1` | `#febf00` (amber) |
+| `--color-chart-2` | `#00aa6f` (green) |
+| `--color-chart-3` | `#8d92f9` (periwinkle) |
+| `--color-chart-4` | `#f14d4c` (red) |
+| `--color-chart-5` | `#7bc27e` (light green) |
 
-### Opacity Variants (common usage)
+### 19.3 Body Text Color (Not a Token — Hardcoded)
 
-| Pattern | Hex | Usage |
-|---|---|---|
-| `bg-white/[0.02]` | `rgba(255,255,255,0.02)` | Card surfaces, empty states |
-| `bg-white/[0.04]` | `rgba(255,255,255,0.04)` | Hover state on cards |
-| `bg-white/[0.06]` | `rgba(255,255,255,0.06)` | Borders on cards |
-| `bg-white/[0.1]` | `rgba(255,255,255,0.1)` | Active ratio toggle bg |
-| `bg-primary/10` | `rgba(254,191,0,0.1)` | Icon container bg |
-| `bg-primary/30` | `rgba(254,191,0,0.3)` | Active chip border |
-| `border-primary/20` | `rgba(254,191,0,0.2)` | Icon container border |
-| `border-primary/30` | `rgba(254,191,0,0.3)` | Active chip border |
-| `text-white/50` | `rgba(255,255,255,0.5)` | Inactive nav links |
-| `text-white/60` | `rgba(255,255,255,0.6)` | Default nav links |
+Body paragraph text uses `#d4d4d8` (zinc-300) — **NOT** `--color-foreground` (`#f8f8f8`). This gives **12.6:1 contrast on `#020202`** (WCAG AAA). Applied via `text-zinc-300` class in component JSX.
 
-### Zinc Utility Colors (used for text, NOT backgrounds)
+### 19.4 The ONLY Permitted Purple
 
-| Class | Hex | Usage |
-|---|---|---|
-| `text-zinc-300` | `#d4d4d8` | Body text (12.6:1 contrast on background) |
-| `text-zinc-400` | `#a1a1aa` | Secondary text |
-| `text-zinc-500` | `#71717a` | Tertiary text, timestamps |
-| `text-zinc-600` | `#52525b` | Muted text, ratio toggle inactive |
-
-⚠️ **`bg-zinc-950`, `bg-zinc-900`, `bg-black` are FORBIDDEN** — use `bg-background` or `bg-card` instead. The `brand-tokens.test.ts` CI guard enforces this.
-
-### The Singular Purple Exception
-
-```css
-/* Examples card hover glow — the ONLY purple on the site */
-.bg-gradient-to-r.from-yellow-500.to-purple-500
+The example-card hover gradient in `examples.tsx:88`:
+```tsx
+<div className="absolute inset-0 -z-10 rounded-[20px] bg-gradient-to-r from-yellow-500 to-purple-500 opacity-50 blur-md transition-opacity duration-300 group-hover:opacity-80" />
 ```
+This is the **ONLY** purple on the entire site. Any other purple is a bug.
 
-This is intentional — it signals "premium example content" and breaks the amber monopoly in exactly one place.
+### 19.5 Forbidden Colors (Enforced by `brand-tokens.test.ts`)
+
+The following Tailwind classes are **FORBIDDEN** in non-test source:
+- `amber-300`, `amber-400`, `amber-500`, `amber-600` (use `primary` instead)
+- `bg-zinc-950`, `bg-zinc-900`, `bg-black` (use `bg-background` or `bg-card` instead)
+
+`brand-tokens.test.ts` enforces 0 violations via source-reading regex.
 
 ---
 
-## 20. TypeScript Interface Reference
+## 20. The Complete TypeScript Interface Reference
 
-All interfaces live in `src/types/index.ts`. Here is the complete reference:
+All marketing interfaces live in `src/types/index.ts` (12 interfaces). All use `interface` (not `type` for object shapes) per project convention.
+
+### 20.1 Marketing Interfaces
 
 ```typescript
 import type { LucideIcon } from 'lucide-react';
 
 /** Navigation link in the Navbar (desktop + mobile Sheet). */
-interface NavLink {
+export interface NavLink {
   label: string;
   href: string;
 }
 
 /** Story example chip in the Hero — clicking populates the textarea. */
-interface StoryExample {
+export interface StoryExample {
   label: string;
   /** The multi-paragraph seed text injected into the textarea on click. */
   seed: string;
 }
 
 /** Aspect ratio toggle button in the Hero (9:16 portrait or 16:9 landscape). */
-interface AspectRatio {
+export interface AspectRatio {
   label: '9:16' | '16:9';
   value: 'portrait' | 'landscape';
 }
 
 /** Portrait example card in the Examples carousel. */
-interface ExampleCard {
+export interface ExampleCard {
   id: string;
   title: string;
   /** Style tag shown below the title (e.g., "Anime · Romance"). */
@@ -1769,7 +1519,7 @@ interface ExampleCard {
 }
 
 /** One of the 4 alternating media/text rows in the Workflow section. */
-interface WorkflowStep {
+export interface WorkflowStep {
   number: 1 | 2 | 3 | 4;
   title: string;
   description: string;
@@ -1779,12 +1529,12 @@ interface WorkflowStep {
   videoSrc: string;
   /** Path to the WebP poster shown before the video loads. */
   videoPoster: string;
-  /** Desktop layout: which side the media sits on. */
+  /** Desktop layout: which side the media sits on. Mobile always stacks media-above-text. */
   mediaPosition: 'left' | 'right';
 }
 
 /** One of the 8 items in the Features 4×2 hairline grid. */
-interface Feature {
+export interface Feature {
   id: string;
   title: string;
   description: string;
@@ -1792,7 +1542,7 @@ interface Feature {
 }
 
 /** One of the 6 testimonial cards in the Testimonials 3×2 grid. */
-interface Testimonial {
+export interface Testimonial {
   id: string;
   quote: string;
   authorName: string;
@@ -1802,7 +1552,7 @@ interface Testimonial {
 }
 
 /** One of the 4 use case cards in the UseCases 2×2 grid. */
-interface UseCase {
+export interface UseCase {
   id: string;
   title: string;
   description: string;
@@ -1811,119 +1561,64 @@ interface UseCase {
 }
 
 /** One of the 6 items in the FAQ Radix Accordion. */
-interface FAQItem {
+export interface FAQItem {
   id: string;
   question: string;
   answer: string;
 }
 
 /** A single link in the Footer. */
-interface FooterLink {
+export interface FooterLink {
   label: string;
   href: string;
 }
 
 /** A titled column of links in the Footer. */
-interface FooterColumn {
+export interface FooterColumn {
   title: string;
   links: FooterLink[];
 }
 
 /** A chip in the Hero style tags marquee. */
-interface StyleChip {
+export interface StyleChip {
   label: string;
   /** Optional smaller sublabel (only "Cyberpunk" uses this: "Futuristic neon"). */
   sublabel?: string;
 }
 ```
 
-### Component Props Interfaces (co-located)
+### 20.2 Pipeline Interfaces (in `src/features/pipeline/domain/`)
 
 ```typescript
-// CtaAmber
-interface CtaAmberProps {
-  children: React.ReactNode;
-  href: string;
-  className?: string;
-  onClick?: () => void;
-}
-
-// CtaGradient
-interface CtaGradientProps {
-  children: React.ReactNode;
-  href: string;
-  className?: string;
-}
-
-// CtaGhost
-interface CtaGhostProps {
-  children: React.ReactNode;
-  href: string;
-  className?: string;
-}
-
-// Eyebrow
-interface EyebrowProps {
-  children: React.ReactNode;
-  className?: string;
-}
-
-// SectionHeading
-interface SectionHeadingProps {
-  children: React.ReactNode;
-  as?: 'h1' | 'h2' | 'h3';
-  id?: string;
-  className?: string;
-}
-
-// StyleChip (component)
-interface StyleChipProps {
-  label: string;
-  sublabel?: string;
-  active?: boolean;
-  onClick?: () => void;
-  className?: string;
-}
-
-// ScrollReveal
-interface ScrollRevealProps {
-  children: ReactNode;
-  delay?: number;
-  className?: string;
-  as?: 'div' | 'section' | 'article' | 'li' | 'span';
-}
-
-// EmptyState
-interface EmptyStateProps {
-  icon?: React.ReactNode;
+// analyze-story.ts
+export interface AnalyzedStory {
   title: string;
-  description: string;
-  ctaLabel?: string;
-  ctaHref?: string;
-  className?: string;
+  summary: string;
+  characters: { name: string; description: string }[];
+  scenes: { order: number; description: string; characters: string[]; duration_sec: number }[];
 }
 
-// useReveal
-interface UseRevealOptions {
-  threshold?: number;
-  rootMargin?: string;
-  once?: boolean;
+// synthesize-voice.ts
+export interface SynthesizeVoiceInput {
+  text: string;
+  voiceId: string;
+}
+export interface SynthesizeVoiceOutput {
+  audioBuffer: Buffer;
+  duration: number;
 }
 
-// useProjectProgress
-interface ProjectProgressState {
-  status: string | null;
-  progressPercent: number | null;
-  progressDetail: string | null;
-  errorMessage: string | null;
-  connectionState: 'connecting' | 'open' | 'closed' | 'error' | 'reconnecting';
+// align-subtitles.ts
+export interface AlignSubtitlesInput {
+  audioBuffer: Buffer;
+  language?: string;  // ISO 639-1, defaults to 'en'
 }
-```
+export interface AlignSubtitlesOutput {
+  cues: SubtitleCue[];
+  srt: string;
+}
 
-### Pipeline Domain Interfaces
-
-```typescript
-// src/features/pipeline/domain/assemble-video.ts
+// assemble-video.ts
 export interface AssembleVideoInput {
   sceneImageUrls: string[];
   sceneDurations: number[];
@@ -1932,117 +1627,60 @@ export interface AssembleVideoInput {
   aspectRatio: 'portrait' | 'landscape';
   resolution: '720p' | '1080p' | '4k';
 }
-
 export interface AssembleVideoOutput {
   videoBuffer: Buffer;
   duration: number;
 }
-
-// src/features/pipeline/domain/moderate-image.ts
-export interface ModerateImageInput {
-  imageUrl: string;
-  rawOutput: unknown;
-}
-
-export interface ImageModerationResult {
-  flagged: boolean;
-  categories: string[];
-  /** true when moderation could not run because the output shape was unknown. */
-  moderationSkipped: boolean;
-}
 ```
 
-### Billing Interfaces
+### 20.3 Billing Interfaces (in `src/features/billing/`)
 
 ```typescript
-// src/features/billing/queries.ts
+// queries.ts
+export interface DebitResult {
+  idempotent: boolean;      // true if this idempotency key was already processed
+  eventId: string | null;   // the usageEvents.id (null if idempotent)
+  creditsRemaining: number | null;  // remaining balance (null if idempotent)
+}
+
 export class InsufficientCreditsError extends Error {
   constructor(
     public readonly required: number,
     public readonly available: number,
   ) {
-    super(`Insufficient credits: need ${required}, have ${available}.`);
+    super(`Insufficient credits: need ${required}, have ${available}`);
     this.name = 'InsufficientCreditsError';
   }
 }
 
-export interface DebitResult {
-  /** true if this call was a no-op (duplicate idempotencyKey detected) */
-  idempotent: boolean;
-  /** The usage_event row id, or null if the debit was skipped */
-  eventId: string | null;
-  /** The user's credit balance after the debit (null if skipped) */
-  creditsRemaining: number | null;
-}
-
-export type DebitOperation =
-  | 'analysis'
-  | 'character_generation'
-  | 'scene_generation'
-  | 'voiceover'
-  | 'subtitle_alignment'
-  | 'video_assembly'
-  | 'moderation_check';
-
-// src/features/billing/domain/tier-limits.ts
-export type Plan = 'free' | 'creator' | 'pro' | 'studio';
-
+// domain/tier-limits.ts
 export interface TierLimit {
-  plan: Plan;
   monthlyCredits: number;
   maxResolution: '720p' | '1080p' | '4k';
   maxVideoDurationSec: number;
   watermark: boolean;
-  priorityQueue: boolean;
+  priorityQueue: 'standard' | 'priority';
 }
+export const TIER_LIMITS: Record<'free' | 'creator' | 'pro' | 'studio', TierLimit>;
+export const CREDIT_COSTS: Record<string, number>;
+export const FULL_PIPELINE_COST = 131;  // 5 + 3×10 + 6×8 + 15 + 3 + 30
 ```
 
-### Auth Interfaces
+### 20.4 Pipeline Queries Interfaces (in `src/features/pipeline/queries.ts`)
 
 ```typescript
-// src/features/auth/actions.ts
-export type SignUpResult =
-  | { success: true; userId: string }
-  | {
-      success: false;
-      error: string;
-      code: 'VALIDATION' | 'EMAIL_EXISTS' | 'INTERNAL' | 'RATE_LIMITED';
-    };
-
-// src/features/auth/domain/verify-session.ts
-interface VerifySessionOptions {
-  /** Where to send the user after sign-in (defaults to current route) */
-  redirectTo?: string;
+export interface AppendResult<T> {
+  inserted: boolean;  // false if onConflictDoNothing hit
+  row: T | null;      // null if not inserted
 }
-
-// src/features/projects/actions.ts
-export type CreateProjectResult =
-  | { success: true; projectId: string }
-  | {
-      success: false;
-      error: string;
-      code:
-        | 'UNAUTHORIZED'
-        | 'VALIDATION'
-        | 'FLAGGED'
-        | 'INSUFFICIENT_CREDITS'
-        | 'INTERNAL'
-        | 'RATE_LIMITED';
-    };
+export type ProjectStatus = 'draft' | 'pending' | 'analyzing' | 'generating_characters' |
+  'generating_scenes' | 'synthesizing_voice' | 'aligning_subtitles' | 'assembling_video' |
+  'completed' | 'failed';
 ```
 
-### SSE / Progress Interfaces
+### 20.5 SSE / Progress Interfaces (in `src/lib/hooks/use-project-progress.ts`)
 
 ```typescript
-// src/app/api/projects/[id]/progress/route.ts
-interface ProgressEvent {
-  status: string;
-  progressPercent: number;
-  progressDetail: string | null;
-  errorMessage: string | null;
-}
-
-// src/lib/hooks/use-project-progress.ts
 export interface ProjectProgressState {
   status: string | null;
   progressPercent: number | null;
@@ -2052,230 +1690,95 @@ export interface ProjectProgressState {
 }
 ```
 
-### Environment Interface (30 vars)
+### 20.6 Auth Interfaces (in `src/features/auth/`)
 
 ```typescript
-// src/lib/env/index.ts (inferred from Zod schema)
-type EnvData = {
-  // Database (Neon)
-  DATABASE_URL: string;              // postgresql://... (pooled)
-  DATABASE_URL_UNPOOLED: string;     // postgresql://... (direct, for migrations)
-  // Auth (Auth.js v5)
-  AUTH_SECRET: string;               // ≥32 chars, not known-weak
-  AUTH_URL: string;                  // https://your-app.com
-  GOOGLE_CLIENT_ID?: string;         // both required to enable Google OAuth
-  GOOGLE_CLIENT_SECRET?: string;
-  // AI Providers
-  OPENAI_API_KEY: string;            // starts with 'sk-'
-  REPLICATE_API_TOKEN: string;       // starts with 'r8_'
-  ELEVENLABS_API_KEY: string;
-  REPLICATE_SDXL_MODEL: string;      // owner/model:sha format (has default)
-  REPLICATE_SDXL_IPADAPTER_MODEL: string; // owner/model:sha (placeholder default — set to real IP-Adapter!)
-  // Stripe
-  STRIPE_SECRET_KEY: string;         // starts with 'sk_'
-  STRIPE_WEBHOOK_SECRET: string;     // starts with 'whsec_'
-  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: string; // starts with 'pk_'
-  // Cloudflare R2
-  R2_ACCOUNT_ID: string;
-  R2_ACCESS_KEY_ID: string;
-  R2_SECRET_ACCESS_KEY: string;
-  R2_BUCKET_UPLOADS: string;
-  R2_BUCKET_GENERATED: string;
-  R2_BUCKET_VIDEOS: string;
-  // Inngest
-  INNGEST_EVENT_KEY: string;
-  INNGEST_SIGNING_KEY: string;
-  // Email (Resend)
-  RESEND_API_KEY: string;            // starts with 're_'
-  // Rate Limiting (Upstash)
-  UPSTASH_REDIS_REST_URL: string;
-  UPSTASH_REDIS_REST_TOKEN: string;
-  // Monitoring (Sentry)
-  SENTRY_DSN: string;
-  // Image Moderation (optional, default depends on NODE_ENV)
-  IMAGE_MODERATION_FAIL_OPEN: 'true' | 'false'; // default 'false' in production, 'true' in dev/test
-  // FFmpeg (optional, default '/usr/bin/ffmpeg')
-  FFMPEG_PATH: string;
-  // App
-  NEXT_PUBLIC_APP_URL: string;       // https://your-app.com
-  NODE_ENV: 'development' | 'production' | 'test';
-};
-// Total: 30 env vars (27 required + 3 optional)
+// actions.ts
+export type SignUpResult =
+  | { success: true; userId: string }
+  | { success: false; code: 'VALIDATION' | 'EMAIL_EXISTS' | 'INTERNAL' | 'RATE_LIMITED' };
+
+// domain/verify-session.ts
+export interface VerifySessionOptions {
+  redirectTo?: string;
+}
 ```
 
-### Database Schema Types (Drizzle-generated)
-
-The 11 tables + 8 enums are defined in `src/lib/db/schema/`:
+### 20.7 Storage Interfaces (in `src/lib/storage/r2.ts`)
 
 ```typescript
-// Enums (8 total)
-project_status: 'draft' | 'pending' | 'analyzing' | 'generating_characters' |
-  'generating_scenes' | 'synthesizing_voice' | 'aligning_subtitles' |
-  'assembling_video' | 'completed' | 'failed'
+export type BucketName = 'uploads' | 'generated' | 'videos';
 
-visual_style: 'ghibli' | 'medieval' | 'oil-painting' | 'anime' |
-  'japanese-animation' | 'realistic' | 'cyberpunk' | 'watercolor' | 'comic'
+export class PayloadTooLargeError extends Error {
+  constructor(
+    public readonly actualBytes: number,
+    public readonly maxBytes: number,
+  ) {
+    super(`putObject payload exceeds size limit: ${actualBytes} bytes (max ${maxBytes} bytes)`);
+    this.name = 'PayloadTooLargeError';
+  }
+}
 
-aspect_ratio: 'portrait' | 'landscape'
-video_status: 'pending' | 'rendering' | 'completed' | 'failed'
-video_resolution: '720p' | '1080p' | '4k'
-plan: 'free' | 'creator' | 'pro' | 'studio'
-subscription_status: 'active' | 'trialing' | 'past_due' | 'canceled' | ...
-usage_event_type: 'analysis' | 'character_generation' | 'scene_generation' |
-  'voiceover' | 'subtitle_alignment' | 'video_assembly' |
-  'moderation_check' | 'stripe_webhook'
+export const MAX_PUT_OBJECT_BYTES = 500 * 1024 * 1024;  // 500 MB
 ```
 
 ---
 
 ## Appendix A: ADRs (Architecture Decision Records)
 
-The engineering blueprint (`PRODUCTION_READINESS_PLAN.md`) defines 11 ADRs. The 7 most-referenced:
-
 | ADR | Decision | Rationale |
 |---|---|---|
-| **ADR-001** | 5-Layer Architecture with Golden Rule | Isolates business logic from Next.js runtime + DB; enables testing domain functions without mocking Next.js |
-| **ADR-002** | Hybrid Rendering (Static Marketing + Dynamic App) | Static prerendering gives marketing ≥95 Lighthouse; dynamic app routes need auth + DB |
-| **ADR-003** | Stripe "Basil" API Period-End Extraction | Pure helper `extractSubscriptionPeriodEnd()` handles the 2025-03-31 shape change (`items.data[0].current_period_end`) |
-| **ADR-004** | Build-Context Env Fallback for Zod Schema | `parseEnv()` returns placeholders when `NEXT_PHASE=phase-production-build` — allows CI build without secrets |
-| **ADR-005** | Click-Time R2 URL Signing (H4 Fix) | Replace `SignedDownloadWrapper` with API route; client fetches fresh URL on click |
-| **ADR-006** | System FFmpeg Binary (Not npm Installer) | `@ffmpeg-installer/ffmpeg` uses dynamic `require()` incompatible with Turbopack |
-| **ADR-011** | Image Moderation on Every AI-Generated Image | `moderateImage()` parses Replicate safety output; env-configurable fail-open policy |
+| ADR-001 | 5-Layer Architecture with Golden Rule | Isolates business logic from Next.js + DB; enables independent testing |
+| ADR-002 | Hybrid Rendering (Static Marketing + Dynamic App) | Static marketing = Lighthouse ≥95; dynamic app = auth/DB access |
+| ADR-003 | Stripe "Basil" API Period-End Extraction | Handles 2025-03-31 shape change (`items.data[0].current_period_end`) |
+| ADR-004 | Credit-Based Billing (prepaid, not metered) | Simplest for AI products; no overage risk; predictable revenue |
+| ADR-005 | Click-Time R2 URL Signing | Eliminates 1h signed-URL expiry trap (stale tabs get 403) |
+| ADR-006 | FFmpeg for Video Assembly (with Shotstack fallback) | Self-hosted; ADR-006 specifies Shotstack if serverless FFmpeg is unreliable |
+| ADR-007 | Inngest for Pipeline Orchestration | Serverless-native step functions; no Redis needed |
+| ADR-008 | Vercel Deployment | Fluid Compute; 800s SSE cap on Pro/Enterprise GA |
+| ADR-009 | Drizzle ORM (not Prisma) | SQL-first; lighter runtime; matches Neon serverless |
+| ADR-010 | System FFmpeg (not `@ffmpeg-installer/ffmpeg`) | Turbopack-incompatible; `FFMPEG_PATH` env var |
+| ADR-011 | Image Moderation on Every AI-Generated Image | Parses Replicate `safety_concept`; fail-closed by default in production |
 
 ---
 
-## Appendix B: The 6-Step AI Pipeline (Credit Costs)
+## Appendix B: 6-Step Pipeline Credit Costs
 
-| Step | Service | Domain File | Credits | Idempotency Key |
-|---|---|---|---|---|
-| 0 — Moderate story | OpenAI Moderation | `moderate-content.ts` | 0 (gate) | — |
-| 1 — Analyze story | OpenAI GPT-4o (JSON mode) | `analyze-story.ts` | 5 | `${projectId}:analysis` |
-| 2 — Generate characters | Replicate SDXL → R2 | `generate-character.ts` + `moderate-image.ts` | 10 each | `${projectId}:character:${name}` |
-| 3 — Generate scenes | Replicate SDXL + IP-Adapter → R2 | `generate-scene.ts` + `moderate-image.ts` | 8 each | `${projectId}:scene:${order}` |
-| 4 — Voiceover | ElevenLabs TTS → R2 | `synthesize-voice.ts` | 15 | `${projectId}:voiceover` |
-| 5 — Subtitles | Whisper ASR → SRT → R2 | `align-subtitles.ts` | 3 | `${projectId}:subtitle_alignment` |
-| 6 — Assemble video | FFmpeg → R2 | `assemble-video.ts` | 30 | `${projectId}:video_assembly` |
-
-**Total cost (3 chars + 6 scenes): 131 credits** (= `FULL_PIPELINE_COST`)
-
----
-
-## Appendix C: Post-Audit-v1 Live-Site Validation (2026-06-29)
-
-This appendix documents the live-site behavioral testing methodology used to validate the audit-v1 remediation against the actual deployment at `https://storyintovideo.jesspete.shop/`. It serves as a template for future post-deploy validations.
-
-### Methodology: `agent-browser` E2E on Live Site
-
-Use the `agent_browser` CLI to drive a headless Chromium against the live URL. This catches operational misconfigurations that unit tests (which run against the source code) cannot detect.
-
-```bash
-# 1. Health check (DB + FFmpeg)
-curl -s https://storyintovideo.jesspete.shop/api/health | jq .status
-# Expected: "healthy"
-
-# 2. Verify auth redirect target host matches the request host
-curl -sI https://storyintovideo.jesspete.shop/dashboard
-# Expected: HTTP/2 307 Location: https://storyintovideo.jesspete.shop/sign-in?callbackUrl=...
-# Forbidden: Location: http://localhost:3000/sign-in
-
-# 3. Test known routes exist
-for route in / /sign-in /sign-up /privacy /terms /pricing /blog /contact; do
-  curl -s -o /dev/null -w "%{http_code}" "https://storyintovideo.jesspete.shop${route}"
-done
-# Expected: all 200
-
-# 4. Test unknown route returns 404
-curl -s -o /dev/null -w "%{http_code}" https://storyintovideo.jesspete.shop/nonexistent
-# Expected: 404
-```
-
-### Validated Findings (2026-06-29)
-
-| Test | Expected | Actual | Status |
+| Step | Operation | Credit Cost | Idempotency Key Pattern |
 |---|---|---|---|
-| `GET /` marketing page | 10 sections render | All 10 sections render, H1 has 3-line `<br>` stack with `style="font-weight:820"` | ✅ |
-| `GET /api/health` | 200 JSON `{status:'healthy', services:{database, ffmpeg}}` (H9) | `{"status":"healthy",...}` | ✅ H9 fix deployed |
-| `GET /dashboard` (unauth) | 307 redirect to `/sign-in` on canonical HTTPS host | **307 redirect to `http://localhost:3000/sign-in`** → `ERR_CONNECTION_REFUSED` | 🔴 Operational misconfig |
-| `GET /pricing`, `/blog`, `/contact` | 200 with proper metadata | Returns 200 with correct metadata | ✅ T6 fix deployed |
-| `GET /nonexistent` | 404 with custom `not-found.tsx` | Returns 404 with custom page | ✅ T7 fix deployed |
+| 0 | Moderate story (OpenAI Moderation) | 0 (gate) | — |
+| 1 | Analyze story (GPT-4o JSON mode) | 5 | `${projectId}:analysis` |
+| 2 | Generate characters (Replicate SDXL) | 10 × N chars | `${projectId}:character:${name}` |
+| 3 | Generate scenes (Replicate SDXL + IP-Adapter) | 8 × N scenes | `${projectId}:scene:${order}` |
+| 4 | Synthesize voiceover (ElevenLabs TTS) | 15 | `${projectId}:voiceover` |
+| 5 | Align subtitles (Whisper ASR) | 3 | `${projectId}:subtitle_alignment` |
+| 6 | Assemble video (FFmpeg) | 30 | `${projectId}:video_assembly` |
 
-### Root-Cause Diagnosis: The `/dashboard` Failure
+**Full pipeline cost (3 chars + 6 scenes):** 5 + (10×3) + (8×6) + 15 + 3 + 30 = **131 credits**
 
-The proxy at `src/proxy.ts:71` correctly uses `new URL('/sign-in', env.NEXT_PUBLIC_APP_URL)` — the issue is that `NEXT_PUBLIC_APP_URL` was set to `http://localhost:3000` instead of `https://storyintovideo.jesspete.shop`. The code was right; the env vars were wrong. This is why T1 throws at boot in production — `console.warn` lets this bug survive into production.
-
-### The 5 New Findings (from Post-Audit-v1 Live-Site Validation, 2026-06-29)
-
-These findings emerged from hitting the **live deployment** with `agent-browser` — they are operational/behavioral issues that unit tests (which run against source code) cannot detect:
-
-1. **Privacy Policy publicly promises unimplemented GDPR endpoints** (Critical) — §4 Data Retention + §6 Your Rights promise `DELETE /api/user` + `GET /api/user/export` that didn't exist at the time. **Status: RESOLVED in Sprint 3 T3+T4.**
-
-2. **Production env var misconfiguration goes silently undetected** (Critical) — `console.warn` at module load is insufficient for production env misconfigs. The `NEXT_PUBLIC_APP_URL=localhost:3000` bug caused all auth redirects to fail with `ERR_CONNECTION_REFUSED`. Lesson: production misconfigurations should fail fast (throw at module load) OR be surfaced via `/api/health`. **Status: T1 now THROWS in production runtime; T2 surfaces via `/api/health` config object.**
-
-3. **Navbar + dashboard + hero use raw `<a href>` instead of `next/link`** (High) — 9 places across 3 files violated the "never use `<a>` for internal routes" rule, causing full-page reloads and Lighthouse regressions. **Status: RESOLVED in Sprint 3 T5 — all 9 files converted to `<Link>`.**
-
-4. **No custom `not-found.tsx` page** (High) — Next.js default 404 inherits root layout metadata, causing unknown URLs to return 200 OK with the marketing page title. Bad for SEO, hides broken links from operators. **Status: RESOLVED in Sprint 3 T7 — custom `src/app/not-found.tsx` shipped.**
-
-5. **`/pricing`, `/blog`, `/contact` routes didn't exist** (Medium) — linked from nav/footer but no route handlers; without `not-found.tsx` they returned 200 OK with the marketing title, hiding the problem from operators + SEO crawlers. **Status: RESOLVED in Sprint 3 T6 — all three implemented as Server Components in `src/app/(legal)/`.`**
-
-### Post-Deploy Smoke Test (add to CI/CD runbook)
-
-After every deploy, run this 30-second smoke test:
-
-```bash
-#!/bin/bash
-set -e
-
-HOST="https://storyintovideo.jesspete.shop"
-REDIRECT=$(curl -sI "$HOST/dashboard" | grep -i location | tr -d '\r')
-
-# 1. Verify auth redirect stays on same host
-if echo "$REDIRECT" | grep -q "localhost"; then
-  echo "FAIL: Redirects to localhost — env NEXT_PUBLIC_APP_URL is wrong"
-  exit 1
-fi
-
-# 2. Verify /api/health (H9)
-curl -s "$HOST/api/health" | jq '.status == "healthy" and .config.healthy' | grep true
-
-# 3. Verify known routes return 200
-for path in / /pricing /blog /contact /privacy /terms; do
-  code=$(curl -s -o /dev/null -w "%{http_code}" "$HOST$path")
-  [[ "$code" == "200" ]] || { echo "FAIL: $path returned $code"; exit 1; }
-done
-
-echo "Smoke test passed"
-```
+Free tier gives 50 credits/month (~0 full videos). Creator tier ($19/mo) gives 500 credits (~3 full videos).
 
 ---
 
-## Appendix: The Meticulous Approach (Six-Phase Workflow)
+## Appendix C: Audit History
 
-All implementation tasks must follow this workflow:
+### Audit-v1 (2026-06-29) — 16 findings, all closed via T1–T12
+See `AUDIT_REPORT_v1.md` + `REMEDIATION_PLAN_v1.md`.
 
-1. **ANALYZE** — Deep requirement mining. Never assume. Check existing patterns before writing new code.
-2. **PLAN** — Structured roadmap. Present plan for confirmation before coding.
-3. **VALIDATE** — Get explicit approval before implementation.
-4. **IMPLEMENT** — Modular, tested components. Test each before integration. TDD: RED → GREEN → REFACTOR.
-5. **VERIFY** — Run full quality gate: `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
-6. **DELIVER** — Confirm all checks pass. Document deviations.
+### Audit-v2 (2026-07-02) — 6 findings, all closed via NF-1 through NF-6
+See `REMEDIATION_PLAN_v2.md` + `status_13.md`.
 
-### Verification Commands Reference
+| ID | Severity | Finding | Fix |
+|---|---|---|---|
+| NF-1 | 🔴 Critical | Live site runs `next dev` instead of `next start` | Production Dockerfile + CI guard |
+| NF-2 | 🟠 High | Missing CSP + HSTS headers | Added to `next.config.ts` `headers()` |
+| NF-3 | 🟡 Medium | FAQ "7+ styles" copy drift | Updated to match `STYLE_CHIPS` (8 styles) |
+| NF-4 | 🟡 Medium | Dead/unused exports | Removed `getProjectVideo`, wired `WHISPER_MODEL` |
+| NF-5 | 🟡 Medium | Doc inaccuracy (H5/Sentry deps) | Corrected CLAUDE.md/AGENTS.md |
+| NF-6 | 🟡 Medium | Pipeline steps lack try/catch | Wrapped steps 1/4/5/6 in try/catch with `setProjectFailed` |
 
-```bash
-pnpm lint              # ESLint flat config — 0 warnings, 0 errors
-pnpm typecheck         # tsc --noEmit — strict mode, 0 errors
-pnpm test              # Vitest — 479 unit tests, 53 files, jsdom
-pnpm test:e2e          # Playwright — 48 E2E tests, 9 specs, Chromium
-pnpm build             # next build — 22 routes, hybrid static + dynamic
-pnpm format            # Prettier auto-fix
-pnpm format:check      # Prettier verify (CI)
-pnpm drizzle:generate  # Create migration SQL from schema diff
-pnpm drizzle:migrate   # Apply migrations to Neon
-pnpm drizzle:studio    # Open Drizzle Studio (schema browser)
-pnpm db:seed           # Seed database with test data
-pnpm db:reset          # Migrate + seed (fresh DB)
-```
+**Test progression:** 479 (Sprint 3) → 524 (audit-v2, +45 new across 5 new test files)
 
 ---
 
-*This skill document is the definitive reference for the StoryIntoVideo codebase. When in doubt, read the source code — this document is a guide, not a substitute for understanding the actual implementation.*
+*End of skill file. This document is the canonical reference for the StoryIntoVideo codebase. For the latest status, see `status_13.md`. For the full audit history, see `AUDIT_REPORT_v1.md` + `REMEDIATION_PLAN_v2.md`.*

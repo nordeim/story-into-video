@@ -90,7 +90,7 @@ Follow this workflow for all implementation tasks:
 - **Server Components by default** — add `'use client'` only when using `useState`, `useEffect`, event handlers, or browser APIs
 - **`next/font` for fonts** — Geist Sans/Mono from `geist` package, Outfit via `next/font/local` (self-hosted woff2)
 - **`next/link` for all internal navigation** — never use `<a>` for internal routes
-- **Security headers** configured in `next.config.ts` (X-Frame-Options DENY, nosniff, strict referrer)
+- **Security headers** configured in `next.config.ts`: X-Frame-Options DENY, nosniff, strict referrer, Permissions-Policy, **Content-Security-Policy** (NF-2: `default-src 'self'`, `frame-ancestors 'none'`, etc.), **Strict-Transport-Security** (NF-2: `max-age=63072000; includeSubDomains; preload`)
 - **`next lint` is deprecated** — use `eslint .` directly (ESLint 9 flat config)
 - **Async `params` / `searchParams` / `cookies()`** — in Next.js 16 all three are `Promise<T>`. Always `await` them.
 - **Suspense required for dynamic data** — wrap async Server Components in `<Suspense>` per `cacheComponents` requirement.
@@ -185,7 +185,7 @@ pnpm dev                        # Start dev server (Turbopack, port 3000)
 | `pnpm build` | Production build (hybrid: static + dynamic) | Before deploy |
 | `pnpm lint` | ESLint (flat config, zero warnings) | Before commit |
 | `pnpm typecheck` | `tsc --noEmit` (zero errors) | Before commit |
-| `pnpm test` | Vitest unit tests (479 tests, jsdom) | Before commit |
+| `pnpm test` | Vitest unit tests (524 tests, jsdom) | Before commit |
 | `pnpm test:e2e` | Playwright E2E tests (48 tests, Chromium) | Before deploy |
 | `pnpm format` | Prettier auto-fix | — |
 | `pnpm format:check` | Prettier verify | CI |
@@ -207,10 +207,10 @@ All four must pass with zero warnings/errors before any commit. **husky + lint-s
 
 | Type | Framework | Location | Count |
 |---|---|---|---|
-| Unit | Vitest + jsdom | `src/tests/unit/**/*.test.{ts,tsx}` | 479 (53 files) |
+| Unit | Vitest + jsdom | `src/tests/unit/**/*.test.{ts,tsx}` | 524 (58 files) |
 | E2E | Playwright (Chromium) | `src/tests/e2e/**/*.spec.ts` | 48 (9 files) |
 
-### Unit Test Coverage (53 files, 479 tests)
+### Unit Test Coverage (58 files, 524 tests)
 
 **Marketing layer (inherited from clone):**
 - `cn.test.ts` (8), `use-scrolled.test.ts` (7), `use-reveal.test.tsx` (7), `use-reduced-motion.test.ts` (4)
@@ -383,7 +383,7 @@ src/
 │   ├── fonts.ts                  # Font configuration
 │   └── utils.ts                  # cn() utility
 ├── tests/
-│   ├── unit/                     # Vitest unit tests (53 files, 479 tests)
+│   ├── unit/                     # Vitest unit tests (58 files, 524 tests)
 │   ├── e2e/                      # Playwright E2E tests (9 files, 48 tests)
 │   └── setup.ts                  # Test setup (jest-dom + test env vars)
 ├── types/
@@ -641,7 +641,7 @@ Final: Mark project status='completed', progressPercent=100
 ### Marketing Layer (inherited)
 1. **`suppressHydrationWarning` on `<body>`** — Browser extensions inject attributes before React hydrates. `<html>` alone is insufficient.
 2. **Workflow is `'use client'`** — Uses `useState` for video loading choreography. Don't assume server components for "mostly static" sections.
-3. **Test counts drift from plans** — MEP planned 6+3, actual is now 479 unit + 48 E2E. Always verify against `pnpm test` output.
+3. **Test counts drift from plans** — MEP planned 6+3, actual is now 524 unit + 48 E2E. Always verify against `pnpm test` output.
 4. **File structure evolves** — `components/primitives/`, `lib/hooks/`, `lib/data/` were created during build. Update docs as you build.
 5. **Playwright needs separate install** — `pnpm install` doesn't install browser binaries.
 
@@ -709,6 +709,14 @@ Final: Mark project status='completed', progressPercent=100
 58. **`<a href>` vs `<Link>` drift is easy to miss in source-reading tests** — `src/components/sections/navbar.tsx`, `src/app/(app)/dashboard/page.tsx`, and `src/components/sections/hero.tsx` all use raw `<a href>` for internal routes, directly violating CLAUDE.md's "never use `<a>` for internal routes" rule. The existing `cta-routes.test.ts` verifies the href VALUES (e.g., `/sign-in`, `/create`) but not whether they're rendered as `<a>` or `<Link>`. Lesson: source-reading tests should assert both the route AND the component type when the distinction matters for performance (full-page reload vs client-side navigation). **✅ Fixed (Sprint 3 T5) — the 9 affected files now use `<Link>`; `cta-routes.test.ts` was extended with source-reading assertions for `<Link` usage so this drift can't return.**
 59. **Next.js default 404 inherits root layout metadata** — without a custom `src/app/not-found.tsx`, any unknown URL (e.g., `/pricing`, `/blog`, `/contact` — all linked from nav/footer) returns 200 OK with the marketing page title. This hides broken links from operators and is bad for SEO. Lesson: always ship a custom `not-found.tsx` with proper metadata + on-brand UX. Confirmed on live site: `https://storyintovideo.jesspete.shop/pricing` returns 200 with title `StoryIntoVideo - Turn Stories Into Videos with AI`.
 60. **Live-site behavioral testing catches what unit tests can't** — the `/dashboard` ERR_CONNECTION_REFUSED issue was only discoverable by hitting the live URL with a browser. Unit tests verify the proxy code uses `env.NEXT_PUBLIC_APP_URL` (correct), but can't catch the operational misconfiguration of that env var on the production server. Lesson: add a smoke test that hits `/api/health` + `/dashboard` (expecting redirect to `/sign-in` on the SAME host) after every deploy.
+
+### Audit-v2 Lessons (2026-07-02)
+61. **`next dev` in production is a silent failure mode** — the live site was running `next dev --turbopack` instead of `next start` for an unknown period. Symptoms: 5–10× slower response times, source-code paths leaking through unhashed chunk names (`src_app_layout_tsx_*`), exposed HMR WebSocket, `cache-control: no-cache` (uncacheable), React DevTools console hint, `/sign-up` taking 18.66s (cold compile). Unit tests can't catch this — it's an operational/deployment issue. Lesson: (a) always ship a production `Dockerfile` separate from `Dockerfile.dev`; (b) add a CI guard that greps the build output for `hmr-client` (dev-only chunk); (c) add a post-deploy smoke test that checks response headers for `cache-control: immutable` on static assets. (NF-1)
+62. **CSP `'unsafe-inline'` is required for Next.js App Router (for now)** — Next.js 16 injects inline `<script>` chunks for router state. A strict CSP with `script-src 'self'` alone breaks the app. The production-hardened alternative is nonce-based CSP (per-request nonce via Next.js 16's built-in support), but that requires wiring `generateNonce` in middleware + passing it to `headers()`. Lesson: ship `'unsafe-inline'` first (better than no CSP), then upgrade to nonce-based in a dedicated hardening sprint. Always include `frame-ancestors 'none'` (equivalent to X-Frame-Options: DENY) and `object-src 'none'` even in the "permissive" CSP. (NF-2)
+63. **Three-way drift between DB enum, UI array, and marketing copy is easy to miss** — the `visual_style` enum had 9 values (including `comic`), the `STYLE_CHIPS` marketing array had 8 (no `comic`, locked by spec), and the FAQ copy said "7+" and listed 7 (including `comic`, omitting Medieval + Japanese animation). Three independent sources of truth, none reconciled. The FAQ was visibly wrong because the marquee showed 8 chips directly above the FAQ. Lesson: when a user-facing count appears in copy, derive it from the source-of-truth array (`STYLE_CHIPS.length.toString()`) OR add a regression test that asserts the copy matches the array. (NF-3)
+64. **Dead exports accumulate silently across sprints** — `getProjectVideo` was written for a future "video detail" query that was never built; `WHISPER_MODEL` was declared but the call site hardcoded `'whisper-1'` instead. Both survived multiple code reviews because they looked intentional. Lesson: (a) every export should have at least one importer (grep before merging); (b) if a constant is declared, USE it at the call site — don't hardcode the value it's meant to centralize; (c) periodic dead-code sweeps (every sprint or two) catch the accumulation. (NF-4)
+65. **Docs claiming "dep installed" when it isn't is a real bug** — `CLAUDE.md` and `remediation_execution_summary.md` both claimed `@aws-sdk/lib-storage` was "installed but refactor not done" for the H5 FFmpeg streaming fix. Validation against `package.json` proved the dep was NEVER installed. Lesson: doc claims about dependency state should be verified against `package.json` (or `pnpm-lock.yaml`) at doc-writing time, not assumed from memory. A doc that says "dep installed" when it isn't will waste the next engineer's time. (NF-5)
+66. **Pipeline steps without try/catch create ghost "in progress" projects** — steps 1, 4, 5, 6 of the Inngest pipeline had no try/catch. If Inngest exhausted its 3 retries, the project row stayed at e.g. `synthesizing_voice` / 65% forever — no `errorMessage`, no `failed` status. Users see a ghost project that never completes and never fails. Lesson: every pipeline step that can throw must (a) catch the error, (b) call `setProjectFailed` with a human-readable message, (c) re-throw so the orchestrator still retries. The exception is the final "mark complete" step — if THAT fails, the work is already done (video is in R2), so don't mark it failed (the user can still download). Distinguish "work failed" from "bookkeeping failed". (NF-6)
 
 ## Outstanding Issues
 
@@ -798,6 +806,19 @@ Final: Mark project status='completed', progressPercent=100
 
 **Sprint 3 test count: 396 → 479 unit tests (+83 new, 0 regressions). Route count: 15 → 22. All 9 tasks TDD with RED → GREEN → VERIFY.**
 
+### ✅ Recently Closed (audit v2 remediation — NF-1 through NF-6, see `REMEDIATION_PLAN_v2.md` + `status_13.md`)
+
+Audit-v2 was triggered by a live-site behavioral smoke test at `https://storyintovideo.jesspete.shop/` that surfaced 6 findings NOT captured by audit-v1 or Sprint 3. All 6 remediated via TDD (479 → 524 tests, +45 new across 5 new test files).
+
+- ~~**NF-1 (Critical): Live site runs `next dev --turbopack` instead of `next start`**~~ → Fixed. Root cause: only `Dockerfile.dev` existed (runs `pnpm dev`); no production Dockerfile. Created production `Dockerfile` (multi-stage: deps → builder → runtime; `node:24-alpine`; ffmpeg + curl; non-root user; healthcheck on `/api/health`; runs `pnpm start` = `next start`). Created `docker-compose.prod.yml` (web service only — Neon + Upstash are external). Created `docs/DEPLOYMENT_RUNBOOK.md` (full deployment process + troubleshooting). Added CI guard in `.github/workflows/ci.yml` that greps `.next/` for `hmr-client` and fails the build if found (prevents future dev-mode regressions). 18 new tests in `deployment.test.ts`.
+- ~~**NF-2 (High): Missing `Content-Security-Policy` + `Strict-Transport-Security` headers**~~ → Fixed. `next.config.ts` `headers()` now returns 6 headers (was 4). CSP: `default-src 'self'`; `script-src 'self' 'unsafe-inline'` (Next.js requires inline for router state); `style-src 'self' 'unsafe-inline'` (Tailwind v4); `img-src 'self' data: https:`; `font-src 'self'`; `connect-src 'self'`; `media-src 'self'`; `frame-ancestors 'none'`; `base-uri 'self'`; `form-action 'self'`; `object-src 'none'`. HSTS: `max-age=63072000; includeSubDomains; preload`. 8 new tests in `security-headers.test.ts`. **Note:** `'unsafe-inline'` is required for Next.js App Router; nonce-based CSP deferred to a future hardening sprint.
+- ~~**NF-3 (Medium): FAQ "7+ styles" copy drift vs 8-chip marquee**~~ → Fixed. The FAQ answer said "7+ visual styles including Ghibli, Oil Painting, Anime, Realistic, Cyberpunk, Watercolor, and Comic" — wrong count (7 vs 8), omitted Medieval + Japanese animation, included Comic (not in chips). Updated `src/lib/data/faq-items.ts` to: "8 visual styles including Ghibli, Medieval, Oil Painting, Anime, Japanese animation, Realistic, Cyberpunk, and Watercolor". Did NOT add Comic to `STYLE_CHIPS` (regression test forbids it); did NOT remove `comic` from the DB enum (PostgreSQL can't cleanly DROP VALUE). 5 new tests in `faq-style-consistency.test.ts`.
+- ~~**NF-4 (Medium): Dead/unused exports**~~ → Fixed. Removed `getProjectVideo` from `queries.ts` (was only in a test mock). Removed `export` keyword from `r2Client`/`BUCKET_MAP` in `r2.ts` (kept as internal `const`). Kept `WHISPER_MODEL` in `openai.ts` and made it actually used — `align-subtitles.ts` now imports `WHISPER_MODEL` instead of hardcoding `'whisper-1'` (centralizes the model name). Kept `getSignedUploadUrl` (future client uploads) + `signOut` (E2E tests). 8 new tests in `dead-exports.test.ts`.
+- ~~**NF-5 (Medium): Documentation inaccuracy**~~ → Fixed. Corrected this file (CLAUDE.md) — H5 entry now states "`@aws-sdk/lib-storage` is NOT yet installed"; Sentry entry now states "`@sentry/nextjs` is NOT installed". Marked `remediation_execution_summary.md` as SUPERSEDED with a header pointing to `status_12.md` / `status_13.md`.
+- ~~**NF-6 (Medium): Pipeline steps lack error handling → ghost "in progress" projects**~~ → Fixed. Steps 1 (analyze-story), 4 (synthesize-voiceover), 5 (align-subtitles), 6 (assemble-video) now wrap their body in try/catch that calls `setProjectFailed(projectId, "<step> failed: <message>")` on error, then re-throws (so Inngest still retries). The `complete` step is special: if `updateProjectProgress('completed', ...)` fails, it logs the error but does NOT call `setProjectFailed` — the video is already in R2 (uploaded in Step 6), so the user can still download it via `/api/projects/[id]/download` (which checks `videoKey` presence, not `status === 'completed'`). 6 new tests in `pipeline-error-handling.test.ts`.
+
+**Audit-v2 test count: 479 → 524 unit tests (+45 new, 0 regressions). 5 new test files. All 6 findings TDD with RED → GREEN → VERIFY.**
+
 ## Recommendations
 
 ### Immediate (before any deploy)
@@ -809,24 +830,27 @@ Final: Mark project status='completed', progressPercent=100
 6. **Test the AI pipeline end-to-end** — sign up (C1 fix: now works via `signUpAction`), paste a story, verify characters/scenes/video generate. This is the highest-risk validation.
 7. **Run `pnpm install` to activate husky** — the `prepare` script sets up `.husky/pre-commit`. Verify the hook fires on your first commit.
 8. **Add a post-deploy smoke test** — hit `/api/health` and assert (a) HTTP 200, (b) `status === 'healthy'`, AND (c) `config.healthy === true` with empty `configErrors` (Sprint 3 T2 surfaces AUTH_URL ↔ NEXT_PUBLIC_APP_URL mismatch here — it does NOT trigger 503). Also hit `/dashboard` while unauthenticated (expect 307 redirect to `/sign-in` on the SAME host, NOT `localhost:3000`). With Sprint 3 T1 deployed, a host mismatch would refuse to boot — so reaching `/api/health` at all implies T1 passed.
+9. **Deploy using the production Dockerfile (NF-1)** — NEVER deploy with `next dev`. Use `docker compose -f docker-compose.prod.yml up -d --build` which runs `next start` via the production `Dockerfile`. After deploy, verify the browser console does NOT emit `[HMR] connected` / `[Fast Refresh]` messages (those are dev-only). Verify JS chunk names are content-hashed (e.g., `main-app-a1b2c3d4.js`), not source-path names (e.g., `src_app_layout_tsx_*`). See `docs/DEPLOYMENT_RUNBOOK.md` for the full process.
+10. **Verify CSP + HSTS headers post-deploy (NF-2)** — `curl -I https://storyintovideo.jesspete.shop/ | grep -i "content-security-policy\|strict-transport"` should return both headers. If missing, the `next.config.ts` `headers()` config didn't deploy.
 
 ### Short-term (first sprint post-launch)
-9. ~~**Add rate limiting**~~ → **DONE (C3)** — Upstash Ratelimit on auth, pipeline, SSE. Env vars in schema; `src/lib/rate-limit.ts` implemented.
-10. ~~**Implement GDPR endpoints**~~ → **DONE (Sprint 3 T3 + T4)** — `GET /api/user/export` (T3) + `DELETE /api/user` (T4) implemented. `deleteUserAccount(userId)` lives in `src/features/auth/queries.ts`; `deleteUserMedia(keys[])` lives in `src/lib/storage/r2.ts` (uses `DeleteObjectsCommand`, 1000-key batches, tries all 3 buckets per key). DB cascade was already wired; the API surface is now in place.
-11. ~~**Implement `/pricing`, `/blog`, `/contact`** pages~~ → **DONE (Sprint 3 T6 + T7)** — all 3 pages implemented as Server Components with metadata (T6). Custom `not-found.tsx` (T7) covers any future dead links.
-12. ~~**Add cookie consent banner**~~ → **DONE (Sprint 3 T8)** — `src/components/app/cookie-banner.tsx` mounted in `src/app/layout.tsx`. Uses `useSyncExternalStore` (SSR-safe — server snapshot returns false to avoid hydration mismatch). Dismissible informational banner (NOT a consent gate — the app uses only essential cookies: session + CSRF). Persists acknowledgement to `localStorage` under `siv-cookie-consent`.
-13. ~~**H2 — Brand color full replacement**~~ → **DONE (T11)** — `sed` sweep across 45 files replaced `amber-300/400/500/600` → `primary`, `bg-zinc-950` → `bg-background`, `bg-zinc-900` → `bg-card`, `bg-black` → `bg-background`. `brand-tokens.test.ts` now enforces 0 violations.
-14. **H5 — FFmpeg stream-to-R2** — refactor `assemble-video.ts` to pipe FFmpeg output directly to R2 via `@aws-sdk/lib-storage` `Upload` class. Eliminates `/tmp` OOM risk. **Dep NOT yet installed — run `pnpm add @aws-sdk/lib-storage` before starting the refactor.**
-15. ~~**Replace internal `<a href>` with `<Link>`**~~ → **DONE (Sprint 3 T5)** — all 9 affected files now use `<Link>`. `mailto:` + hash anchors intentionally kept as `<a>`.
-16. ~~**Promote env host-mismatch warning to a thrown error in production**~~ → **DONE (Sprint 3 T1 + T2)** — `src/lib/env/index.ts` now throws at boot when `AUTH_URL` and `NEXT_PUBLIC_APP_URL` hosts differ in production runtime (dev/test keep the warn-only behavior). `/api/health` also surfaces the mismatch via `config` + `configErrors` (T2).
+11. ~~**Add rate limiting**~~ → **DONE (C3)** — Upstash Ratelimit on auth, pipeline, SSE. Env vars in schema; `src/lib/rate-limit.ts` implemented.
+12. ~~**Implement GDPR endpoints**~~ → **DONE (Sprint 3 T3 + T4)** — `GET /api/user/export` (T3) + `DELETE /api/user` (T4) implemented. `deleteUserAccount(userId)` lives in `src/features/auth/queries.ts`; `deleteUserMedia(keys[])` lives in `src/lib/storage/r2.ts` (uses `DeleteObjectsCommand`, 1000-key batches, tries all 3 buckets per key). DB cascade was already wired; the API surface is now in place.
+13. ~~**Implement `/pricing`, `/blog`, `/contact`** pages~~ → **DONE (Sprint 3 T6 + T7)** — all 3 pages implemented as Server Components with metadata (T6). Custom `not-found.tsx` (T7) covers any future dead links.
+14. ~~**Add cookie consent banner**~~ → **DONE (Sprint 3 T8)** — `src/components/app/cookie-banner.tsx` mounted in `src/app/layout.tsx`. Uses `useSyncExternalStore` (SSR-safe — server snapshot returns false to avoid hydration mismatch). Dismissible informational banner (NOT a consent gate — the app uses only essential cookies: session + CSRF). Persists acknowledgement to `localStorage` under `siv-cookie-consent`.
+15. ~~**H2 — Brand color full replacement**~~ → **DONE (T11)** — `sed` sweep across 45 files replaced `amber-300/400/500/600` → `primary`, `bg-zinc-950` → `bg-background`, `bg-zinc-900` → `bg-card`, `bg-black` → `bg-background`. `brand-tokens.test.ts` now enforces 0 violations.
+16. **H5 — FFmpeg stream-to-R2** — refactor `assemble-video.ts` to pipe FFmpeg output directly to R2 via `@aws-sdk/lib-storage` `Upload` class. Eliminates `/tmp` OOM risk. **Dep NOT yet installed — run `pnpm add @aws-sdk/lib-storage` before starting the refactor.**
+17. ~~**Replace internal `<a href>` with `<Link>`**~~ → **DONE (Sprint 3 T5)** — all 9 affected files now use `<Link>`. `mailto:` + hash anchors intentionally kept as `<a>`.
+18. ~~**Promote env host-mismatch warning to a thrown error in production**~~ → **DONE (Sprint 3 T1 + T2)** — `src/lib/env/index.ts` now throws at boot when `AUTH_URL` and `NEXT_PUBLIC_APP_URL` hosts differ in production runtime (dev/test keep the warn-only behavior). `/api/health` also surfaces the mismatch via `config` + `configErrors` (T2).
 
 ### Medium-term (scale + compliance)
-17. ~~**Add E2E tests to CI**~~ → **DONE (Sprint 3 T9)** — `e2e` job added to `.github/workflows/ci.yml` with Postgres 17-alpine service container, FFmpeg install, drizzle migrations + seed, Playwright Chromium install, and report upload artifact. `continue-on-error: true` initially — flip to required once stable.
-18. **Add monitoring** — Sentry (errors), Vercel Analytics (product), Axiom (logs).
-19. **Visual regression testing** — Playwright screenshot comparison against live site.
-20. **Bundle size monitoring** — `next/bundle-analyzer`.
-21. **Add the interactive timeline editor** — the post-MVP feature (Remotion-based). Deferred per the blueprint.
-22. **Run the pre-launch checklist** — `PRODUCTION_READINESS_PLAN.md` §8 before going live.
+19. ~~**Add E2E tests to CI**~~ → **DONE (Sprint 3 T9)** — `e2e` job added to `.github/workflows/ci.yml` with Postgres 17-alpine service container, FFmpeg install, drizzle migrations + seed, Playwright Chromium install, and report upload artifact. `continue-on-error: true` initially — flip to required once stable.
+20. **Add monitoring** — Sentry (errors), Vercel Analytics (product), Axiom (logs). **`@sentry/nextjs` is NOT installed — run `pnpm add @sentry/nextjs` + wire `sentry.{client,server,edge}.config.ts` + wrap `next.config.ts` with `withSentryConfig`.**
+21. **Visual regression testing** — Playwright screenshot comparison against live site.
+22. **Bundle size monitoring** — `next/bundle-analyzer`.
+23. **Nonce-based CSP** — upgrade from `'unsafe-inline'` (NF-2) to per-request nonce via Next.js 16's built-in nonce support. Wire `generateNonce` in `proxy.ts` + pass to `headers()` in `next.config.ts`.
+24. **Add the interactive timeline editor** — the post-MVP feature (Remotion-based). Deferred per the blueprint.
+25. **Run the pre-launch checklist** — `PRODUCTION_READINESS_PLAN.md` §8 before going live.
 
 ## Anti-Patterns to Avoid
 
@@ -846,6 +870,8 @@ Final: Mark project status='completed', progressPercent=100
 - **Do not use default exports for components** — use named exports
 - **Do not skip the verification chain** — `pnpm lint && pnpm typecheck && pnpm test && pnpm build`
 - **Do not use `db push` in production** — always `drizzle-kit generate` + `migrate`
+- **Do not deploy with `next dev`** — always use the production `Dockerfile` (`next start`). Dev mode leaks source paths, exposes HMR WebSocket, emits `cache-control: no-cache`, and is 5–10× slower. (NF-1)
+- **Do not ship a pipeline step without try/catch** — every step must call `setProjectFailed` on error so projects don't get stuck in ghost "in progress" states. Exception: the final "mark complete" step (video is already in R2). (NF-6)
 
 ## Remediation Sprint 2 (Post-Review Hardening)
 
@@ -929,6 +955,11 @@ and the verification chain passes clean.
 | `AGENTS.md` | Compact agent instructions (stack, colors, interactions) |
 | `README.md` | Quick start, architecture, design system summary |
 | `deviation_report_validation.md` | Validation of the deviation report (1 genuine gap + 1 enhancement) |
+| `AUDIT_REPORT_v1.md` | Audit-v1 findings (16 items, all closed via T1–T12) |
+| `REMEDIATION_PLAN_v1.md` | Audit-v1 TDD task cards (T1–T12, all closed) |
+| `REMEDIATION_PLAN_v2.md` | Audit-v2 TDD task cards (NF-1 through NF-6, all closed) |
+| `status_13.md` | Audit-v2 remediation completion report (latest status) |
+| `docs/DEPLOYMENT_RUNBOOK.md` | Production deployment process + troubleshooting (NF-1) |
 
 ## Success Criteria
 
@@ -936,7 +967,7 @@ You are successful when:
 
 - `pnpm lint` exits with 0 warnings
 - `pnpm typecheck` exits with 0 errors
-- `pnpm test` passes all 479 unit tests
+- `pnpm test` passes all 524 unit tests
 - `pnpm test:e2e` passes all 48 E2E tests (requires Playwright browsers installed)
 - `pnpm build` exits with 0 errors
 - Lighthouse scores ≥95 across Performance, Accessibility, Best Practices, SEO (marketing page)
